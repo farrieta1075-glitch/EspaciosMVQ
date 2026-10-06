@@ -21,6 +21,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { AssetImage } from "@/components/ui/asset-image";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { HelpHint } from "@/components/ui/help-hint";
 import { cn } from "@/lib/utils";
 
@@ -64,15 +70,22 @@ export function AdminRecursosClient({
 }: AdminRecursosClientProps) {
   const router = useRouter();
   const [resources, setResources] = React.useState(initialResources);
-  const [filter, setFilter] = React.useState<FilterType>("ALL");
+  const [listModal, setListModal] = React.useState<{
+    filter: FilterType;
+    label: string;
+  } | null>(null);
   const [form, setForm] = React.useState<ResourceFormState>(emptyForm);
   const [editingId, setEditingId] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
-  const filteredResources = resources.filter(
-    (resource) => filter === "ALL" || resource.type === filter,
-  );
+  const modalResources = React.useMemo(() => {
+    if (!listModal) return [];
+    return resources.filter(
+      (resource) =>
+        listModal.filter === "ALL" || resource.type === listModal.filter,
+    );
+  }, [listModal, resources]);
 
   async function refreshResources() {
     const response = await fetch("/api/admin/recursos");
@@ -89,6 +102,7 @@ export function AdminRecursosClient({
   }
 
   function startEdit(resource: Resource) {
+    setListModal(null);
     setEditingId(resource.id);
     setForm({
       name: resource.name,
@@ -191,6 +205,85 @@ export function AdminRecursosClient({
     setLoading(false);
   }
 
+  function renderResourceRow(resource: Resource) {
+    return (
+      <Card
+        key={resource.id}
+        className={cn(editingId === resource.id && "ring-2 ring-primary")}
+      >
+        <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-start">
+          <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg border border-border bg-muted">
+            {resource.imageUrl ? (
+              <AssetImage
+                src={resource.imageUrl}
+                alt={resource.name}
+                fill
+                className="object-cover"
+                sizes="80px"
+              />
+            ) : (
+              <div className="flex h-full items-center justify-center">
+                <Package className="h-8 w-8 text-muted-foreground" />
+              </div>
+            )}
+          </div>
+
+          <div className="min-w-0 flex-1 space-y-2">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <h3 className="font-medium">{resource.name}</h3>
+                <p className="text-sm text-muted-foreground">
+                  Cantidad disponible: {resource.totalQty}
+                </p>
+              </div>
+              <div className="flex shrink-0 gap-1">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => startEdit(resource)}
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => handleDelete(resource.id)}
+                  disabled={loading}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Badge variant="secondary">
+                {RESOURCE_TYPE_LABELS[resource.type]}
+              </Badge>
+              <Badge variant="outline">
+                {RESOURCE_SCOPE_LABELS[resource.scope]}
+              </Badge>
+              {!resource.active && (
+                <Badge variant="outline">Inactivo</Badge>
+              )}
+            </div>
+
+            {resource.scope === "RESTRICTED" &&
+              resource.restrictedSpaceIds.length > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Espacios:{" "}
+                  {resource.restrictedSpaceIds
+                    .map(
+                      (id) => spaces.find((s) => s.id === id)?.name ?? id,
+                    )
+                    .join(", ")}
+                </p>
+              )}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {error && (
@@ -199,29 +292,7 @@ export function AdminRecursosClient({
         </p>
       )}
 
-      <div className="flex flex-wrap gap-2">
-        {FILTER_OPTIONS.map((option) => (
-          <Button
-            key={option.value}
-            type="button"
-            size="sm"
-            variant={filter === option.value ? "default" : "outline"}
-            onClick={() => setFilter(option.value)}
-          >
-            {option.label}
-            <span className="ml-1.5 text-xs opacity-70">
-              (
-              {option.value === "ALL"
-                ? resources.length
-                : resources.filter((r) => r.type === option.value).length}
-              )
-            </span>
-          </Button>
-        ))}
-      </div>
-
-      <div className="grid gap-6 xl:grid-cols-[380px_1fr]">
-        <Card>
+      <Card className="max-w-xl">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               {editingId ? (
@@ -385,99 +456,55 @@ export function AdminRecursosClient({
           </CardContent>
         </Card>
 
-        <div className="space-y-3">
-          {filteredResources.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
+      <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+        {FILTER_OPTIONS.map((option) => (
+          <Button
+            key={option.value}
+            type="button"
+            variant="outline"
+            className="h-10 sm:min-w-[7.5rem]"
+            onClick={() =>
+              setListModal({ filter: option.value, label: option.label })
+            }
+          >
+            {option.label}
+            <span className="ml-1.5 text-xs opacity-70">
+              (
+              {option.value === "ALL"
+                ? resources.length
+                : resources.filter((r) => r.type === option.value).length}
+              )
+            </span>
+          </Button>
+        ))}
+      </div>
+
+      <Dialog
+        open={listModal !== null}
+        onOpenChange={(open) => {
+          if (!open) setListModal(null);
+        }}
+      >
+        <DialogContent className="flex max-h-[min(85dvh,640px)] w-[min(92vw,32rem)] flex-col gap-0 overflow-hidden p-0">
+          <DialogHeader className="shrink-0 border-b px-6 py-4">
+            <DialogTitle>{listModal?.label ?? "Recursos"}</DialogTitle>
+          </DialogHeader>
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+            {modalResources.length === 0 ? (
+              <div className="flex flex-col items-center gap-3 py-10 text-center">
                 <Package className="h-10 w-10 text-muted-foreground" />
                 <p className="text-sm text-muted-foreground">
                   No hay recursos en esta categoría.
                 </p>
-              </CardContent>
-            </Card>
-          ) : (
-            filteredResources.map((resource) => (
-              <Card
-                key={resource.id}
-                className={cn(
-                  editingId === resource.id && "ring-2 ring-primary",
-                )}
-              >
-                <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-start">
-                  <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg border border-border bg-muted">
-                    {resource.imageUrl ? (
-                      <AssetImage
-                        src={resource.imageUrl}
-                        alt={resource.name}
-                        fill
-                        className="object-cover"
-                        sizes="80px"
-                      />
-                    ) : (
-                      <div className="flex h-full items-center justify-center">
-                        <Package className="h-8 w-8 text-muted-foreground" />
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="min-w-0 flex-1 space-y-2">
-                    <div className="flex flex-wrap items-start justify-between gap-2">
-                      <div>
-                        <h3 className="font-medium">{resource.name}</h3>
-                        <p className="text-sm text-muted-foreground">
-                          Cantidad disponible: {resource.totalQty}
-                        </p>
-                      </div>
-                      <div className="flex shrink-0 gap-1">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => startEdit(resource)}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleDelete(resource.id)}
-                          disabled={loading}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-wrap gap-2">
-                      <Badge variant="secondary">
-                        {RESOURCE_TYPE_LABELS[resource.type]}
-                      </Badge>
-                      <Badge variant="outline">
-                        {RESOURCE_SCOPE_LABELS[resource.scope]}
-                      </Badge>
-                      {!resource.active && (
-                        <Badge variant="outline">Inactivo</Badge>
-                      )}
-                    </div>
-
-                    {resource.scope === "RESTRICTED" &&
-                      resource.restrictedSpaceIds.length > 0 && (
-                        <p className="text-xs text-muted-foreground">
-                          Espacios:{" "}
-                          {resource.restrictedSpaceIds
-                            .map(
-                              (id) =>
-                                spaces.find((s) => s.id === id)?.name ?? id,
-                            )
-                            .join(", ")}
-                        </p>
-                      )}
-                  </div>
-                </CardContent>
-              </Card>
-            ))
-          )}
-        </div>
-      </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {modalResources.map((resource) => renderResourceRow(resource))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
