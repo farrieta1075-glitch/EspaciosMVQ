@@ -1,7 +1,11 @@
 import "server-only";
 import { get, list } from "@vercel/blob";
 import { NextResponse } from "next/server";
-import { getBlobAccessMode } from "@/lib/storage/blob-access";
+import {
+  getBlobAccessMode,
+  getBlobRequestOptions,
+  isBlobConfigured,
+} from "@/lib/storage/blob-access";
 
 const FILENAME_PATTERN = /^[a-zA-Z0-9._-]+$/;
 
@@ -9,16 +13,17 @@ export async function serveBlobFile(
   folder: "maps" | "resources",
   filename: string,
 ): Promise<Response> {
-  const token = process.env.BLOB_READ_WRITE_TOKEN?.trim();
-  if (!token) {
+  if (!isBlobConfigured()) {
     return NextResponse.json(
       {
         error: "Almacenamiento no configurado",
-        code: "NO_BLOB_TOKEN",
+        code: "NO_BLOB_AUTH",
       },
       { status: 503 },
     );
   }
+
+  const blobAuth = getBlobRequestOptions();
 
   const decoded = decodeURIComponent(filename);
   if (!decoded || !FILENAME_PATTERN.test(decoded)) {
@@ -31,19 +36,19 @@ export async function serveBlobFile(
   const pathname = `${folder}/${decoded}`;
   const access = getBlobAccessMode();
 
-  let result = await get(pathname, { access, token });
+  let result = await get(pathname, { access, ...blobAuth });
 
   if (!result || result.statusCode !== 200 || !result.stream) {
     const dot = decoded.lastIndexOf(".");
     const base = dot > 0 ? decoded.slice(0, dot) : decoded;
     const listed = await list({
       prefix: `${folder}/${base}.`,
-      token,
+      ...blobAuth,
       limit: 20,
     });
     const fallback = listed.blobs[0];
     if (fallback) {
-      result = await get(fallback.pathname, { access, token });
+      result = await get(fallback.pathname, { access, ...blobAuth });
     }
   }
 

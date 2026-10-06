@@ -2,7 +2,11 @@ import "server-only";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { put } from "@vercel/blob";
-import { getBlobAccessMode } from "@/lib/storage/blob-access";
+import {
+  getBlobAccessMode,
+  getBlobRequestOptions,
+  isBlobConfigured,
+} from "@/lib/storage/blob-access";
 
 const MIME_BY_EXT: Record<string, string> = {
   png: "image/png",
@@ -24,15 +28,14 @@ export async function storePublicFile(options: {
   buffer: Buffer;
 }): Promise<string> {
   const contentType = contentTypeForFilename(options.filename);
-  const token = process.env.BLOB_READ_WRITE_TOKEN?.trim();
 
-  if (token) {
+  if (isBlobConfigured()) {
     const access = getBlobAccessMode();
     const pathname = `${options.folder}/${options.filename}`;
     const blob = await put(pathname, options.buffer, {
       access,
       contentType,
-      token,
+      ...getBlobRequestOptions(),
       addRandomSuffix: false,
       allowOverwrite: true,
     });
@@ -46,7 +49,7 @@ export async function storePublicFile(options: {
 
   if (process.env.VERCEL === "1") {
     throw new Error(
-      "En Vercel debes configurar BLOB_READ_WRITE_TOKEN (Storage → Blob en el proyecto).",
+      "En Vercel conecta Storage → Blob al proyecto o configura BLOB_READ_WRITE_TOKEN.",
     );
   }
 
