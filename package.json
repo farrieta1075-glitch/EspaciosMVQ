@@ -11,7 +11,8 @@
     "lint": "next lint",
     "seed": "node scripts/seed-sheets.mjs",
     "test:email": "node --env-file=.env.local scripts/test-email.mjs",
-    "list:admin-emails": "node --env-file=.env.local scripts/list-admin-emails.mjs"
+    "list:admin-emails": "node --env-file=.env.local scripts/list-admin-emails.mjs",
+    "migrate:uploads-to-blob": "node --env-file=.env.local scripts/migrate-uploads-to-blob.mjs"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.14",
@@ -20,6 +21,7 @@
     "@radix-ui/react-separator": "^1.1.7",
     "@radix-ui/react-slot": "^1.2.3",
     "@radix-ui/react-switch": "^1.2.5",
+    "@vercel/blob": "^2.8.0",
     "bcryptjs": "^3.0.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

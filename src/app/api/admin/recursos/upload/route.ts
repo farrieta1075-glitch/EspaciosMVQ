@@ -1,8 +1,7 @@
-import { mkdir, writeFile } from "node:fs/promises";
-import path from "node:path";
 import { NextResponse } from "next/server";
 import { requireAdminSession, unauthorizedResponse } from "@/lib/auth/api";
 import { getResourceById, updateResource } from "@/lib/sheets/resources";
+import { storePublicFile } from "@/lib/storage/public-files";
 
 export async function POST(request: Request) {
   const session = await requireAdminSession();
@@ -32,14 +31,22 @@ export async function POST(request: Request) {
     );
   }
 
-  const uploadsDir = path.join(process.cwd(), "public", "uploads", "resources");
-  await mkdir(uploadsDir, { recursive: true });
-
   const filename = `${resourceId}.${ext}`;
   const buffer = Buffer.from(await file.arrayBuffer());
-  await writeFile(path.join(uploadsDir, filename), buffer);
 
-  const imageUrl = `/uploads/resources/${filename}`;
+  let imageUrl: string;
+  try {
+    imageUrl = await storePublicFile({
+      folder: "resources",
+      filename,
+      buffer,
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "No se pudo guardar el archivo";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+
   const updated = await updateResource(resourceId, { imageUrl });
 
   return NextResponse.json(updated);

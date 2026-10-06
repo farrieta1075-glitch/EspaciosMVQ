@@ -1,8 +1,7 @@
-import { mkdir, writeFile } from "node:fs/promises";
-import path from "node:path";
 import { NextResponse } from "next/server";
 import { requireAdminSession, unauthorizedResponse } from "@/lib/auth/api";
 import { getMapById, updateMap } from "@/lib/sheets/maps";
+import { storePublicFile } from "@/lib/storage/public-files";
 
 export async function POST(request: Request) {
   const session = await requireAdminSession();
@@ -27,14 +26,22 @@ export async function POST(request: Request) {
       ? "pdf"
       : file.name.split(".").pop()?.toLowerCase() ?? "png";
 
-  const uploadsDir = path.join(process.cwd(), "public", "uploads", "maps");
-  await mkdir(uploadsDir, { recursive: true });
-
   const filename = `${mapId}.${ext}`;
   const buffer = Buffer.from(await file.arrayBuffer());
-  await writeFile(path.join(uploadsDir, filename), buffer);
 
-  const backgroundUrl = `/uploads/maps/${filename}`;
+  let backgroundUrl: string;
+  try {
+    backgroundUrl = await storePublicFile({
+      folder: "maps",
+      filename,
+      buffer,
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "No se pudo guardar el archivo";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+
   const type =
     backgroundType === "pdf" || ext === "pdf"
       ? "pdf"
