@@ -34,6 +34,7 @@ export async function storePublicFile(options: {
       contentType,
       token,
       addRandomSuffix: false,
+      allowOverwrite: true,
     });
 
     if (access === "private") {

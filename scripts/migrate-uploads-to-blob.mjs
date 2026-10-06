@@ -92,6 +92,7 @@ async function uploadFolder({ folder, sheets, spreadsheetId, tab, urlColumnIndex
       contentType: MIME_BY_EXT[ext] ?? "application/octet-stream",
       token: process.env.BLOB_READ_WRITE_TOKEN,
       addRandomSuffix: false,
+      allowOverwrite: true,
     });
 
     const storedUrl = access === "private" ? `blob:${blob.pathname}` : blob.url;
