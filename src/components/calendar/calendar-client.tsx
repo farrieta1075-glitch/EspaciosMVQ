@@ -2,15 +2,24 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { Area } from "@/types/area";
 import type { FloorMap, Space } from "@/types/space";
 import type { ReservationDetail } from "@/types/reservation";
+import { AreaLegendToggle } from "@/components/calendar/area-legend-toggle";
 import { CalendarDaySheet } from "@/components/calendar/calendar-day-sheet";
 import { MonthView } from "@/components/calendar/month-view";
 import { WeekView } from "@/components/calendar/week-view";
 import { Button } from "@/components/ui/button";
-import { formatDateISO, addMonths, addWeeks } from "@/lib/date-utils";
+import {
+  addMonths,
+  addWeeks,
+  formatDateISO,
+  getWeekDays,
+  isSameMonth,
+} from "@/lib/date-utils";
+import { setPickedReservationDate } from "@/lib/reservation-draft-storage";
 
 type CalendarViewMode = "week" | "month";
 
@@ -25,6 +34,29 @@ interface CalendarClientProps {
   initialDate?: string;
   initialMapId?: string;
   initialSpaceId?: string;
+  pickMode?: boolean;
+  returnTo?: string;
+}
+
+function reservationsInVisiblePeriod(
+  reservations: ReservationDetail[],
+  anchorDate: Date,
+  viewMode: CalendarViewMode,
+): ReservationDetail[] {
+  if (viewMode === "week") {
+    const days = getWeekDays(anchorDate);
+    const start = new Date(days[0]);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(days[6]);
+    end.setHours(23, 59, 59, 999);
+    return reservations.filter((reservation) => {
+      const t = new Date(reservation.startAt).getTime();
+      return t >= start.getTime() && t <= end.getTime();
+    });
+  }
+  return reservations.filter((reservation) =>
+    isSameMonth(new Date(reservation.startAt), anchorDate),
+  );
 }
 
 export function CalendarClient({
@@ -38,8 +70,12 @@ export function CalendarClient({
   initialDate,
   initialMapId,
   initialSpaceId,
+  pickMode = false,
+  returnTo,
 }: CalendarClientProps) {
+  const router = useRouter();
   const [viewMode, setViewMode] = React.useState<CalendarViewMode>("month");
+  const [showAreaLegend, setShowAreaLegend] = React.useState(false);
   const [anchorDate, setAnchorDate] = React.useState(() => {
     if (initialDate) {
       const [y, m, d] = initialDate.split("-").map(Number);
@@ -57,7 +93,7 @@ export function CalendarClient({
   } | null>(null);
 
   React.useEffect(() => {
-    if (!initialDate) return;
+    if (pickMode || !initialDate) return;
     const [y, m, d] = initialDate.split("-").map(Number);
     if (y && m && d) {
       setSheetDate(new Date(y, m - 1, d, 12));
@@ -67,7 +103,7 @@ export function CalendarClient({
         spaceId: initialSpaceId,
       });
     }
-  }, [initialDate, initialMapId, initialSpaceId]);
+  }, [initialDate, initialMapId, initialSpaceId, pickMode]);
 
   const pendingCount = React.useMemo(
     () => reservations.filter((reservation) => reservation.needsApproval).length,
@@ -87,6 +123,19 @@ export function CalendarClient({
     return set;
   }, [activeReservations]);
 
+  const areasInView = React.useMemo(() => {
+    const visible = reservationsInVisiblePeriod(
+      activeReservations,
+      anchorDate,
+      viewMode,
+    );
+    const ids = new Set<string>();
+    for (const reservation of visible) {
+      if (reservation.areaId) ids.add(reservation.areaId);
+    }
+    return areas.filter((area) => ids.has(area.id));
+  }, [activeReservations, anchorDate, areas, viewMode]);
+
   function navigate(direction: -1 | 1) {
     setAnchorDate((current) =>
       viewMode === "week"
@@ -101,9 +150,37 @@ export function CalendarClient({
     setSheetOpen(true);
   }
 
+  function handleSelectDate(date: Date) {
+    if (pickMode && returnTo) {
+      setPickedReservationDate(formatDateISO(date));
+      router.push(returnTo);
+      return;
+    }
+    openDaySheet(date);
+  }
+
   return (
     <div className="min-w-0 space-y-4">
-      {isAdmin && pendingCount > 0 && (
+      <header className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <h1 className="text-2xl font-semibold tracking-tight">Calendario</h1>
+        {!pickMode && (
+          <AreaLegendToggle
+            areas={areasInView}
+            show={showAreaLegend}
+            onToggle={() => setShowAreaLegend((value) => !value)}
+            className="sm:items-end"
+          />
+        )}
+      </header>
+
+      {pickMode && (
+        <div className="rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm">
+          Toca un día para cambiar la fecha de tu reserva. Volverás al formulario
+          sin perder lo que ya capturaste.
+        </div>
+      )}
+
+      {isAdmin && pendingCount > 0 && !pickMode && (
         <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm">
           Hay <strong>{pendingCount}</strong> solicitud(es) pendientes de autorización.{" "}
           <Link href="/admin/aprobaciones" className="font-medium underline">
@@ -117,9 +194,8 @@ export function CalendarClient({
           anchorDate={anchorDate}
           selectedDate={sheetDate ?? anchorDate}
           reservations={activeReservations}
-          datesWithEvents={datesWithEvents}
           areas={areas}
-          onSelectDate={openDaySheet}
+          onSelectDate={handleSelectDate}
         />
       ) : (
         <MonthView
@@ -128,7 +204,7 @@ export function CalendarClient({
           reservations={activeReservations}
           datesWithEvents={datesWithEvents}
           areas={areas}
-          onSelectDate={openDaySheet}
+          onSelectDate={handleSelectDate}
         />
       )}
 
@@ -173,25 +249,27 @@ export function CalendarClient({
         </Button>
       </div>
 
-      {canReserve && (
+      {canReserve && !pickMode && (
         <Button asChild className="h-11 w-full text-base">
           <Link href="/reserva">Reservar</Link>
         </Button>
       )}
 
-      <CalendarDaySheet
-        open={sheetOpen}
-        onOpenChange={setSheetOpen}
-        date={sheetDate}
-        reservations={activeReservations}
-        maps={maps}
-        spaces={spaces}
-        areas={areas}
-        viewerAreaId={viewerAreaId}
-        canReserve={canReserve}
-        initialMapId={sheetSelectionHint?.mapId}
-        initialSpaceId={sheetSelectionHint?.spaceId}
-      />
+      {!pickMode && (
+        <CalendarDaySheet
+          open={sheetOpen}
+          onOpenChange={setSheetOpen}
+          date={sheetDate}
+          reservations={activeReservations}
+          maps={maps}
+          spaces={spaces}
+          areas={areas}
+          viewerAreaId={viewerAreaId}
+          canReserve={canReserve}
+          initialMapId={sheetSelectionHint?.mapId}
+          initialSpaceId={sheetSelectionHint?.spaceId}
+        />
+      )}
     </div>
   );
 }

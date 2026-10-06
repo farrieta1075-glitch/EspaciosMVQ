@@ -5,7 +5,13 @@ import { listAllReservationDetails } from "@/lib/reservation-service";
 import { CalendarClient } from "@/components/calendar/calendar-client";
 
 interface CalendarioPageProps {
-  searchParams: Promise<{ date?: string; mapId?: string; spaceId?: string }>;
+  searchParams: Promise<{
+    date?: string;
+    mapId?: string;
+    spaceId?: string;
+    pick?: string;
+    returnTo?: string;
+  }>;
 }
 
 export default async function CalendarioPage({
@@ -22,12 +28,14 @@ export default async function CalendarioPage({
 
   const admin = isAdmin(session?.user ?? null);
 
+  const pickMode = params.pick === "1";
+  const returnTo =
+    params.returnTo && params.returnTo.startsWith("/")
+      ? params.returnTo
+      : undefined;
+
   return (
     <section className="space-y-4">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Calendario</h1>
-      </header>
-
       <CalendarClient
         reservations={reservations}
         maps={maps}
@@ -39,6 +47,8 @@ export default async function CalendarioPage({
         initialDate={params.date}
         initialMapId={params.mapId}
         initialSpaceId={params.spaceId}
+        pickMode={pickMode && Boolean(returnTo)}
+        returnTo={returnTo}
       />
     </section>
   );

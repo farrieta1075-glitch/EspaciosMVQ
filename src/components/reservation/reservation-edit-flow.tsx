@@ -12,7 +12,17 @@ import {
   extractTimeFromIso,
 } from "@/lib/date-utils";
 import { reservationNeedsAttendeeJustification } from "@/lib/capacity-validation";
-import { MapDateSelector } from "@/components/map-date/map-date-selector";
+import {
+  MapDateSelector,
+  type InitialMapSelection,
+} from "@/components/map-date/map-date-selector";
+import {
+  buildCalendarPickUrl,
+  clearReservationDraft,
+  consumePickedReservationDate,
+  loadReservationDraft,
+  saveReservationDraft,
+} from "@/lib/reservation-draft-storage";
 import { EventForm } from "@/components/reservation/event-form";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -117,6 +127,54 @@ export function ReservationEditFlow({
     name: string;
     similarity: number;
   } | null>(null);
+  const [mapSelectorKey, setMapSelectorKey] = React.useState(0);
+  const [restoredSelection, setRestoredSelection] = React.useState<
+    InitialMapSelection | undefined
+  >(undefined);
+
+  React.useEffect(() => {
+    const draft = loadReservationDraft();
+    if (
+      !draft ||
+      draft.kind !== "edit" ||
+      draft.editReservationId !== reservation.id
+    ) {
+      return;
+    }
+
+    const picked = consumePickedReservationDate();
+    setEventName(draft.eventName);
+    setEventDescription(draft.eventDescription);
+    setEstimatedAttendees(draft.estimatedAttendees);
+    setAttendeeJustificationCode(draft.attendeeJustificationCode);
+    setAttendeeJustificationNote(draft.attendeeJustificationNote);
+    setAreaId(draft.areaId);
+
+    if (draft.selection) {
+      setSelection(draft.selection);
+      setRestoredSelection({
+        date: picked ?? draft.selection.date,
+        startTime: draft.selection.startTime,
+        endTime: draft.selection.endTime,
+        mapId: draft.selection.mapId,
+        selectedSpaceIds: draft.selection.selectedSpaceIds,
+        selectedResources: Object.fromEntries(
+          draft.selection.selectedResources.map((item) => [
+            item.resourceId,
+            item.quantity,
+          ]),
+        ),
+      });
+    } else if (picked) {
+      setRestoredSelection({
+        ...initialMapSelection,
+        date: picked,
+      });
+    }
+
+    clearReservationDraft();
+    setMapSelectorKey((value) => value + 1);
+  }, [initialMapSelection, reservation.id]);
 
   const handleSelectionChange = React.useCallback(
     (value: MapDateSelection) => {
@@ -214,22 +272,56 @@ export function ReservationEditFlow({
     activeSelection.selectedResources.filter((item) => item.quantity > 0)
       .length ?? 0;
 
+  const mapInitialSelection = restoredSelection ?? initialMapSelection;
+
+  function handleReservationDatePick() {
+    saveReservationDraft({
+      kind: "edit",
+      editReservationId: reservation.id,
+      eventName,
+      eventDescription,
+      estimatedAttendees,
+      attendeeJustificationCode,
+      attendeeJustificationNote,
+      recurrenceType: "NONE",
+      recurrenceUntil: "",
+      areaId,
+      selection: selection ?? {
+        date: mapInitialSelection.date ?? initialDate,
+        startTime: mapInitialSelection.startTime ?? initialStartTime,
+        endTime: mapInitialSelection.endTime ?? initialEndTime,
+        mapId: mapInitialSelection.mapId ?? defaultMapId,
+        selectedSpaceIds: mapInitialSelection.selectedSpaceIds ?? [],
+        selectedResources: Object.entries(
+          mapInitialSelection.selectedResources ?? {},
+        ).map(([resourceId, quantity]) => ({ resourceId, quantity })),
+      },
+    });
+    router.push(
+      buildCalendarPickUrl(
+        `/reservas/${reservation.id}/editar`,
+        selection?.date ?? mapInitialSelection.date ?? initialDate,
+      ),
+    );
+  }
+
   return (
     <div className="flex flex-col gap-2 pb-2">
       <MapDateSelector
-        key={reservation.id}
+        key={`${reservation.id}-${mapSelectorKey}`}
         maps={maps}
         spaces={spaces}
         layout="reservation"
         showResourcePanel
         showCalendarLink={false}
         excludeReservationId={reservation.id}
-        initialSelection={initialMapSelection}
+        initialSelection={mapInitialSelection}
         areas={areas}
         highlightAreaId={isAdmin ? areaId : reservation.areaId}
         resourcesSheetOpen={resourcesOpen}
         onResourcesSheetOpenChange={setResourcesOpen}
         onSelectionChange={handleSelectionChange}
+        onReservationDatePick={handleReservationDatePick}
       />
 
       {isAdmin && (

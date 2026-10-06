@@ -57,6 +57,7 @@ interface MapDateSelectorProps {
   /** Excluye esta reserva al calcular disponibilidad (edición). */
   excludeReservationId?: string;
   onSelectionChange?: (selection: MapDateSelection) => void;
+  onReservationDatePick?: () => void;
 }
 
 export function MapDateSelector({
@@ -78,6 +79,7 @@ export function MapDateSelector({
   onResourcesSheetOpenChange,
   excludeReservationId,
   onSelectionChange,
+  onReservationDatePick,
 }: MapDateSelectorProps) {
   const isReservationLayout = layout === "reservation";
   const [selectedDate, setSelectedDate] = React.useState(() => {
@@ -298,15 +300,6 @@ export function MapDateSelector({
     }));
   }
 
-  const calendarHref = React.useMemo(() => {
-    const params = new URLSearchParams({
-      date: formatDateISO(selectedDate),
-    });
-    if (mapId) params.set("mapId", mapId);
-    if (selectedSpaceIds[0]) params.set("spaceId", selectedSpaceIds[0]);
-    return `/calendario?${params.toString()}`;
-  }, [selectedDate, mapId, selectedSpaceIds]);
-
   if (maps.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
@@ -326,7 +319,9 @@ export function MapDateSelector({
         onEndTimeChange={setEndTime}
         showCalendarLink={showCalendarLink && !isReservationLayout}
         variant={isReservationLayout ? "reservation" : "default"}
-        calendarHref={isReservationLayout ? calendarHref : undefined}
+        onReservationDatePick={
+          isReservationLayout ? onReservationDatePick : undefined
+        }
       />
 
       {maps.length > 1 && (

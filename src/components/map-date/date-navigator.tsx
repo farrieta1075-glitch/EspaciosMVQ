@@ -32,6 +32,7 @@ interface DateNavigatorProps {
   showCalendarLink?: boolean;
   variant?: "default" | "reservation";
   calendarHref?: string;
+  onReservationDatePick?: () => void;
 }
 
 const navButtonClass = "h-8 w-8 shrink-0 sm:h-9 sm:w-9";
@@ -46,6 +47,7 @@ export function DateNavigator({
   showCalendarLink = true,
   variant = "default",
   calendarHref,
+  onReservationDatePick,
 }: DateNavigatorProps) {
   const isoDate = formatDateISO(date);
   const startParsed =
@@ -62,15 +64,28 @@ export function DateNavigator({
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Fecha seleccionada
           </p>
-          <Link
-            href={calendarHref ?? `/calendario?date=${isoDate}`}
-            className={cn(
-              "mt-0.5 block truncate text-base font-semibold",
-              "text-primary underline-offset-4 hover:underline",
-            )}
-          >
-            {formatDateDisplay(date)}
-          </Link>
+          {onReservationDatePick ? (
+            <button
+              type="button"
+              onClick={onReservationDatePick}
+              className={cn(
+                "mt-0.5 block w-full truncate text-left text-base font-semibold",
+                "text-primary underline-offset-4 hover:underline",
+              )}
+            >
+              {formatDateDisplay(date)}
+            </button>
+          ) : (
+            <Link
+              href={calendarHref ?? `/calendario?date=${isoDate}`}
+              className={cn(
+                "mt-0.5 block truncate text-base font-semibold",
+                "text-primary underline-offset-4 hover:underline",
+              )}
+            >
+              {formatDateDisplay(date)}
+            </Link>
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-2">

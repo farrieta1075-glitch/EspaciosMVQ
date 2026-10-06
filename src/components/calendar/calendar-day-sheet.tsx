@@ -336,6 +336,11 @@ export function CalendarDaySheet({
                     <p className="mt-2 text-sm">
                       {reservation.spaceNames.join(", ")}
                     </p>
+                    {reservation.estimatedAttendees > 0 && (
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Asistentes estimados: {reservation.estimatedAttendees}
+                      </p>
+                    )}
                   </article>
                 );
               })

@@ -7,7 +7,18 @@ import type { Area } from "@/types/area";
 import type { FloorMap, Space } from "@/types/space";
 import type { MapDateSelection, RecurrenceType } from "@/types/reservation";
 import { reservationNeedsAttendeeJustification } from "@/lib/capacity-validation";
-import { MapDateSelector } from "@/components/map-date/map-date-selector";
+import {
+  MapDateSelector,
+  type InitialMapSelection,
+} from "@/components/map-date/map-date-selector";
+import {
+  buildCalendarPickUrl,
+  clearReservationDraft,
+  consumePickedReservationDate,
+  loadReservationDraft,
+  saveReservationDraft,
+} from "@/lib/reservation-draft-storage";
+import { formatDateISO } from "@/lib/date-utils";
 import { EventForm } from "@/components/reservation/event-form";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -83,6 +94,47 @@ export function ReservationFlow({
     count: number;
     pending: boolean;
   } | null>(null);
+  const [mapSelectorKey, setMapSelectorKey] = React.useState(0);
+  const [restoredSelection, setRestoredSelection] = React.useState<
+    InitialMapSelection | undefined
+  >(undefined);
+
+  React.useEffect(() => {
+    const draft = loadReservationDraft();
+    if (!draft || draft.kind !== "create") return;
+
+    const picked = consumePickedReservationDate();
+    setEventName(draft.eventName);
+    setEventDescription(draft.eventDescription);
+    setEstimatedAttendees(draft.estimatedAttendees);
+    setAttendeeJustificationCode(draft.attendeeJustificationCode);
+    setAttendeeJustificationNote(draft.attendeeJustificationNote);
+    setRecurrenceType(draft.recurrenceType);
+    setRecurrenceUntil(draft.recurrenceUntil);
+    setAreaId(draft.areaId);
+
+    if (draft.selection) {
+      setSelection(draft.selection);
+      setRestoredSelection({
+        date: picked ?? draft.selection.date,
+        startTime: draft.selection.startTime,
+        endTime: draft.selection.endTime,
+        mapId: draft.selection.mapId,
+        selectedSpaceIds: draft.selection.selectedSpaceIds,
+        selectedResources: Object.fromEntries(
+          draft.selection.selectedResources.map((item) => [
+            item.resourceId,
+            item.quantity,
+          ]),
+        ),
+      });
+    } else if (picked) {
+      setRestoredSelection({ date: picked });
+    }
+
+    clearReservationDraft();
+    setMapSelectorKey((value) => value + 1);
+  }, []);
 
   const handleSelectionChange = React.useCallback(
     (value: MapDateSelection) => {
@@ -178,14 +230,37 @@ export function ReservationFlow({
   const resourceCount =
     selection?.selectedResources.filter((item) => item.quantity > 0).length ?? 0;
 
+  function handleReservationDatePick() {
+    saveReservationDraft({
+      kind: "create",
+      eventName,
+      eventDescription,
+      estimatedAttendees,
+      attendeeJustificationCode,
+      attendeeJustificationNote,
+      recurrenceType,
+      recurrenceUntil,
+      areaId,
+      selection,
+    });
+    const date =
+      selection?.date ??
+      restoredSelection?.date ??
+      initialDate ??
+      formatDateISO(new Date());
+    router.push(buildCalendarPickUrl("/reserva", date));
+  }
+
   return (
     <div className="flex flex-col gap-2 pb-2">
       <MapDateSelector
+        key={mapSelectorKey}
         maps={maps}
         spaces={spaces}
-        initialDate={initialDate}
+        initialDate={restoredSelection?.date ?? initialDate}
         initialMapId={initialMapId}
         initialSpaceId={initialSpaceId}
+        initialSelection={restoredSelection}
         areas={areas}
         highlightAreaId={isAdmin ? areaId : userAreaId}
         layout="reservation"
@@ -194,6 +269,7 @@ export function ReservationFlow({
         resourcesSheetOpen={resourcesOpen}
         onResourcesSheetOpenChange={setResourcesOpen}
         onSelectionChange={handleSelectionChange}
+        onReservationDatePick={handleReservationDatePick}
       />
 
       {isAdmin && (
