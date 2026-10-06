@@ -13,6 +13,12 @@ import { ResourcePanel } from "@/components/map-date/resource-panel";
 import { SpaceMapViewer } from "@/components/map-date/space-map-viewer";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { formatDateISO } from "@/lib/date-utils";
 
 export interface InitialMapSelection {
@@ -34,6 +40,9 @@ interface MapDateSelectorProps {
   showCalendarLink?: boolean;
   readOnly?: boolean;
   compact?: boolean;
+  layout?: "default" | "reservation";
+  resourcesSheetOpen?: boolean;
+  onResourcesSheetOpenChange?: (open: boolean) => void;
   /** Excluye esta reserva al calcular disponibilidad (edición). */
   excludeReservationId?: string;
   onSelectionChange?: (selection: MapDateSelection) => void;
@@ -49,9 +58,13 @@ export function MapDateSelector({
   showCalendarLink = true,
   readOnly = false,
   compact = false,
+  layout = "default",
+  resourcesSheetOpen,
+  onResourcesSheetOpenChange,
   excludeReservationId,
   onSelectionChange,
 }: MapDateSelectorProps) {
+  const isReservationLayout = layout === "reservation";
   const [selectedDate, setSelectedDate] = React.useState(() => {
     const dateStr = initialSelection?.date ?? initialDate;
     if (dateStr) {
@@ -61,11 +74,15 @@ export function MapDateSelector({
     return new Date();
   });
   const [startTime, setStartTime] = React.useState(
-    initialSelection?.startTime ?? "09:00",
+    initialSelection?.startTime ??
+      (isReservationLayout ? "" : "09:00"),
   );
   const [endTime, setEndTime] = React.useState(
-    initialSelection?.endTime ?? "18:00",
+    initialSelection?.endTime ?? (isReservationLayout ? "" : "18:00"),
   );
+  const [internalResourcesOpen, setInternalResourcesOpen] = React.useState(false);
+  const resourcesOpen = resourcesSheetOpen ?? internalResourcesOpen;
+  const setResourcesOpen = onResourcesSheetOpenChange ?? setInternalResourcesOpen;
   const [mapId, setMapId] = React.useState(
     initialSelection?.mapId ?? defaultMapId ?? maps[0]?.id ?? "",
   );
@@ -105,6 +122,13 @@ export function MapDateSelector({
 
   React.useEffect(() => {
     if (!mapId) return;
+    const timesValid =
+      /^\d{2}:\d{2}$/.test(startTime) && /^\d{2}:\d{2}$/.test(endTime);
+    if (!timesValid) {
+      setAvailability({ spaces: [], resources: [] });
+      setLoading(false);
+      return;
+    }
 
     const controller = new AbortController();
 
@@ -198,7 +222,7 @@ export function MapDateSelector({
   }
 
   return (
-    <div className="space-y-4">
+    <div className={isReservationLayout ? "space-y-2" : "space-y-4"}>
       <DateNavigator
         date={selectedDate}
         startTime={startTime}
@@ -206,12 +230,19 @@ export function MapDateSelector({
         onDateChange={setSelectedDate}
         onStartTimeChange={setStartTime}
         onEndTimeChange={setEndTime}
-        showCalendarLink={showCalendarLink}
+        showCalendarLink={showCalendarLink && !isReservationLayout}
+        variant={isReservationLayout ? "reservation" : "default"}
       />
 
       {maps.length > 1 && (
-        <div className="max-w-xs space-y-2">
-          <Label htmlFor="mapSelect">Mapa</Label>
+        <div
+          className={
+            isReservationLayout ? "space-y-1" : "max-w-xs space-y-2"
+          }
+        >
+          <Label htmlFor="mapSelect" className={isReservationLayout ? "text-xs" : undefined}>
+            Mapa
+          </Label>
           <Select
             id="mapSelect"
             value={mapId}
@@ -228,12 +259,12 @@ export function MapDateSelector({
 
       <div
         className={
-          compact
-            ? "space-y-4"
+          compact || isReservationLayout
+            ? "space-y-2"
             : "grid gap-4 xl:grid-cols-[minmax(260px,320px)_1fr]"
         }
       >
-        {showResourcePanel && !compact && (
+        {showResourcePanel && !compact && !isReservationLayout && (
           <ResourcePanel
             resources={availability?.resources ?? []}
             selectedResources={selectedResources}
@@ -243,9 +274,9 @@ export function MapDateSelector({
           />
         )}
 
-        <div className="relative space-y-3">
+        <div className="relative w-full min-w-0 max-w-full space-y-2">
           {loading && (
-            <div className="absolute right-3 top-3 z-10 flex items-center gap-2 rounded-md bg-background/90 px-2 py-1 text-xs shadow-sm">
+            <div className="absolute right-2 top-2 z-10 flex items-center gap-2 rounded-md bg-background/90 px-2 py-1 text-xs shadow-sm">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
               Actualizando...
             </div>
@@ -259,11 +290,15 @@ export function MapDateSelector({
               selectedSpaceIds={selectedSpaceIds}
               onSpaceToggle={readOnly ? undefined : handleSpaceToggle}
               readOnly={readOnly}
-              compact={compact}
+              compact={compact || isReservationLayout}
+              fitContainerWidth={isReservationLayout}
+              showDefaultLegend={!isReservationLayout}
             />
           )}
 
-          {!readOnly && selectedSpaceIds.length > 0 && (
+          {!readOnly &&
+            !isReservationLayout &&
+            selectedSpaceIds.length > 0 && (
             <p className="text-sm text-muted-foreground">
               {selectedSpaceIds.length} espacio(s) seleccionado(s):{" "}
               {selectedSpaceIds
@@ -274,7 +309,7 @@ export function MapDateSelector({
         </div>
       </div>
 
-      {showResourcePanel && !compact && (
+      {showResourcePanel && !compact && !isReservationLayout && (
         <ResourcePanel
           resources={availability?.resources ?? []}
           selectedResources={selectedResources}
@@ -282,6 +317,28 @@ export function MapDateSelector({
           readOnly={readOnly}
           mobileAsSheet
         />
+      )}
+
+      {isReservationLayout && showResourcePanel && !readOnly && (
+        <Sheet open={resourcesOpen} onOpenChange={setResourcesOpen}>
+          <SheetContent
+            side="bottom"
+            className="max-h-[85dvh] overflow-y-auto px-4 pb-8 pt-4"
+          >
+            <SheetHeader className="text-left">
+              <SheetTitle>Recursos</SheetTitle>
+            </SheetHeader>
+            <div className="mt-4">
+              <ResourcePanel
+                inline
+                resources={availability?.resources ?? []}
+                selectedResources={selectedResources}
+                onQuantityChange={handleResourceQuantityChange}
+                readOnly={readOnly}
+              />
+            </div>
+          </SheetContent>
+        </Sheet>
       )}
     </div>
   );

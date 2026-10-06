@@ -16,6 +16,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 
 interface ReservationFlowProps {
   maps: FloorMap[];
@@ -48,6 +54,8 @@ export function ReservationFlow({
   );
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [resourcesOpen, setResourcesOpen] = React.useState(false);
+  const [eventOpen, setEventOpen] = React.useState(false);
   const [similarPrompt, setSimilarPrompt] = React.useState<{
     name: string;
     similarity: number;
@@ -64,7 +72,11 @@ export function ReservationFlow({
     [],
   );
 
+  const hasValidTimes =
+    Boolean(selection?.startTime) && Boolean(selection?.endTime);
+
   const canSubmit =
+    hasValidTimes &&
     Boolean(selection?.selectedSpaceIds.length) &&
     eventName.trim().length > 0 &&
     (!isAdmin || Boolean(areaId));
@@ -157,43 +169,72 @@ export function ReservationFlow({
     );
   }
 
-  return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Paso 1–3: Espacios, periodo y recursos</CardTitle>
-          <CardDescription>
-            Selecciona fecha, horario, espacios en el mapa y recursos necesarios.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <MapDateSelector
-            maps={maps}
-            spaces={spaces}
-            initialDate={initialDate}
-            showResourcePanel
-            showCalendarLink
-            onSelectionChange={handleSelectionChange}
-          />
-        </CardContent>
-      </Card>
+  const resourceCount =
+    selection?.selectedResources.filter((item) => item.quantity > 0).length ?? 0;
 
-      <EventForm
-        eventName={eventName}
-        onEventNameChange={setEventName}
-        eventDescription={eventDescription}
-        onEventDescriptionChange={setEventDescription}
-        recurrenceType={recurrenceType}
-        onRecurrenceTypeChange={setRecurrenceType}
-        recurrenceUntil={recurrenceUntil}
-        onRecurrenceUntilChange={setRecurrenceUntil}
-        baseDate={selection?.date ?? ""}
-        areaId={areaId}
-        onAreaIdChange={setAreaId}
-        areas={areas}
-        isAdmin={isAdmin}
-        disabled={!selection?.selectedSpaceIds.length}
+  return (
+    <div className="flex flex-col gap-2 pb-2">
+      <MapDateSelector
+        maps={maps}
+        spaces={spaces}
+        initialDate={initialDate}
+        layout="reservation"
+        showResourcePanel
+        showCalendarLink={false}
+        resourcesSheetOpen={resourcesOpen}
+        onResourcesSheetOpenChange={setResourcesOpen}
+        onSelectionChange={handleSelectionChange}
       />
+
+      <div className="grid grid-cols-2 gap-2 pt-1">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-9"
+          onClick={() => setResourcesOpen(true)}
+        >
+          Recursos{resourceCount > 0 ? ` (${resourceCount})` : ""}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-9"
+          onClick={() => setEventOpen(true)}
+        >
+          Datos del evento
+        </Button>
+      </div>
+
+      <Sheet open={eventOpen} onOpenChange={setEventOpen}>
+        <SheetContent
+          side="bottom"
+          className="max-h-[85dvh] overflow-y-auto px-4 pb-8 pt-4"
+        >
+          <SheetHeader className="text-left">
+            <SheetTitle>Datos del evento</SheetTitle>
+          </SheetHeader>
+          <div className="mt-4">
+            <EventForm
+              bare
+              eventName={eventName}
+              onEventNameChange={setEventName}
+              eventDescription={eventDescription}
+              onEventDescriptionChange={setEventDescription}
+              recurrenceType={recurrenceType}
+              onRecurrenceTypeChange={setRecurrenceType}
+              recurrenceUntil={recurrenceUntil}
+              onRecurrenceUntilChange={setRecurrenceUntil}
+              baseDate={selection?.date ?? ""}
+              areaId={areaId}
+              onAreaIdChange={setAreaId}
+              areas={areas}
+              isAdmin={isAdmin}
+            />
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {similarPrompt && (
         <Card className="border-amber-500/40 bg-amber-500/10">
@@ -228,28 +269,21 @@ export function ReservationFlow({
         </p>
       )}
 
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm text-muted-foreground">
-          {!selection?.selectedSpaceIds.length
-            ? "Selecciona al menos un espacio en el mapa para continuar."
-            : "Revisa los datos y confirma la reserva."}
-        </p>
-        <Button
-          size="lg"
-          disabled={!canSubmit || loading}
-          onClick={() => submitReservation(false)}
-          className="gap-2 sm:min-w-[180px]"
-        >
-          {loading ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Guardando...
-            </>
-          ) : (
-            "Confirmar reserva"
-          )}
-        </Button>
-      </div>
+      <Button
+        size="lg"
+        className="h-10 w-full"
+        disabled={!canSubmit || loading}
+        onClick={() => submitReservation(false)}
+      >
+        {loading ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Guardando...
+          </>
+        ) : (
+          "Confirmar reserva"
+        )}
+      </Button>
     </div>
   );
 }

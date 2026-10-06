@@ -20,6 +20,7 @@ import {
   formatTimeDisplay,
   parseReservationDateTime,
 } from "@/lib/date-utils";
+import { cn } from "@/lib/utils";
 
 interface DateNavigatorProps {
   date: Date;
@@ -29,6 +30,7 @@ interface DateNavigatorProps {
   onStartTimeChange: (time: string) => void;
   onEndTimeChange: (time: string) => void;
   showCalendarLink?: boolean;
+  variant?: "default" | "reservation";
 }
 
 const navButtonClass = "h-8 w-8 shrink-0 sm:h-9 sm:w-9";
@@ -41,10 +43,63 @@ export function DateNavigator({
   onStartTimeChange,
   onEndTimeChange,
   showCalendarLink = true,
+  variant = "default",
 }: DateNavigatorProps) {
   const isoDate = formatDateISO(date);
-  const startParsed = parseReservationDateTime(`${isoDate}T${startTime}:00`);
-  const endParsed = parseReservationDateTime(`${isoDate}T${endTime}:00`);
+  const startParsed =
+    startTime &&
+    parseReservationDateTime(`${isoDate}T${startTime}:00`);
+  const endParsed =
+    endTime && parseReservationDateTime(`${isoDate}T${endTime}:00`);
+  const isReservation = variant === "reservation";
+
+  if (isReservation) {
+    return (
+      <div className="space-y-3">
+        <div className="min-w-0">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Fecha seleccionada
+          </p>
+          <Link
+            href={`/calendario?date=${isoDate}`}
+            className={cn(
+              "mt-0.5 block truncate text-base font-semibold capitalize",
+              "text-primary underline-offset-4 hover:underline",
+            )}
+          >
+            {formatDateDisplay(date)}
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <div className="space-y-1">
+            <Label htmlFor="startTime" className="text-xs">
+              Hora inicio
+            </Label>
+            <Input
+              id="startTime"
+              type="time"
+              value={startTime}
+              onChange={(event) => onStartTimeChange(event.target.value)}
+              className="h-9"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="endTime" className="text-xs">
+              Hora fin
+            </Label>
+            <Input
+              id="endTime"
+              type="time"
+              value={endTime}
+              onChange={(event) => onEndTimeChange(event.target.value)}
+              className="h-9"
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4 rounded-xl border border-border bg-card p-3 sm:p-4">

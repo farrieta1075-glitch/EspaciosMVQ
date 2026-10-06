@@ -27,6 +27,7 @@ interface ResourcePanelProps {
   onQuantityChange: (resourceId: string, quantity: number) => void;
   readOnly?: boolean;
   mobileAsSheet?: boolean;
+  inline?: boolean;
   className?: string;
 }
 
@@ -36,6 +37,7 @@ export function ResourcePanel({
   onQuantityChange,
   readOnly = false,
   mobileAsSheet = false,
+  inline = false,
   className,
 }: ResourcePanelProps) {
   const [filter, setFilter] = React.useState<ResourceFilter>("ALL");
@@ -138,6 +140,10 @@ export function ResourcePanel({
       </div>
     </div>
   );
+
+  if (inline) {
+    return <div className={className}>{content}</div>;
+  }
 
   if (mobileAsSheet) {
     return (

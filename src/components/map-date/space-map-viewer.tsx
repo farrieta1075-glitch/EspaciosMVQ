@@ -38,6 +38,7 @@ interface SpaceMapViewerProps {
   onSpaceToggle?: (spaceId: string) => void;
   readOnly?: boolean;
   compact?: boolean;
+  fitContainerWidth?: boolean;
   showDefaultLegend?: boolean;
   headerExtra?: React.ReactNode;
   getSpacePaintStyle?: (
@@ -55,6 +56,7 @@ export function SpaceMapViewer({
   onSpaceToggle,
   readOnly = false,
   compact = false,
+  fitContainerWidth = false,
   showDefaultLegend = true,
   headerExtra,
   getSpacePaintStyle,
@@ -71,7 +73,9 @@ export function SpaceMapViewer({
   const measuredWidth = containerWidth ?? 0;
   const displayScale =
     measuredWidth > 0
-      ? Math.min(measuredWidth / mapWidth, compact ? 0.6 : 1)
+      ? fitContainerWidth
+        ? measuredWidth / mapWidth
+        : Math.min(measuredWidth / mapWidth, compact ? 0.6 : 1)
       : 0;
 
   React.useEffect(() => {
@@ -153,7 +157,7 @@ export function SpaceMapViewer({
   return (
     <div
       ref={containerRef}
-      className="max-w-full overflow-hidden rounded-xl border border-border bg-muted/20 p-2"
+      className="w-full min-w-0 max-w-full overflow-hidden rounded-xl border border-border bg-muted/20 p-1 sm:p-2"
     >
       {(showDefaultLegend || headerExtra) && (
         <div className="mb-2 space-y-2">

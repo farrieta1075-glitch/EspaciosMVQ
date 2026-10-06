@@ -48,6 +48,15 @@ export function CalendarClient({
   const [sheetDate, setSheetDate] = React.useState<Date | null>(null);
   const [sheetOpen, setSheetOpen] = React.useState(false);
 
+  React.useEffect(() => {
+    if (!initialDate) return;
+    const [y, m, d] = initialDate.split("-").map(Number);
+    if (y && m && d) {
+      setSheetDate(new Date(y, m - 1, d, 12));
+      setSheetOpen(true);
+    }
+  }, [initialDate]);
+
   const pendingCount = React.useMemo(
     () => reservations.filter((reservation) => reservation.needsApproval).length,
     [reservations],

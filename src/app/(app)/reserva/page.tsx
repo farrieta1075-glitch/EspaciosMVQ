@@ -17,16 +17,16 @@ export default async function ReservaPage({
   const [maps, spaces, areas] = await getCachedCatalogBundle();
 
   return (
-    <section className="space-y-6">
+    <section className="space-y-3">
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight">
+        <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
           {readOnly ? "Consulta de espacios" : "Nueva reserva"}
         </h1>
-        <p className="text-sm text-muted-foreground">
-          {readOnly
-            ? "Consulta disponibilidad de espacios y recursos."
-            : "Completa el flujo: espacios → periodo → recursos → datos del evento."}
-        </p>
+        {readOnly && (
+          <p className="text-sm text-muted-foreground">
+            Consulta disponibilidad de espacios y recursos.
+          </p>
+        )}
       </header>
 
       {readOnly ? (

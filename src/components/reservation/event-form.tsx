@@ -32,6 +32,7 @@ interface EventFormProps {
   isAdmin: boolean;
   disabled?: boolean;
   hideRecurrence?: boolean;
+  bare?: boolean;
 }
 
 export function EventForm({
@@ -50,6 +51,7 @@ export function EventForm({
   isAdmin,
   disabled = false,
   hideRecurrence = false,
+  bare = false,
 }: EventFormProps) {
   const [suggestions, setSuggestions] = React.useState<
     { eventName: string; count: number }[]
@@ -85,15 +87,8 @@ export function EventForm({
     }
   }, [recurrenceType, recurrenceUntil, baseDate, onRecurrenceUntilChange]);
 
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Datos del evento</CardTitle>
-        <CardDescription>
-          Nombre, recurrencia y área responsable de la reserva.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+  const fields = (
+        <div className="space-y-4">
         <div className="relative space-y-2">
           <Label htmlFor="eventName">Nombre del evento</Label>
           <Input
@@ -205,7 +200,22 @@ export function EventForm({
             </Select>
           </div>
         )}
-      </CardContent>
+        </div>
+  );
+
+  if (bare) {
+    return fields;
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Datos del evento</CardTitle>
+        <CardDescription>
+          Nombre, recurrencia y área responsable de la reserva.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>{fields}</CardContent>
     </Card>
   );
 }
