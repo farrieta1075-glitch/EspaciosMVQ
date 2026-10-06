@@ -7,6 +7,7 @@ import {
   getSheetMeta,
   getSheetRowsCanonical,
   updateSheetRowById,
+  type SheetRow,
 } from "@/lib/sheets/repository";
 import { SHEET_HEADERS, SHEET_TABS } from "@/lib/sheets/tabs";
 import type { Space, SpaceGeometry } from "@/types/space";
@@ -41,11 +42,27 @@ function spaceToRow(space: Space): string[] {
     space.name,
     space.floor,
     String(space.capacity),
-    String(space.minCapacity > 0 ? space.minCapacity : 1),
     space.geometry ? JSON.stringify(space.geometry) : "",
     space.mapId,
     space.active ? "true" : "false",
+    String(space.minCapacity > 0 ? space.minCapacity : 1),
   ];
+}
+
+/** Filas de 7 columnas leídas con minCapacity en medio (desplaza geometryJson). */
+function remapLegacyMisalignedSpaceRow(row: SheetRow): SheetRow {
+  const minRaw = row.minCapacity?.trim() ?? "";
+  const geoRaw = row.geometryJson?.trim() ?? "";
+  if (!minRaw.startsWith("{")) return row;
+  if (geoRaw.startsWith("{")) return row;
+
+  return {
+    ...row,
+    minCapacity: "",
+    geometryJson: minRaw,
+    mapId: geoRaw,
+    active: row.mapId?.trim() ?? row.active,
+  };
 }
 
 export async function getAllSpaces(): Promise<Space[]> {
@@ -54,7 +71,8 @@ export async function getAllSpaces(): Promise<Space[]> {
 
   for (const row of rows) {
     if (!row.id?.trim()) continue;
-    const parsed = spaceRowSchema.safeParse(row);
+    const normalized = remapLegacyMisalignedSpaceRow(row);
+    const parsed = spaceRowSchema.safeParse(normalized);
     if (!parsed.success) {
       console.warn(
         `[sheets] Fila de espacio ignorada (${row.id ?? "sin id"}):`,

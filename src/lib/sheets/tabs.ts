@@ -29,10 +29,11 @@ export const SHEET_HEADERS: Record<SheetTab, string[]> = {
     "name",
     "floor",
     "capacity",
-    "minCapacity",
     "geometryJson",
     "mapId",
     "active",
+    /** Al final para no desalinear filas existentes (antes de minCapacity). */
+    "minCapacity",
   ],
   Mapas: ["id", "name", "backgroundType", "backgroundUrl", "width", "height"],
   Recursos: [
