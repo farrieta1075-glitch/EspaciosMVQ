@@ -67,7 +67,8 @@ export async function serveBlobFile(
   return new Response(result.stream, {
     headers: {
       "Content-Type": result.blob.contentType ?? "application/octet-stream",
-      "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
+      "Cache-Control": "public, max-age=3600, stale-while-revalidate=86400",
+      "X-Content-Type-Options": "nosniff",
     },
   });
 }
