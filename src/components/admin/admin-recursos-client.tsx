@@ -22,6 +22,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { resolveAssetUrl } from "@/lib/storage/resolve-asset-url";
 import { cn } from "@/lib/utils";
 
 interface AdminRecursosClientProps {
@@ -409,7 +410,7 @@ export function AdminRecursosClient({
                   <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg border border-border bg-muted">
                     {resource.imageUrl ? (
                       <Image
-                        src={resource.imageUrl}
+                        src={resolveAssetUrl(resource.imageUrl)}
                         alt={resource.name}
                         fill
                         className="object-cover"

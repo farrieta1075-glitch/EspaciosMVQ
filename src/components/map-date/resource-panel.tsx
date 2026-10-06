@@ -17,6 +17,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { resolveAssetUrl } from "@/lib/storage/resolve-asset-url";
 import { cn } from "@/lib/utils";
 
 type ResourceFilter = "ALL" | ResourceType;
@@ -76,7 +77,7 @@ export function ResourcePanel({
               <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-md bg-muted">
                 {resource.imageUrl ? (
                   <Image
-                    src={resource.imageUrl}
+                    src={resolveAssetUrl(resource.imageUrl)}
                     alt={resource.name}
                     fill
                     className="object-cover"

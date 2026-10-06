@@ -82,12 +82,19 @@ async function uploadFolder({ folder, sheets, spreadsheetId, tab, urlColumnIndex
 
     const ext = filename.split(".").pop()?.toLowerCase() ?? "";
     const buffer = await readFile(join(dir, filename));
+    const access =
+      (process.env.BLOB_ACCESS ?? "private").trim().toLowerCase() === "public"
+        ? "public"
+        : "private";
+
     const blob = await put(`${folder}/${filename}`, buffer, {
-      access: "public",
+      access,
       contentType: MIME_BY_EXT[ext] ?? "application/octet-stream",
       token: process.env.BLOB_READ_WRITE_TOKEN,
       addRandomSuffix: false,
     });
+
+    const storedUrl = access === "private" ? `blob:${blob.pathname}` : blob.url;
 
     const sheetRow = rowIndex + 2;
     const col = String.fromCharCode(65 + urlColumnIndex);
@@ -95,10 +102,10 @@ async function uploadFolder({ folder, sheets, spreadsheetId, tab, urlColumnIndex
       spreadsheetId,
       range: `${tab}!${col}${sheetRow}`,
       valueInputOption: "RAW",
-      requestBody: { values: [[blob.url]] },
+      requestBody: { values: [[storedUrl]] },
     });
 
-    console.log(`✓ ${folder}/${filename} → ${blob.url}`);
+    console.log(`✓ ${folder}/${filename} → ${storedUrl}`);
   }
 }
 
@@ -116,6 +123,7 @@ async function main() {
   }
 
   process.env.BLOB_READ_WRITE_TOKEN = env.BLOB_READ_WRITE_TOKEN.trim();
+  process.env.BLOB_ACCESS = (env.BLOB_ACCESS ?? "private").trim();
 
   const auth = new google.auth.GoogleAuth({
     credentials: {

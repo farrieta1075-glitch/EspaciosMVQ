@@ -2,6 +2,7 @@ import "server-only";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { put } from "@vercel/blob";
+import { getBlobAccessMode } from "@/lib/storage/blob-access";
 
 const MIME_BY_EXT: Record<string, string> = {
   png: "image/png",
@@ -26,12 +27,19 @@ export async function storePublicFile(options: {
   const token = process.env.BLOB_READ_WRITE_TOKEN?.trim();
 
   if (token) {
-    const blob = await put(`${options.folder}/${options.filename}`, options.buffer, {
-      access: "public",
+    const access = getBlobAccessMode();
+    const pathname = `${options.folder}/${options.filename}`;
+    const blob = await put(pathname, options.buffer, {
+      access,
       contentType,
       token,
       addRandomSuffix: false,
     });
+
+    if (access === "private") {
+      return `blob:${blob.pathname}`;
+    }
+
     return blob.url;
   }
 

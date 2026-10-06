@@ -17,6 +17,7 @@ import {
 import { Stage, Layer, Rect, Line, Image as KonvaImage, Text } from "react-konva";
 import type { FloorMap, Space, SpaceGeometry } from "@/types/space";
 import { loadImage } from "@/lib/load-image";
+import { resolveAssetUrl } from "@/lib/storage/resolve-asset-url";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
@@ -87,15 +88,16 @@ export function SpaceMapEditor({ map, initialSpaces }: SpaceMapEditorProps) {
           return;
         }
 
+        const assetUrl = resolveAssetUrl(map.backgroundUrl);
         if (map.backgroundType === "pdf") {
           const { renderPdfFirstPage } = await import("@/lib/pdf-render");
-          const rendered = await renderPdfFirstPage(map.backgroundUrl);
+          const rendered = await renderPdfFirstPage(assetUrl);
           const img = await loadImage(rendered.dataUrl);
           setBackgroundImage(img);
           return;
         }
 
-        const img = await loadImage(map.backgroundUrl);
+        const img = await loadImage(assetUrl);
         setBackgroundImage(img);
       } catch {
         setMessage("No se pudo cargar el fondo del mapa.");

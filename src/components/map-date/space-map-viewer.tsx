@@ -8,6 +8,7 @@ import { Stage, Layer, Rect, Line, Image as KonvaImage, Text } from "react-konva
 import type { FloorMap, Space } from "@/types/space";
 import type { SpaceAvailabilityStatus } from "@/types/reservation";
 import { loadImage } from "@/lib/load-image";
+import { resolveAssetUrl } from "@/lib/storage/resolve-asset-url";
 
 const STATUS_COLORS: Record<
   SpaceAvailabilityStatus | "selected",
@@ -76,13 +77,14 @@ export function SpaceMapViewer({
           setBackgroundImage(null);
           return;
         }
+        const assetUrl = resolveAssetUrl(map.backgroundUrl);
         if (map.backgroundType === "pdf") {
           const { renderPdfFirstPage } = await import("@/lib/pdf-render");
-          const rendered = await renderPdfFirstPage(map.backgroundUrl);
+          const rendered = await renderPdfFirstPage(assetUrl);
           setBackgroundImage(await loadImage(rendered.dataUrl));
           return;
         }
-        setBackgroundImage(await loadImage(map.backgroundUrl));
+        setBackgroundImage(await loadImage(assetUrl));
       } finally {
         setLoadingBg(false);
       }
