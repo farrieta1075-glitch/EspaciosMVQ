@@ -15,6 +15,7 @@ interface WeekViewProps {
   reservations: ReservationDetail[];
   areas: Area[];
   onSelectDate: (date: Date) => void;
+  isDateSelectable?: (date: Date) => boolean;
 }
 
 const WEEKDAY_LABELS_SHORT = ["D", "L", "M", "X", "J", "V", "S"];
@@ -40,6 +41,7 @@ export function WeekView({
   reservations,
   areas,
   onSelectDate,
+  isDateSelectable,
 }: WeekViewProps) {
   const days = getWeekDays(anchorDate);
   const today = new Date();
@@ -52,6 +54,7 @@ export function WeekView({
           const dayEvents = eventsForDay(reservations, day);
           const isSelected = isSameDay(day, selectedDate);
           const isToday = isSameDay(day, today);
+          const selectable = isDateSelectable?.(day) ?? true;
 
           return (
             <div
@@ -60,10 +63,11 @@ export function WeekView({
             >
               <button
                 type="button"
-                onClick={() => onSelectDate(day)}
+                disabled={!selectable}
+                onClick={() => selectable && onSelectDate(day)}
                 className={cn(
                   "flex w-full flex-col items-center border-b border-border px-0.5 py-2 text-center transition-colors sm:px-2 sm:py-3",
-                  isSelected ? "bg-primary/10" : "hover:bg-muted/50",
+                  isSelected ? "bg-primary/10" : selectable ? "hover:bg-muted/50" : "cursor-not-allowed opacity-50",
                 )}
               >
                 <span className="text-[10px] uppercase text-muted-foreground sm:text-xs">
@@ -87,8 +91,12 @@ export function WeekView({
                     <button
                       key={event.id}
                       type="button"
-                      onClick={() => onSelectDate(day)}
-                      className="flex w-full items-center gap-1.5 rounded-md px-1 py-0.5 text-left hover:bg-muted/60 sm:px-1.5 sm:py-1"
+                      disabled={!selectable}
+                      onClick={() => selectable && onSelectDate(day)}
+                      className={cn(
+                        "flex w-full items-center gap-1.5 rounded-md px-1 py-0.5 text-left sm:px-1.5 sm:py-1",
+                        selectable ? "hover:bg-muted/60" : "cursor-not-allowed opacity-50",
+                      )}
                       title={event.eventName}
                     >
                       <span

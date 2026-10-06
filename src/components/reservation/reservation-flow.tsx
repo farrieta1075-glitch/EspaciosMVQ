@@ -19,6 +19,11 @@ import {
   saveReservationDraft,
 } from "@/lib/reservation-draft-storage";
 import { formatDateISO } from "@/lib/date-utils";
+import {
+  isLikelyTransientFetchError,
+  readJsonResponse,
+  sleep,
+} from "@/lib/read-json-response";
 import { EventForm } from "@/components/reservation/event-form";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -172,41 +177,62 @@ export function ReservationFlow({
     setLoading(true);
     setError(null);
 
-    try {
-      const response = await fetch("/api/reservas", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          eventName: eventName.trim(),
-          eventDescription: eventDescription.trim(),
-          spaceIds: selection.selectedSpaceIds,
-          areaId: isAdmin ? areaId : userAreaId,
-          date: selection.date,
-          startTime: selection.startTime,
-          endTime: selection.endTime,
-          recurrence: {
-            type: recurrenceType,
-            until: recurrenceType === "NONE" ? selection.date : recurrenceUntil,
-          },
-          resources: selection.selectedResources,
-          confirmSimilarName,
-          estimatedAttendees: estimatedNumber,
-          attendeeJustificationCode: needsJustification
-            ? attendeeJustificationCode
-            : "",
-          attendeeJustificationNote:
-            needsJustification && attendeeJustificationCode === "OTHER"
-              ? attendeeJustificationNote.trim()
-              : "",
-        }),
-      });
+    const payload = {
+      eventName: eventName.trim(),
+      eventDescription: eventDescription.trim(),
+      spaceIds: selection.selectedSpaceIds,
+      areaId: isAdmin ? areaId : userAreaId,
+      date: selection.date,
+      startTime: selection.startTime,
+      endTime: selection.endTime,
+      recurrence: {
+        type: recurrenceType,
+        until: recurrenceType === "NONE" ? selection.date : recurrenceUntil,
+      },
+      resources: selection.selectedResources,
+      confirmSimilarName,
+      estimatedAttendees: estimatedNumber,
+      attendeeJustificationCode: needsJustification
+        ? attendeeJustificationCode
+        : "",
+      attendeeJustificationNote:
+        needsJustification && attendeeJustificationCode === "OTHER"
+          ? attendeeJustificationNote.trim()
+          : "",
+    };
 
-      const data = await response.json();
+    try {
+      let response!: Response;
+      let data!: {
+        error?: string;
+        similarName?: string;
+        similarity?: number;
+        pending?: boolean;
+        count?: number;
+      };
+
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          response = await fetch("/api/reservas", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          data = await readJsonResponse(response);
+          break;
+        } catch (err) {
+          if (attempt === 0 && isLikelyTransientFetchError(err)) {
+            await sleep(2000);
+            continue;
+          }
+          throw err;
+        }
+      }
 
       if (response.status === 409 && data.error === "similar_name") {
         setSimilarPrompt({
-          name: data.similarName,
-          similarity: data.similarity,
+          name: data.similarName ?? "",
+          similarity: data.similarity ?? 0,
         });
         return;
       }

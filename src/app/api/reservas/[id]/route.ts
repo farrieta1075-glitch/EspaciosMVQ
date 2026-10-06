@@ -60,6 +60,7 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  try {
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
@@ -123,6 +124,16 @@ export async function PATCH(
     }
 
     return NextResponse.json({ error: message }, { status: 400 });
+  }
+  } catch (error) {
+    console.error("[reservas PATCH]", error);
+    return NextResponse.json(
+      {
+        error:
+          "No se pudo completar la actualización. Intenta de nuevo en unos segundos.",
+      },
+      { status: 500 },
+    );
   }
 }
 

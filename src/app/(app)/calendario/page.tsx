@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth/index";
 import { can, isAdmin } from "@/lib/auth/permissions";
+import type { UserRole } from "@/types/user";
 import { getCachedCatalogBundle } from "@/lib/sheets/cached-catalog";
 import { listAllReservationDetails } from "@/lib/reservation-service";
 import { CalendarClient } from "@/components/calendar/calendar-client";
@@ -44,6 +45,8 @@ export default async function CalendarioPage({
         isAdmin={admin}
         canReserve={canReserve}
         viewerAreaId={session?.user?.areaId ?? null}
+        viewerRole={(session?.user?.role ?? "VISUALIZACION") as UserRole}
+        viewerUser={session?.user ?? null}
         initialDate={params.date}
         initialMapId={params.mapId}
         initialSpaceId={params.spaceId}

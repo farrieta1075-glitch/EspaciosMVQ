@@ -19,7 +19,9 @@ import {
   getWeekDays,
   isSameMonth,
 } from "@/lib/date-utils";
+import { canSelectCalendarDay } from "@/lib/calendar-date-selection";
 import { setPickedReservationDate } from "@/lib/reservation-draft-storage";
+import type { SessionUser, UserRole } from "@/types/user";
 
 type CalendarViewMode = "week" | "month";
 
@@ -31,6 +33,8 @@ interface CalendarClientProps {
   isAdmin: boolean;
   canReserve: boolean;
   viewerAreaId: string | null;
+  viewerRole: UserRole;
+  viewerUser: SessionUser | null;
   initialDate?: string;
   initialMapId?: string;
   initialSpaceId?: string;
@@ -67,6 +71,8 @@ export function CalendarClient({
   isAdmin,
   canReserve,
   viewerAreaId,
+  viewerRole,
+  viewerUser,
   initialDate,
   initialMapId,
   initialSpaceId,
@@ -92,19 +98,6 @@ export function CalendarClient({
     spaceId?: string;
   } | null>(null);
 
-  React.useEffect(() => {
-    if (pickMode || !initialDate) return;
-    const [y, m, d] = initialDate.split("-").map(Number);
-    if (y && m && d) {
-      setSheetDate(new Date(y, m - 1, d, 12));
-      setSheetOpen(true);
-      setSheetSelectionHint({
-        mapId: initialMapId,
-        spaceId: initialSpaceId,
-      });
-    }
-  }, [initialDate, initialMapId, initialSpaceId, pickMode]);
-
   const pendingCount = React.useMemo(
     () => reservations.filter((reservation) => reservation.needsApproval).length,
     [reservations],
@@ -114,6 +107,39 @@ export function CalendarClient({
     () => reservations.filter((reservation) => reservation.status !== "CANCELLED"),
     [reservations],
   );
+
+  const isDateSelectable = React.useCallback(
+    (day: Date) =>
+      canSelectCalendarDay(day, {
+        isAdmin,
+        viewerRole,
+        viewerUser,
+        reservations: activeReservations,
+        pickMode,
+      }),
+    [activeReservations, isAdmin, pickMode, viewerRole, viewerUser],
+  );
+
+  React.useEffect(() => {
+    if (pickMode || !initialDate) return;
+    const [y, m, d] = initialDate.split("-").map(Number);
+    if (y && m && d) {
+      const date = new Date(y, m - 1, d, 12);
+      if (!isDateSelectable(date)) return;
+      setSheetDate(date);
+      setSheetOpen(true);
+      setSheetSelectionHint({
+        mapId: initialMapId,
+        spaceId: initialSpaceId,
+      });
+    }
+  }, [
+    initialDate,
+    initialMapId,
+    initialSpaceId,
+    pickMode,
+    isDateSelectable,
+  ]);
 
   const datesWithEvents = React.useMemo(() => {
     const set = new Set<string>();
@@ -151,6 +177,7 @@ export function CalendarClient({
   }
 
   function handleSelectDate(date: Date) {
+    if (!isDateSelectable(date)) return;
     if (pickMode && returnTo) {
       setPickedReservationDate(formatDateISO(date));
       router.push(returnTo);
@@ -196,6 +223,7 @@ export function CalendarClient({
           reservations={activeReservations}
           areas={areas}
           onSelectDate={handleSelectDate}
+          isDateSelectable={isDateSelectable}
         />
       ) : (
         <MonthView
@@ -205,6 +233,7 @@ export function CalendarClient({
           datesWithEvents={datesWithEvents}
           areas={areas}
           onSelectDate={handleSelectDate}
+          isDateSelectable={isDateSelectable}
         />
       )}
 

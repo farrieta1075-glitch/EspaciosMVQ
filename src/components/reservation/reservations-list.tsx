@@ -20,6 +20,14 @@ import {
   canModifyReservation,
 } from "@/lib/auth/reservation-permissions";
 import { isPastReservation } from "@/lib/reservation-utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { readJsonResponse } from "@/lib/read-json-response";
 import { cn } from "@/lib/utils";
 
 interface ReservationsListProps {
@@ -73,6 +81,10 @@ export function ReservationsList({
   const [loadingId, setLoadingId] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [success, setSuccess] = React.useState<string | null>(null);
+  const [cancelTarget, setCancelTarget] = React.useState<{
+    id: string;
+    eventName: string;
+  } | null>(null);
 
   const filtered = React.useMemo(() => {
     const list = reservations.filter((reservation) =>
@@ -103,14 +115,13 @@ export function ReservationsList({
     });
   }
 
-  async function handleCancel(id: string, eventName: string) {
-    if (
-      !confirm(
-        `¿Cancelar la reserva "${eventName}"? Se liberarán espacios y recursos.`,
-      )
-    ) {
-      return;
-    }
+  function requestCancel(id: string, eventName: string) {
+    setCancelTarget({ id, eventName });
+  }
+
+  async function confirmCancel() {
+    if (!cancelTarget) return;
+    const { id } = cancelTarget;
 
     setLoadingId(id);
     setError(null);
@@ -120,7 +131,9 @@ export function ReservationsList({
       const response = await fetch(`/api/reservas/${id}`, {
         method: "DELETE",
       });
-      const data = await response.json();
+      const data = await readJsonResponse<{ error?: string; pending?: boolean }>(
+        response,
+      );
       if (!response.ok) {
         throw new Error(data.error ?? "No se pudo cancelar");
       }
@@ -129,6 +142,7 @@ export function ReservationsList({
           "La cancelación fue enviada y queda pendiente de autorización por un administrador.",
         );
       }
+      setCancelTarget(null);
       await refreshList();
       router.refresh();
     } catch (err) {
@@ -328,7 +342,10 @@ export function ReservationsList({
                           className="text-destructive hover:text-destructive"
                           disabled={loadingId === reservation.id}
                           onClick={() =>
-                            handleCancel(reservation.id, reservation.eventName)
+                            requestCancel(
+                              reservation.id,
+                              reservation.eventName,
+                            )
                           }
                         >
                           {loadingId === reservation.id ? (
@@ -347,6 +364,45 @@ export function ReservationsList({
           })}
         </div>
       )}
+
+      <Dialog
+        open={Boolean(cancelTarget)}
+        onOpenChange={(open) => !open && setCancelTarget(null)}
+      >
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Cancelar reserva</DialogTitle>
+            <DialogDescription>
+              {cancelTarget
+                ? `¿Cancelar la reserva «${cancelTarget.eventName}»? Se liberarán espacios y recursos.`
+                : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="flex-1"
+              onClick={() => setCancelTarget(null)}
+            >
+              Volver
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              className="flex-1"
+              disabled={Boolean(loadingId)}
+              onClick={confirmCancel}
+            >
+              {loadingId ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                "Confirmar cancelación"
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

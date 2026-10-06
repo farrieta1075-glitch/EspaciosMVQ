@@ -23,6 +23,11 @@ import {
   loadReservationDraft,
   saveReservationDraft,
 } from "@/lib/reservation-draft-storage";
+import {
+  isLikelyTransientFetchError,
+  readJsonResponse,
+  sleep,
+} from "@/lib/read-json-response";
 import { EventForm } from "@/components/reservation/event-form";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -218,37 +223,52 @@ export function ReservationEditFlow({
     setLoading(true);
     setError(null);
 
-    try {
-      const response = await fetch(`/api/reservas/${reservation.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          eventName: eventName.trim(),
-          eventDescription: eventDescription.trim(),
-          spaceIds: activeSelection.selectedSpaceIds,
-          areaId: isAdmin ? areaId : reservation.areaId,
-          date: activeSelection.date,
-          startTime: activeSelection.startTime,
-          endTime: activeSelection.endTime,
-          resources: activeSelection.selectedResources,
-          confirmSimilarName,
-          estimatedAttendees: estimatedNumber,
-          attendeeJustificationCode: needsJustification
-            ? attendeeJustificationCode
-            : "",
-          attendeeJustificationNote:
-            needsJustification && attendeeJustificationCode === "OTHER"
-              ? attendeeJustificationNote.trim()
-              : "",
-        }),
-      });
+    const payload = {
+      eventName: eventName.trim(),
+      eventDescription: eventDescription.trim(),
+      spaceIds: activeSelection.selectedSpaceIds,
+      areaId: isAdmin ? areaId : reservation.areaId,
+      date: activeSelection.date,
+      startTime: activeSelection.startTime,
+      endTime: activeSelection.endTime,
+      resources: activeSelection.selectedResources,
+      confirmSimilarName,
+      estimatedAttendees: estimatedNumber,
+      attendeeJustificationCode: needsJustification
+        ? attendeeJustificationCode
+        : "",
+      attendeeJustificationNote:
+        needsJustification && attendeeJustificationCode === "OTHER"
+          ? attendeeJustificationNote.trim()
+          : "",
+    };
 
-      const data = await response.json();
+    try {
+      let response!: Response;
+      let data!: { error?: string; similarName?: string; similarity?: number; pending?: boolean };
+
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          response = await fetch(`/api/reservas/${reservation.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          data = await readJsonResponse(response);
+          break;
+        } catch (err) {
+          if (attempt === 0 && isLikelyTransientFetchError(err)) {
+            await sleep(2000);
+            continue;
+          }
+          throw err;
+        }
+      }
 
       if (response.status === 409 && data.error === "similar_name") {
         setSimilarPrompt({
-          name: data.similarName,
-          similarity: data.similarity,
+          name: data.similarName ?? "",
+          similarity: data.similarity ?? 0,
         });
         return;
       }

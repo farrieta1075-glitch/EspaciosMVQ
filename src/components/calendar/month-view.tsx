@@ -23,6 +23,7 @@ interface MonthViewProps {
   datesWithEvents: Set<string>;
   areas: Area[];
   onSelectDate: (date: Date) => void;
+  isDateSelectable?: (date: Date) => boolean;
 }
 
 const WEEKDAY_LABELS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
@@ -40,6 +41,7 @@ export function MonthView({
   datesWithEvents,
   areas,
   onSelectDate,
+  isDateSelectable,
 }: MonthViewProps) {
   const days = getMonthGrid(anchorDate);
   const today = new Date();
@@ -83,19 +85,23 @@ export function MonthView({
           const hasEvents = datesWithEvents.has(iso);
           const dayEvents = eventsForDay(reservations, day);
           const dotEvents = dayEvents.slice(0, 3);
+          const selectable = isDateSelectable?.(day) ?? true;
 
           return (
             <button
               key={iso}
               type="button"
-              onClick={() => onSelectDate(day)}
+              disabled={!selectable}
+              onClick={() => selectable && onSelectDate(day)}
               className={cn(
                 "flex min-h-[48px] min-w-0 flex-col rounded-md border p-0.5 text-left transition-colors sm:min-h-[72px] sm:rounded-lg sm:p-2 lg:min-h-[84px]",
                 inMonth ? "border-border/80" : "border-transparent opacity-40",
                 isSelected
                   ? "border-primary bg-primary/10"
-                  : "hover:bg-muted/50",
-                hasEvents && !isSelected && "bg-secondary/10",
+                  : selectable
+                    ? "hover:bg-muted/50"
+                    : "cursor-not-allowed opacity-50",
+                hasEvents && !isSelected && selectable && "bg-secondary/10",
               )}
             >
               <span

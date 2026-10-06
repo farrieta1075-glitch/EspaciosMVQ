@@ -27,6 +27,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { formatDateISO } from "@/lib/date-utils";
+import { readJsonResponse } from "@/lib/read-json-response";
 
 export interface InitialMapSelection {
   date?: string;
@@ -241,7 +242,9 @@ export function MapDateSelector({
         });
 
         if (!response.ok) throw new Error("Error al consultar disponibilidad");
-        setAvailability(await response.json());
+        setAvailability(
+          await readJsonResponse<AvailabilityResponse>(response),
+        );
       } catch (error) {
         if ((error as Error).name !== "AbortError") {
           setAvailability({ spaces: [], resources: [] });
