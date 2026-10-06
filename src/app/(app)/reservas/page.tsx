@@ -28,6 +28,7 @@ export default async function ReservasPage() {
       <ReservationsList
         initialReservations={reservations}
         isAdmin={admin}
+        viewerUser={session?.user ?? null}
       />
     </section>
   );

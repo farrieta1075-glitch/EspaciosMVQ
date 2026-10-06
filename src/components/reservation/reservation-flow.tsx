@@ -6,6 +6,7 @@ import { CheckCircle2, Loader2 } from "lucide-react";
 import type { Area } from "@/types/area";
 import type { FloorMap, Space } from "@/types/space";
 import type { MapDateSelection, RecurrenceType } from "@/types/reservation";
+import { reservationNeedsAttendeeJustification } from "@/lib/capacity-validation";
 import { MapDateSelector } from "@/components/map-date/map-date-selector";
 import { EventForm } from "@/components/reservation/event-form";
 import { Button } from "@/components/ui/button";
@@ -59,6 +60,11 @@ export function ReservationFlow({
   );
   const [eventName, setEventName] = React.useState("");
   const [eventDescription, setEventDescription] = React.useState("");
+  const [estimatedAttendees, setEstimatedAttendees] = React.useState("");
+  const [attendeeJustificationCode, setAttendeeJustificationCode] =
+    React.useState("");
+  const [attendeeJustificationNote, setAttendeeJustificationNote] =
+    React.useState("");
   const [recurrenceType, setRecurrenceType] =
     React.useState<RecurrenceType>("NONE");
   const [recurrenceUntil, setRecurrenceUntil] = React.useState("");
@@ -88,10 +94,24 @@ export function ReservationFlow({
   const hasValidTimes =
     Boolean(selection?.startTime) && Boolean(selection?.endTime);
 
+  const estimatedNumber = Number(estimatedAttendees);
+  const needsJustification =
+    selection &&
+    reservationNeedsAttendeeJustification(
+      spaces,
+      selection.selectedSpaceIds,
+      estimatedNumber,
+    );
+
   const canSubmit =
     hasValidTimes &&
     Boolean(selection?.selectedSpaceIds.length) &&
     eventName.trim().length > 0 &&
+    estimatedNumber > 0 &&
+    (!needsJustification ||
+      (Boolean(attendeeJustificationCode) &&
+        (attendeeJustificationCode !== "OTHER" ||
+          attendeeJustificationNote.trim().length > 0))) &&
     (!isAdmin || Boolean(areaId));
 
   async function submitReservation(confirmSimilarName = false) {
@@ -118,6 +138,14 @@ export function ReservationFlow({
           },
           resources: selection.selectedResources,
           confirmSimilarName,
+          estimatedAttendees: estimatedNumber,
+          attendeeJustificationCode: needsJustification
+            ? attendeeJustificationCode
+            : "",
+          attendeeJustificationNote:
+            needsJustification && attendeeJustificationCode === "OTHER"
+              ? attendeeJustificationNote.trim()
+              : "",
         }),
       });
 
@@ -235,6 +263,14 @@ export function ReservationFlow({
               areas={areas}
               isAdmin={isAdmin}
               hideAdminArea
+              estimatedAttendees={estimatedAttendees}
+              onEstimatedAttendeesChange={setEstimatedAttendees}
+              attendeeJustificationCode={attendeeJustificationCode}
+              onAttendeeJustificationCodeChange={setAttendeeJustificationCode}
+              attendeeJustificationNote={attendeeJustificationNote}
+              onAttendeeJustificationNoteChange={setAttendeeJustificationNote}
+              selectedSpaceIds={selection?.selectedSpaceIds ?? []}
+              spaces={spaces}
             />
           </div>
         </SheetContent>
@@ -325,6 +361,9 @@ export function ReservationFlow({
                 setSuccessInfo(null);
                 setEventName("");
                 setEventDescription("");
+                setEstimatedAttendees("");
+                setAttendeeJustificationCode("");
+                setAttendeeJustificationNote("");
                 setRecurrenceType("NONE");
                 setRecurrenceUntil("");
               }}

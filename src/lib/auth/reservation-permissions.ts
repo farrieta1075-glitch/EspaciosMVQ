@@ -1,6 +1,7 @@
 import type { SessionUser } from "@/types/user";
 import type { Reservation } from "@/types/reservation";
 import { can, isAdmin } from "@/lib/auth/permissions";
+import { isPastReservation } from "@/lib/reservation-utils";
 
 export function canAccessReservation(
   user: SessionUser | null,
@@ -16,7 +17,9 @@ export function canModifyReservation(
   reservation: Reservation,
 ): boolean {
   if (!can(user, "modify:reservation")) return false;
-  return canAccessReservation(user, reservation);
+  if (!canAccessReservation(user, reservation)) return false;
+  if (isPastReservation(reservation) && !isAdmin(user)) return false;
+  return true;
 }
 
 export function canCancelReservation(
@@ -24,5 +27,16 @@ export function canCancelReservation(
   reservation: Reservation,
 ): boolean {
   if (!can(user, "cancel:reservation")) return false;
-  return canAccessReservation(user, reservation);
+  if (!canAccessReservation(user, reservation)) return false;
+  if (isPastReservation(reservation) && !isAdmin(user)) return false;
+  return true;
+}
+
+export function canConfirmAttendance(
+  user: SessionUser | null,
+  reservation: Reservation,
+): boolean {
+  if (!canAccessReservation(user, reservation)) return false;
+  if (reservation.status === "CANCELLED") return false;
+  return isPastReservation(reservation);
 }

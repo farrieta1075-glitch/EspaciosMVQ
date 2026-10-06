@@ -11,6 +11,7 @@ export interface Space {
   name: string;
   floor: string;
   capacity: number;
+  minCapacity: number;
   geometry: SpaceGeometry | null;
   mapId: string;
   active: boolean;

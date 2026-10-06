@@ -11,6 +11,7 @@ const updateSpaceSchema = z.object({
   name: z.string().min(1).optional(),
   floor: z.string().optional(),
   capacity: z.coerce.number().optional(),
+  minCapacity: z.coerce.number().optional(),
   mapId: z.string().optional(),
   active: z.boolean().optional(),
   geometry: z

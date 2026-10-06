@@ -16,6 +16,11 @@ export interface Reservation {
   pendingAction: PendingAction;
   pendingPayload: string;
   approvalToken: string;
+  estimatedAttendees: number;
+  attendeeJustificationCode: string;
+  attendeeJustificationNote: string;
+  actualAttendees: number | null;
+  attendanceComment: string;
 }
 
 export interface PendingUpdatePayload {
@@ -27,6 +32,9 @@ export interface PendingUpdatePayload {
   startTime: string;
   endTime: string;
   resources: { resourceId: string; quantity: number }[];
+  estimatedAttendees?: number;
+  attendeeJustificationCode?: string;
+  attendeeJustificationNote?: string;
 }
 
 export interface ReservationResource {
@@ -88,6 +96,9 @@ export interface CreateReservationInput {
   resources: { resourceId: string; quantity: number }[];
   confirmSimilarName?: boolean;
   createdByAdmin?: boolean;
+  estimatedAttendees?: number;
+  attendeeJustificationCode?: string;
+  attendeeJustificationNote?: string;
 }
 
 export interface EventSuggestion {
@@ -126,6 +137,14 @@ export interface UpdateReservationInput {
   resources: { resourceId: string; quantity: number }[];
   confirmSimilarName?: boolean;
   requestedByAdmin?: boolean;
+  estimatedAttendees?: number;
+  attendeeJustificationCode?: string;
+  attendeeJustificationNote?: string;
+}
+
+export interface ConfirmAttendanceInput {
+  actualAttendees: number;
+  attendanceComment?: string;
 }
 
 export function parsePendingPayload(raw: string): PendingUpdatePayload | null {

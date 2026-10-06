@@ -2,7 +2,10 @@
 
 import * as React from "react";
 import type { Area } from "@/types/area";
+import type { Space } from "@/types/space";
 import type { RecurrenceType } from "@/types/reservation";
+import { ATTENDEE_JUSTIFICATION_OPTIONS } from "@/lib/attendee-justification";
+import { reservationNeedsAttendeeJustification } from "@/lib/capacity-validation";
 import { addMonths, formatDateISO } from "@/lib/date-utils";
 import {
   Card,
@@ -34,6 +37,14 @@ interface EventFormProps {
   hideRecurrence?: boolean;
   hideAdminArea?: boolean;
   bare?: boolean;
+  estimatedAttendees: string;
+  onEstimatedAttendeesChange: (value: string) => void;
+  attendeeJustificationCode: string;
+  onAttendeeJustificationCodeChange: (value: string) => void;
+  attendeeJustificationNote: string;
+  onAttendeeJustificationNoteChange: (value: string) => void;
+  selectedSpaceIds?: string[];
+  spaces?: Space[];
 }
 
 export function EventForm({
@@ -54,6 +65,14 @@ export function EventForm({
   hideRecurrence = false,
   hideAdminArea = false,
   bare = false,
+  estimatedAttendees,
+  onEstimatedAttendeesChange,
+  attendeeJustificationCode,
+  onAttendeeJustificationCodeChange,
+  attendeeJustificationNote,
+  onAttendeeJustificationNoteChange,
+  selectedSpaceIds = [],
+  spaces = [],
 }: EventFormProps) {
   const [suggestions, setSuggestions] = React.useState<
     { eventName: string; count: number }[]
@@ -88,6 +107,13 @@ export function EventForm({
       onRecurrenceUntilChange(formatDateISO(addMonths(base, 1)));
     }
   }, [recurrenceType, recurrenceUntil, baseDate, onRecurrenceUntilChange]);
+
+  const estimatedNumber = Number(estimatedAttendees);
+  const showJustification = reservationNeedsAttendeeJustification(
+    spaces,
+    selectedSpaceIds,
+    estimatedNumber,
+  );
 
   const fields = (
         <div className="space-y-4">
@@ -140,6 +166,68 @@ export function EventForm({
             className="flex min-h-[96px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
           />
         </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="estimatedAttendees">Asistentes estimados</Label>
+          <Input
+            id="estimatedAttendees"
+            type="number"
+            min={1}
+            value={estimatedAttendees}
+            disabled={disabled}
+            onChange={(event) => onEstimatedAttendeesChange(event.target.value)}
+            placeholder="Ej. 25"
+            required
+          />
+        </div>
+
+        {showJustification && (
+          <div className="space-y-3 rounded-lg border border-amber-500/40 bg-amber-500/5 p-3">
+            <p className="text-sm font-medium">
+              Justificación de cantidad de asistentes
+            </p>
+            <p className="text-xs text-muted-foreground">
+              La estimación está fuera de la capacidad mínima o máxima de al
+              menos un espacio seleccionado.
+            </p>
+            <div className="space-y-2">
+              <Label htmlFor="attendeeJustification">Motivo</Label>
+              <Select
+                id="attendeeJustification"
+                value={attendeeJustificationCode}
+                disabled={disabled}
+                onChange={(event) =>
+                  onAttendeeJustificationCodeChange(event.target.value)
+                }
+                required
+              >
+                <option value="">Selecciona una opción</option>
+                {ATTENDEE_JUSTIFICATION_OPTIONS.map((option) => (
+                  <option key={option.code} value={option.code}>
+                    {option.label}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            {attendeeJustificationCode === "OTHER" && (
+              <div className="space-y-2">
+                <Label htmlFor="attendeeJustificationNote">Explica</Label>
+                <textarea
+                  id="attendeeJustificationNote"
+                  value={attendeeJustificationNote}
+                  disabled={disabled}
+                  onChange={(event) =>
+                    onAttendeeJustificationNoteChange(event.target.value)
+                  }
+                  rows={3}
+                  className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  placeholder="Describe la justificación..."
+                  required
+                />
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="grid gap-4 sm:grid-cols-2">
           {!hideRecurrence && (

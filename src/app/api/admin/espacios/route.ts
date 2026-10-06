@@ -7,6 +7,7 @@ const createSpaceSchema = z.object({
   name: z.string().min(1),
   floor: z.string().optional().default(""),
   capacity: z.coerce.number().optional().default(0),
+  minCapacity: z.coerce.number().optional().default(1),
   mapId: z.string().optional().default(""),
   active: z.boolean().optional().default(true),
   geometry: z
@@ -44,6 +45,7 @@ export async function POST(request: Request) {
     name: parsed.data.name,
     floor: parsed.data.floor,
     capacity: parsed.data.capacity,
+    minCapacity: parsed.data.minCapacity,
     mapId: parsed.data.mapId,
     active: parsed.data.active,
     geometry: parsed.data.geometry ?? null,

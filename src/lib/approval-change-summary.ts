@@ -80,33 +80,7 @@ export function buildApprovalChangeSummary(input: {
       actionLabel: "Cancelación de reserva",
       resources,
       pendingResources: null,
-      changes: [
-        {
-          label: "Acción",
-          before: "Reserva confirmada",
-          after: "Cancelar reserva",
-        },
-        {
-          label: "Evento",
-          before: reservation.eventName,
-          after: "—",
-        },
-        {
-          label: "Horario",
-          before: formatDateTimeRange(reservation.startAt, reservation.endAt),
-          after: "—",
-        },
-        {
-          label: "Espacios",
-          before: spaceNames.join(", ") || "—",
-          after: "—",
-        },
-        {
-          label: "Recursos",
-          before: formatResourceList(resources),
-          after: "—",
-        },
-      ],
+      changes: [],
     };
   }
 
@@ -216,7 +190,7 @@ export function formatChangeSummaryText(summary: ApprovalChangeSummary): string 
   }
 
   if (summary.action === "CANCEL") {
-    lines.push("Recursos de la reserva a cancelar:");
+    lines.push("Recursos solicitados:");
     lines.push(formatResourceList(summary.resources));
     return lines.join("\n");
   }
@@ -251,7 +225,7 @@ export function formatChangeSummaryHtml(summary: ApprovalChangeSummary): string 
           `<li><strong>${escapeHtml(item.resourceName)}</strong> — cantidad: ${item.quantity}</li>`,
       )
       .join("");
-    return `<p><strong>Se solicita cancelar esta reserva.</strong></p><p>Recursos asociados:</p><ul>${items || "<li>Ninguno</li>"}</ul>`;
+    return `<p><strong>Recursos solicitados</strong></p><ul>${items || "<li>Ninguno</li>"}</ul>`;
   }
 
   const rows = summary.changes

@@ -36,6 +36,20 @@ const reservationRowSchema = z.object({
   pendingAction: z.string().optional().default(""),
   pendingPayload: z.string().optional().default(""),
   approvalToken: z.string().optional().default(""),
+  estimatedAttendees: z.coerce.number().optional().default(0),
+  attendeeJustificationCode: z.string().optional().default(""),
+  attendeeJustificationNote: z.string().optional().default(""),
+  actualAttendees: z
+    .string()
+    .optional()
+    .default("")
+    .transform((value) => {
+      const trimmed = value.trim();
+      if (!trimmed) return null;
+      const num = Number(trimmed);
+      return Number.isFinite(num) ? num : null;
+    }),
+  attendanceComment: z.string().optional().default(""),
 });
 
 export function parseSpaceIds(raw: string): string[] {
@@ -74,6 +88,11 @@ function mapParsedRowToReservation(parsed: ParsedReservationRow): Reservation {
     pendingAction: parsed.pendingAction as PendingAction,
     pendingPayload: parsed.pendingPayload,
     approvalToken: parsed.approvalToken,
+    estimatedAttendees: parsed.estimatedAttendees,
+    attendeeJustificationCode: parsed.attendeeJustificationCode,
+    attendeeJustificationNote: parsed.attendeeJustificationNote,
+    actualAttendees: parsed.actualAttendees,
+    attendanceComment: parsed.attendanceComment,
   };
 }
 
@@ -92,6 +111,13 @@ export function reservationToRow(reservation: Reservation): string[] {
     reservation.pendingAction,
     reservation.pendingPayload,
     reservation.approvalToken,
+    String(reservation.estimatedAttendees ?? 0),
+    reservation.attendeeJustificationCode ?? "",
+    reservation.attendeeJustificationNote ?? "",
+    reservation.actualAttendees != null
+      ? String(reservation.actualAttendees)
+      : "",
+    reservation.attendanceComment ?? "",
   ];
 }
 

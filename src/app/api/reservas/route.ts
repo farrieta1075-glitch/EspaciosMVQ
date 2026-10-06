@@ -52,6 +52,9 @@ const createSchema = z.object({
     .optional()
     .default([]),
   confirmSimilarName: z.boolean().optional().default(false),
+  estimatedAttendees: z.coerce.number().min(1),
+  attendeeJustificationCode: z.string().optional().default(""),
+  attendeeJustificationNote: z.string().optional().default(""),
 });
 
 export async function POST(request: Request) {
@@ -132,6 +135,9 @@ export async function POST(request: Request) {
       resources: parsed.data.resources.filter((item) => item.quantity > 0),
       confirmSimilarName: parsed.data.confirmSimilarName,
       createdByAdmin: admin,
+      estimatedAttendees: parsed.data.estimatedAttendees,
+      attendeeJustificationCode: parsed.data.attendeeJustificationCode,
+      attendeeJustificationNote: parsed.data.attendeeJustificationNote,
     });
 
     revalidatePath("/calendario");

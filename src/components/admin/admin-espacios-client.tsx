@@ -50,6 +50,7 @@ export function AdminEspaciosClient({
   const [spaceName, setSpaceName] = React.useState("");
   const [spaceFloor, setSpaceFloor] = React.useState("");
   const [spaceCapacity, setSpaceCapacity] = React.useState("10");
+  const [spaceMinCapacity, setSpaceMinCapacity] = React.useState("1");
   const [spaceMapId, setSpaceMapId] = React.useState(maps[0]?.id ?? "");
   const [mapsSectionOpen, setMapsSectionOpen] = React.useState(false);
   const [spacesSectionOpen, setSpacesSectionOpen] = React.useState(false);
@@ -124,6 +125,7 @@ export function AdminEspaciosClient({
           name: spaceName,
           floor: spaceFloor,
           capacity: Number(spaceCapacity) || 0,
+          minCapacity: Number(spaceMinCapacity) || 1,
           mapId: spaceMapId,
           active: true,
         }),
@@ -134,6 +136,7 @@ export function AdminEspaciosClient({
       setSpaceName("");
       setSpaceFloor("");
       setSpaceCapacity("10");
+      setSpaceMinCapacity("1");
       await refreshData();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al crear espacio");
@@ -330,13 +333,23 @@ export function AdminEspaciosClient({
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="spaceCapacity">Capacidad</Label>
+                  <Label htmlFor="spaceCapacity">Capacidad máxima</Label>
                   <Input
                     id="spaceCapacity"
                     type="number"
                     min={0}
                     value={spaceCapacity}
                     onChange={(e) => setSpaceCapacity(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="spaceMinCapacity">Capacidad mínima</Label>
+                  <Input
+                    id="spaceMinCapacity"
+                    type="number"
+                    min={1}
+                    value={spaceMinCapacity}
+                    onChange={(e) => setSpaceMinCapacity(e.target.value)}
                   />
                 </div>
               </div>
@@ -381,8 +394,9 @@ export function AdminEspaciosClient({
                   >
                     <div className="min-w-0">
                       <p className="truncate font-medium">{space.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {space.floor || "—"} · Cap. {space.capacity}
+                        <p className="text-xs text-muted-foreground">
+                        {space.floor || "—"} · Cap. {space.minCapacity}–
+                        {space.capacity}
                       </p>
                       <div className="mt-1 flex flex-wrap gap-2">
                         <Badge variant={space.geometry ? "default" : "outline"}>

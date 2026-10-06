@@ -18,17 +18,19 @@ import {
   formatTimeHHmm,
   parseReservationDateTime,
 } from "@/lib/date-utils";
+import { reservationNeedsAttendeeJustification } from "@/lib/capacity-validation";
+import { getAllSpaces } from "@/lib/sheets/spaces";
 import {
   getActiveReservations,
   getAllReservationResources,
   getReservationById,
   getReservationsNeedingApproval,
+  reservationToRow,
   replaceReservationResources,
   updateReservationRecord,
   reservationsOverlap,
 } from "@/lib/sheets/reservations";
 import { getAllResources } from "@/lib/sheets/resources";
-import { getAllSpaces } from "@/lib/sheets/spaces";
 import { getAllAreas } from "@/lib/sheets/areas";
 import { SHEET_TABS } from "@/lib/sheets/tabs";
 import type {
@@ -159,6 +161,37 @@ async function getAreaUserIds(areaId: string): Promise<string[]> {
     .map((user) => user.id);
 }
 
+async function assertAttendeeFields(
+  spaceIds: string[],
+  estimatedAttendees: number | undefined,
+  justificationCode: string | undefined,
+  justificationNote: string | undefined,
+): Promise<void> {
+  const estimated = estimatedAttendees ?? 0;
+  if (!Number.isFinite(estimated) || estimated <= 0) {
+    throw new Error("Indica la cantidad estimada de asistentes.");
+  }
+
+  const spaces = await getAllSpaces();
+  const needsJustification = reservationNeedsAttendeeJustification(
+    spaces,
+    spaceIds,
+    estimated,
+  );
+
+  if (!needsJustification) return;
+
+  const code = justificationCode?.trim() ?? "";
+  if (!code) {
+    throw new Error(
+      "Selecciona una justificación de asistentes para la capacidad del espacio.",
+    );
+  }
+  if (code === "OTHER" && !justificationNote?.trim()) {
+    throw new Error("Describe la justificación cuando seleccionas «Otro».");
+  }
+}
+
 export async function createReservation(
   input: CreateReservationInput,
 ): Promise<{ ids: string[]; count: number; pending: boolean }> {
@@ -167,6 +200,22 @@ export async function createReservation(
   if (input.spaceIds.length === 0) {
     throw new Error("Selecciona al menos un espacio.");
   }
+
+  if (!input.createdByAdmin) {
+    const start = parseReservationDateTime(
+      `${input.date}T${input.startTime}:00`,
+    );
+    if (start && start.getTime() < Date.now()) {
+      throw new Error("No puedes crear reservas en fechas u horarios pasados.");
+    }
+  }
+
+  await assertAttendeeFields(
+    input.spaceIds,
+    input.estimatedAttendees,
+    input.attendeeJustificationCode,
+    input.attendeeJustificationNote,
+  );
 
   const similar = await findSimilarEvents(eventName);
   if (similar.length > 0 && !input.confirmSimilarName) {
@@ -195,7 +244,6 @@ export async function createReservation(
 
   const { createId } = await import("@/lib/id");
   const recurrenceRule = serializeRecurrenceRule(input.recurrence);
-  const spaceIdsJson = JSON.stringify(input.spaceIds);
   const createdIds: string[] = [];
   const status = input.createdByAdmin ? "CONFIRMED" : "PENDING";
   const eventDescription = input.eventDescription?.trim() ?? "";
@@ -218,23 +266,17 @@ export async function createReservation(
       pendingAction: "",
       pendingPayload: "",
       approvalToken,
+      estimatedAttendees: input.estimatedAttendees ?? 0,
+      attendeeJustificationCode: input.attendeeJustificationCode?.trim() ?? "",
+      attendeeJustificationNote: input.attendeeJustificationNote?.trim() ?? "",
+      actualAttendees: null,
+      attendanceComment: "",
     };
 
-    await appendSheetRow(SHEET_TABS.RESERVAS, [
-      reservation.id,
-      reservation.eventName,
-      spaceIdsJson,
-      reservation.areaId,
-      reservation.userId,
-      reservation.startAt,
-      reservation.endAt,
-      reservation.recurrenceRule,
-      reservation.status,
-      reservation.eventDescription,
-      reservation.pendingAction,
-      reservation.pendingPayload,
-      reservation.approvalToken,
-    ]);
+    await appendSheetRow(
+      SHEET_TABS.RESERVAS,
+      reservationToRow({ ...reservation, spaceIds: input.spaceIds }),
+    );
     createdIds.push(id);
 
     for (const resource of input.resources) {
@@ -402,6 +444,22 @@ export async function updateReservation(
     throw new Error("Selecciona al menos un espacio.");
   }
 
+  if (!input.requestedByAdmin) {
+    const start = parseReservationDateTime(
+      `${input.date}T${input.startTime}:00`,
+    );
+    if (start && start.getTime() < Date.now()) {
+      throw new Error("No puedes mover la reserva a una fecha u horario pasado.");
+    }
+  }
+
+  await assertAttendeeFields(
+    input.spaceIds,
+    input.estimatedAttendees,
+    input.attendeeJustificationCode,
+    input.attendeeJustificationNote,
+  );
+
   const similar = await findSimilarEvents(eventName);
   const exactExisting = similar.every(
     (item) => item.eventName.toLowerCase() !== existing.eventName.toLowerCase(),
@@ -450,6 +508,9 @@ export async function updateReservation(
       startTime: input.startTime,
       endTime: input.endTime,
       resources: input.resources,
+      estimatedAttendees: input.estimatedAttendees,
+      attendeeJustificationCode: input.attendeeJustificationCode,
+      attendeeJustificationNote: input.attendeeJustificationNote,
     };
 
     const updated: Reservation = {
@@ -474,6 +535,13 @@ export async function updateReservation(
     pendingAction: "",
     pendingPayload: "",
     approvalToken: "",
+    estimatedAttendees: input.estimatedAttendees ?? existing.estimatedAttendees,
+    attendeeJustificationCode:
+      input.attendeeJustificationCode?.trim() ??
+      existing.attendeeJustificationCode,
+    attendeeJustificationNote:
+      input.attendeeJustificationNote?.trim() ??
+      existing.attendeeJustificationNote,
   };
 
   const ok = await updateReservationRecord(updated);
@@ -505,11 +573,41 @@ async function applyPendingUpdate(reservation: Reservation): Promise<void> {
     pendingAction: "",
     pendingPayload: "",
     approvalToken: "",
+    estimatedAttendees:
+      payload.estimatedAttendees ?? reservation.estimatedAttendees,
+    attendeeJustificationCode:
+      payload.attendeeJustificationCode ??
+      reservation.attendeeJustificationCode,
+    attendeeJustificationNote:
+      payload.attendeeJustificationNote ??
+      reservation.attendeeJustificationNote,
   };
 
   await updateReservationRecord(updated);
   await replaceReservationResources(reservation.id, payload.resources);
   await recordEventUsage(payload.eventName, payload.areaId);
+}
+
+export async function confirmReservationAttendance(
+  id: string,
+  input: { actualAttendees: number; attendanceComment?: string },
+): Promise<ReservationDetail | null> {
+  const reservation = await getReservationById(id);
+  if (!reservation) throw new Error("Reserva no encontrada.");
+
+  const actual = input.actualAttendees;
+  if (!Number.isFinite(actual) || actual <= 0) {
+    throw new Error("Indica cuántos asistentes hubo.");
+  }
+
+  const updated: Reservation = {
+    ...reservation,
+    actualAttendees: actual,
+    attendanceComment: input.attendanceComment?.trim() ?? "",
+  };
+
+  await updateReservationRecord(updated);
+  return getReservationDetail(id);
 }
 
 export async function approveReservation(

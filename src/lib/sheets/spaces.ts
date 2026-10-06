@@ -5,7 +5,7 @@ import {
   deleteSheetRowByIndex,
   findRowIndexById,
   getSheetMeta,
-  getSheetRows,
+  getSheetRowsCanonical,
   updateSheetRowById,
 } from "@/lib/sheets/repository";
 import { SHEET_HEADERS, SHEET_TABS } from "@/lib/sheets/tabs";
@@ -16,6 +16,7 @@ const spaceRowSchema = z.object({
   name: z.string().min(1),
   floor: z.string().optional().default(""),
   capacity: z.coerce.number().optional().default(0),
+  minCapacity: z.coerce.number().optional().default(1),
   geometryJson: z.string().optional().default(""),
   mapId: z.string().optional().default(""),
   active: z
@@ -40,6 +41,7 @@ function spaceToRow(space: Space): string[] {
     space.name,
     space.floor,
     String(space.capacity),
+    String(space.minCapacity > 0 ? space.minCapacity : 1),
     space.geometry ? JSON.stringify(space.geometry) : "",
     space.mapId,
     space.active ? "true" : "false",
@@ -47,7 +49,7 @@ function spaceToRow(space: Space): string[] {
 }
 
 export async function getAllSpaces(): Promise<Space[]> {
-  const { rows } = await getSheetRows(SHEET_TABS.ESPACIOS);
+  const { rows } = await getSheetRowsCanonical(SHEET_TABS.ESPACIOS);
   const spaces: Space[] = [];
 
   for (const row of rows) {
@@ -65,6 +67,8 @@ export async function getAllSpaces(): Promise<Space[]> {
       name: parsed.data.name,
       floor: parsed.data.floor,
       capacity: parsed.data.capacity,
+      minCapacity:
+        parsed.data.minCapacity > 0 ? parsed.data.minCapacity : 1,
       geometry: parseGeometry(parsed.data.geometryJson),
       mapId: parsed.data.mapId,
       active: parsed.data.active,
@@ -91,6 +95,7 @@ export async function createSpace(
     name: input.name,
     floor: input.floor,
     capacity: input.capacity,
+    minCapacity: input.minCapacity > 0 ? input.minCapacity : 1,
     geometry: input.geometry,
     mapId: input.mapId,
     active: input.active,

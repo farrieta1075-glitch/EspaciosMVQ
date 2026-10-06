@@ -9,15 +9,23 @@ import {
   formatTimeDisplay,
 } from "@/lib/date-utils";
 import type { ReservationDetail } from "@/types/reservation";
+import type { SessionUser } from "@/types/user";
 import { reservationNeedsAdminAction } from "@/types/reservation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  canCancelReservation,
+  canConfirmAttendance,
+  canModifyReservation,
+} from "@/lib/auth/reservation-permissions";
+import { isPastReservation } from "@/lib/reservation-utils";
 import { cn } from "@/lib/utils";
 
 interface ReservationsListProps {
   initialReservations: ReservationDetail[];
   isAdmin: boolean;
+  viewerUser: SessionUser | null;
 }
 
 type ListFilter = "upcoming" | "past";
@@ -39,10 +47,6 @@ function statusVariant(
   return "default";
 }
 
-function isPastReservation(reservation: ReservationDetail): boolean {
-  return new Date(reservation.endAt).getTime() < Date.now();
-}
-
 function summaryDateTime(reservation: ReservationDetail): string {
   const start = new Date(reservation.startAt);
   const end = new Date(reservation.endAt);
@@ -57,6 +61,7 @@ function summaryDateTime(reservation: ReservationDetail): string {
 export function ReservationsList({
   initialReservations,
   isAdmin,
+  viewerUser,
 }: ReservationsListProps) {
   const router = useRouter();
   const [reservations, setReservations] =
@@ -270,6 +275,22 @@ export function ReservationsList({
                               .join(", ")
                           : "Ninguno"}
                       </p>
+                      {reservation.estimatedAttendees > 0 && (
+                        <p>
+                          <span className="text-muted-foreground">
+                            Asistentes estimados:{" "}
+                          </span>
+                          {reservation.estimatedAttendees}
+                        </p>
+                      )}
+                      {reservation.actualAttendees != null && (
+                        <p>
+                          <span className="text-muted-foreground">
+                            Asistentes registrados:{" "}
+                          </span>
+                          {reservation.actualAttendees}
+                        </p>
+                      )}
                       {isAdmin && (
                         <p>
                           <span className="text-muted-foreground">Área: </span>
@@ -283,28 +304,41 @@ export function ReservationsList({
                       onClick={(event) => event.stopPropagation()}
                       onKeyDown={(event) => event.stopPropagation()}
                     >
-                      <Button asChild size="sm" variant="outline">
-                        <Link href={`/reservas/${reservation.id}/editar`}>
-                          <Pencil className="mr-1 h-4 w-4" />
-                          Modificar
-                        </Link>
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="text-destructive hover:text-destructive"
-                        disabled={loadingId === reservation.id}
-                        onClick={() =>
-                          handleCancel(reservation.id, reservation.eventName)
-                        }
-                      >
-                        {loadingId === reservation.id ? (
-                          <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-                        ) : (
-                          <Trash2 className="mr-1 h-4 w-4" />
+                      {canConfirmAttendance(viewerUser, reservation) &&
+                        isPastReservation(reservation) &&
+                        !isAdmin && (
+                          <Button asChild size="sm" variant="default">
+                            <Link href={`/reservas/${reservation.id}/editar`}>
+                              Registrar asistencia
+                            </Link>
+                          </Button>
                         )}
-                        Cancelar
-                      </Button>
+                      {canModifyReservation(viewerUser, reservation) && (
+                        <Button asChild size="sm" variant="outline">
+                          <Link href={`/reservas/${reservation.id}/editar`}>
+                            <Pencil className="mr-1 h-4 w-4" />
+                            Modificar
+                          </Link>
+                        </Button>
+                      )}
+                      {canCancelReservation(viewerUser, reservation) && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-destructive hover:text-destructive"
+                          disabled={loadingId === reservation.id}
+                          onClick={() =>
+                            handleCancel(reservation.id, reservation.eventName)
+                          }
+                        >
+                          {loadingId === reservation.id ? (
+                            <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="mr-1 h-4 w-4" />
+                          )}
+                          Cancelar
+                        </Button>
+                      )}
                     </div>
                   </CardContent>
                 )}

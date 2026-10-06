@@ -32,6 +32,9 @@ const updateSchema = z.object({
     .optional()
     .default([]),
   confirmSimilarName: z.boolean().optional().default(false),
+  estimatedAttendees: z.coerce.number().min(1),
+  attendeeJustificationCode: z.string().optional().default(""),
+  attendeeJustificationNote: z.string().optional().default(""),
 });
 
 export async function GET(
@@ -95,6 +98,9 @@ export async function PATCH(
       resources: parsed.data.resources.filter((item) => item.quantity > 0),
       confirmSimilarName: parsed.data.confirmSimilarName,
       requestedByAdmin: admin,
+      estimatedAttendees: parsed.data.estimatedAttendees,
+      attendeeJustificationCode: parsed.data.attendeeJustificationCode,
+      attendeeJustificationNote: parsed.data.attendeeJustificationNote,
     });
 
     const detail = await getReservationDetail(id);
