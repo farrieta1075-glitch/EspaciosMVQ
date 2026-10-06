@@ -2,7 +2,14 @@
 
 import * as React from "react";
 import { Loader2 } from "lucide-react";
+import type { Area } from "@/types/area";
 import type { FloorMap, Space } from "@/types/space";
+import {
+  getAreaHex,
+  hexToRgba,
+  MAP_AVAILABLE_FILL,
+  MAP_AVAILABLE_STROKE,
+} from "@/lib/area-colors";
 import type {
   AvailabilityResponse,
   MapDateSelection,
@@ -43,6 +50,8 @@ interface MapDateSelectorProps {
   readOnly?: boolean;
   compact?: boolean;
   layout?: "default" | "reservation";
+  areas?: Area[];
+  highlightAreaId?: string | null;
   resourcesSheetOpen?: boolean;
   onResourcesSheetOpenChange?: (open: boolean) => void;
   /** Excluye esta reserva al calcular disponibilidad (edición). */
@@ -63,6 +72,8 @@ export function MapDateSelector({
   readOnly = false,
   compact = false,
   layout = "default",
+  areas = [],
+  highlightAreaId = null,
   resourcesSheetOpen,
   onResourcesSheetOpenChange,
   excludeReservationId,
@@ -87,13 +98,15 @@ export function MapDateSelector({
   const [internalResourcesOpen, setInternalResourcesOpen] = React.useState(false);
   const resourcesOpen = resourcesSheetOpen ?? internalResourcesOpen;
   const setResourcesOpen = onResourcesSheetOpenChange ?? setInternalResourcesOpen;
-  const [mapId, setMapId] = React.useState(
-    initialSelection?.mapId ??
-      initialMapId ??
-      defaultMapId ??
-      maps[0]?.id ??
-      "",
-  );
+  const [mapId, setMapId] = React.useState(() => {
+    if (initialSelection?.mapId) return initialSelection.mapId;
+    if (initialMapId) return initialMapId;
+    if (initialSpaceId) {
+      const space = spaces.find((item) => item.id === initialSpaceId);
+      if (space?.mapId) return space.mapId;
+    }
+    return defaultMapId ?? maps[0]?.id ?? "";
+  });
   const [selectedSpaceIds, setSelectedSpaceIds] = React.useState<string[]>(
     () => {
       if (initialSelection?.selectedSpaceIds?.length) {
@@ -128,11 +141,69 @@ export function MapDateSelector({
     if (!mapId && maps[0]?.id) setMapId(maps[0].id);
   }, [mapId, maps, initialSelection?.mapId]);
 
+  const skipClearSpacesOnMapChange = React.useRef(true);
   React.useEffect(() => {
     if (initialSelection) return;
+    if (skipClearSpacesOnMapChange.current) {
+      skipClearSpacesOnMapChange.current = false;
+      return;
+    }
     setSelectedSpaceIds([]);
     setSelectedResources({});
   }, [mapId, initialSelection]);
+
+  const spaceOccupantAreaIds = React.useMemo(() => {
+    const map = new Map<string, string>();
+    for (const space of availability?.spaces ?? []) {
+      if (space.areaId) map.set(space.id, space.areaId);
+    }
+    return map;
+  }, [availability?.spaces]);
+
+  const reservationPaintStyle = React.useCallback(
+    (
+      spaceId: string,
+      availabilityStatus: SpaceAvailabilityStatus,
+      isSelected: boolean,
+    ) => {
+      const highlightArea =
+        areas.find((area) => area.id === highlightAreaId) ?? null;
+      const viewerHex = getAreaHex(highlightArea);
+
+      if (isSelected) {
+        const occupantId = spaceOccupantAreaIds.get(spaceId);
+        const highlightHex =
+          availabilityStatus === "occupied" && occupantId
+            ? getAreaHex(areas.find((area) => area.id === occupantId) ?? null)
+            : viewerHex;
+        return {
+          fill: hexToRgba(highlightHex, 0.78),
+          stroke: highlightHex,
+          listening: true,
+        };
+      }
+
+      if (availabilityStatus === "occupied") {
+        const hex = getAreaHex(
+          areas.find(
+            (area) => area.id === spaceOccupantAreaIds.get(spaceId),
+          ) ?? null,
+        );
+        return {
+          fill: hexToRgba(hex, 0.55),
+          stroke: hex,
+          listening: false,
+        };
+      }
+
+      return {
+        fill: MAP_AVAILABLE_FILL,
+        stroke: MAP_AVAILABLE_STROKE,
+        listening: !readOnly,
+      };
+    },
+    [areas, highlightAreaId, readOnly, spaceOccupantAreaIds],
+  );
 
   React.useEffect(() => {
     if (!mapId) return;
@@ -317,6 +388,9 @@ export function MapDateSelector({
               compact={compact || isReservationLayout}
               fitContainerWidth={isReservationLayout}
               showDefaultLegend={!isReservationLayout}
+              getSpacePaintStyle={
+                isReservationLayout ? reservationPaintStyle : undefined
+              }
             />
           )}
 

@@ -65,7 +65,7 @@ export function DateNavigator({
           <Link
             href={calendarHref ?? `/calendario?date=${isoDate}`}
             className={cn(
-              "mt-0.5 block truncate text-base font-semibold capitalize",
+              "mt-0.5 block truncate text-base font-semibold",
               "text-primary underline-offset-4 hover:underline",
             )}
           >
@@ -110,7 +110,7 @@ export function DateNavigator({
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Fecha seleccionada
           </p>
-          <p className="truncate text-sm font-medium capitalize sm:text-lg">
+          <p className="truncate text-sm font-medium sm:text-lg">
             {formatDateDisplay(date)}
           </p>
         </div>

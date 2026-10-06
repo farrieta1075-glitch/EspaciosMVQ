@@ -40,6 +40,8 @@ export type SpaceAvailabilityStatus = "available" | "occupied";
 export interface SpaceAvailability {
   id: string;
   status: SpaceAvailabilityStatus;
+  /** Área de la reserva que ocupa el espacio (si está ocupado). */
+  areaId?: string;
 }
 
 export interface ResourceAvailability {

@@ -21,13 +21,17 @@ export function addMonths(date: Date, months: number): Date {
   return next;
 }
 
+/** Ej.: Miércoles, 7 de octubre de 2026 */
 export function formatDateDisplay(date: Date): string {
-  return date.toLocaleDateString("es-MX", {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
+  const weekdayRaw = date.toLocaleDateString("es-MX", { weekday: "long" });
+  const weekday =
+    weekdayRaw.charAt(0).toUpperCase() + weekdayRaw.slice(1).toLowerCase();
+  const month = date
+    .toLocaleDateString("es-MX", { month: "long" })
+    .toLowerCase();
+  const day = date.getDate();
+  const year = date.getFullYear();
+  return `${weekday}, ${day} de ${month} de ${year}`;
 }
 
 /** Interpreta fechas guardadas en Sheets (ISO, solo fecha, o D/M/YYYY con hora). */
@@ -177,7 +181,7 @@ export function formatReservationDateTimeRange(
     start!.getDate() === end!.getDate();
 
   if (sameDay) {
-    return `${dateLabel} · ${startTime} – ${endTime}`;
+    return `${formatDateDisplay(start!)} · ${startTime} – ${endTime}`;
   }
 
   const endDateLabel = formatDateShortDisplay(end!);

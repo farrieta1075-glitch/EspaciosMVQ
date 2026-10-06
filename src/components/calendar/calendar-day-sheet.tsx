@@ -165,7 +165,7 @@ export function CalendarDaySheet({
         className="max-h-[92dvh] overflow-y-auto rounded-t-2xl px-4 pb-8 pt-4 sm:px-6"
       >
         <SheetHeader className="text-left">
-          <SheetTitle className="capitalize">{formatDateDisplay(date)}</SheetTitle>
+          <SheetTitle>{formatDateDisplay(date)}</SheetTitle>
         </SheetHeader>
 
         <div className="mt-4 space-y-4">

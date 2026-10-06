@@ -44,6 +44,7 @@ export async function getAvailability(
   const overlappingReservationIds = new Set<string>();
 
   const occupiedSpaceIds = new Set<string>();
+  const occupiedSpaceAreaIds = new Map<string, string>();
 
   for (const reservation of reservations) {
     if (!reservation.startAt || !reservation.endAt) continue;
@@ -63,6 +64,9 @@ export async function getAvailability(
     for (const spaceId of reservation.spaceIds) {
       if (activeSpaceIds.has(spaceId)) {
         occupiedSpaceIds.add(spaceId);
+        if (!occupiedSpaceAreaIds.has(spaceId) && reservation.areaId) {
+          occupiedSpaceAreaIds.set(spaceId, reservation.areaId);
+        }
       }
     }
   }
@@ -72,6 +76,7 @@ export async function getAvailability(
     .map((space) => ({
       id: space.id,
       status: occupiedSpaceIds.has(space.id) ? "occupied" : "available",
+      areaId: occupiedSpaceAreaIds.get(space.id),
     }));
 
   const reservedQtyByResource = new Map<string, number>();

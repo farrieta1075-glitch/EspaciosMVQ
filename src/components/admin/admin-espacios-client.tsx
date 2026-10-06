@@ -4,19 +4,21 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  ChevronDown,
+  ChevronRight,
   Loader2,
   Map,
   Pencil,
   Plus,
   Trash2,
 } from "lucide-react";
+import { AdminSectionHint } from "@/components/admin/admin-section-hint";
 import type { FloorMap, Space } from "@/types/space";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -49,6 +51,8 @@ export function AdminEspaciosClient({
   const [spaceFloor, setSpaceFloor] = React.useState("");
   const [spaceCapacity, setSpaceCapacity] = React.useState("10");
   const [spaceMapId, setSpaceMapId] = React.useState(maps[0]?.id ?? "");
+  const [mapsSectionOpen, setMapsSectionOpen] = React.useState(false);
+  const [spacesSectionOpen, setSpacesSectionOpen] = React.useState(false);
 
   React.useEffect(() => {
     if (!spaceMapId && maps[0]?.id) setSpaceMapId(maps[0].id);
@@ -157,6 +161,11 @@ export function AdminEspaciosClient({
 
   return (
     <div className="space-y-8">
+      <header className="flex items-center gap-2">
+        <h1 className="text-2xl font-semibold tracking-tight">Espacios</h1>
+        <AdminSectionHint text="Administra mapas de planta y espacios reservables." />
+      </header>
+
       {error && (
         <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {error}
@@ -165,15 +174,26 @@ export function AdminEspaciosClient({
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Map className="h-5 w-5" />
-              Mapas de planta
-            </CardTitle>
-            <CardDescription>
-              Crea un lienzo en blanco o sube PNG/JPG/PDF como fondo.
-            </CardDescription>
+          <CardHeader className="pb-3">
+            <button
+              type="button"
+              className="flex w-full items-center gap-2 text-left"
+              onClick={() => setMapsSectionOpen((open) => !open)}
+              aria-expanded={mapsSectionOpen}
+            >
+              {mapsSectionOpen ? (
+                <ChevronDown className="h-5 w-5 shrink-0 text-muted-foreground" />
+              ) : (
+                <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" />
+              )}
+              <Map className="h-5 w-5 shrink-0" />
+              <CardTitle className="flex flex-1 items-center gap-2 text-lg">
+                Mapas de planta
+                <AdminSectionHint text="Crea un lienzo en blanco o sube PNG/JPG/PDF como fondo." />
+              </CardTitle>
+            </button>
           </CardHeader>
+          {mapsSectionOpen && (
           <CardContent>
             <form onSubmit={handleCreateMap} className="space-y-4">
               <div className="space-y-2">
@@ -264,15 +284,29 @@ export function AdminEspaciosClient({
               )}
             </div>
           </CardContent>
+          )}
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle>Espacios reservables</CardTitle>
-            <CardDescription>
-              Define espacios y luego delímitalos en el editor gráfico.
-            </CardDescription>
+          <CardHeader className="pb-3">
+            <button
+              type="button"
+              className="flex w-full items-center gap-2 text-left"
+              onClick={() => setSpacesSectionOpen((open) => !open)}
+              aria-expanded={spacesSectionOpen}
+            >
+              {spacesSectionOpen ? (
+                <ChevronDown className="h-5 w-5 shrink-0 text-muted-foreground" />
+              ) : (
+                <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" />
+              )}
+              <CardTitle className="flex flex-1 items-center gap-2 text-lg">
+                Espacios reservables
+                <AdminSectionHint text="Define espacios y luego delímitalos en el editor gráfico." />
+              </CardTitle>
+            </button>
           </CardHeader>
+          {spacesSectionOpen && (
           <CardContent>
             <form onSubmit={handleCreateSpace} className="space-y-4">
               <div className="space-y-2">
@@ -371,6 +405,7 @@ export function AdminEspaciosClient({
               )}
             </div>
           </CardContent>
+          )}
         </Card>
       </div>
     </div>

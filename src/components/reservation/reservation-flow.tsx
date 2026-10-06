@@ -156,6 +156,8 @@ export function ReservationFlow({
         initialDate={initialDate}
         initialMapId={initialMapId}
         initialSpaceId={initialSpaceId}
+        areas={areas}
+        highlightAreaId={isAdmin ? areaId : userAreaId}
         layout="reservation"
         showResourcePanel
         showCalendarLink={false}
