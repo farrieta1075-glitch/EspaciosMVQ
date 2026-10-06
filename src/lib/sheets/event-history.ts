@@ -1,7 +1,6 @@
 import "server-only";
 import {
   appendSheetRow,
-  findRowIndexById,
   getSheetRows,
   updateSheetRowByIndex,
 } from "@/lib/sheets/repository";

@@ -200,7 +200,7 @@ export function ReservationFlow({
           <CardHeader>
             <CardTitle className="text-base">Nombre similar detectado</CardTitle>
             <CardDescription>
-              "{similarPrompt.name}" es similar al nombre ingresado (
+              &ldquo;{similarPrompt.name}&rdquo; es similar al nombre ingresado (
               {similarPrompt.similarity}% coincidencia). ¿Deseas continuar?
             </CardDescription>
           </CardHeader>

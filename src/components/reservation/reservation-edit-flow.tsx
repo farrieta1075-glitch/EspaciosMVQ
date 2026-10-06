@@ -238,8 +238,8 @@ export function ReservationEditFlow({
           <CardHeader>
             <CardTitle className="text-base">Nombre similar detectado</CardTitle>
             <CardDescription>
-              "{similarPrompt.name}" es similar ({similarPrompt.similarity}%).
-              ¿Deseas continuar?
+              &ldquo;{similarPrompt.name}&rdquo; es similar ({similarPrompt.similarity}
+              %). ¿Deseas continuar?
             </CardDescription>
           </CardHeader>
           <CardContent className="flex gap-2">

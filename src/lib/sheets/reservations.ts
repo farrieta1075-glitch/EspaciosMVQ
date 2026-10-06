@@ -3,7 +3,6 @@ import { z } from "zod";
 import {
   appendSheetRow,
   deleteSheetRowByIndex,
-  findRowIndexById,
   getSheetMeta,
   getSheetRowsCanonical,
   updateSheetRowById,

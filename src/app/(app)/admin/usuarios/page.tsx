@@ -12,13 +12,15 @@ export default async function AdminUsuariosPage() {
   ]);
 
   const areaMap = new Map(areas.map((area) => [area.id, area.name]));
-  const publicUsers: PublicUser[] = users.map((user) => {
-    const { passwordHash: _passwordHash, ...rest } = user;
-    return {
-      ...rest,
-      areaName: user.areaId ? areaMap.get(user.areaId) ?? null : null,
-    };
-  });
+  const publicUsers: PublicUser[] = users.map((user) => ({
+    id: user.id,
+    email: user.email,
+    username: user.username,
+    role: user.role,
+    areaId: user.areaId,
+    active: user.active,
+    areaName: user.areaId ? areaMap.get(user.areaId) ?? null : null,
+  }));
 
   return (
     <section className="space-y-6">
