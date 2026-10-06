@@ -6,19 +6,16 @@ import {
 } from "@/lib/approval-change-summary";
 import { getReservationDetail } from "@/lib/reservation-service";
 import { getAllSpaces } from "@/lib/sheets/spaces";
+import { getAppBaseUrl } from "@/lib/app-url";
 import type { Reservation } from "@/types/reservation";
 import { parsePendingPayload } from "@/types/reservation";
-
-function appBaseUrl(): string {
-  return process.env.AUTH_URL ?? "http://localhost:3000";
-}
 
 export function approvalResponderUrl(reservation: Reservation): string {
   const params = new URLSearchParams({
     id: reservation.id,
     token: reservation.approvalToken,
   });
-  return `${appBaseUrl()}/aprobaciones/responder?${params.toString()}`;
+  return `${getAppBaseUrl()}/aprobaciones/responder?${params.toString()}`;
 }
 
 /** Enlace de un clic desde el correo (respuesta HTML mínima, sin layout de la app). */
@@ -30,7 +27,7 @@ export function approvalEmailActionUrl(
     token: reservation.approvalToken,
     action,
   });
-  return `${appBaseUrl()}/api/reservas/${encodeURIComponent(reservation.id)}/accion-correo?${params.toString()}`;
+  return `${getAppBaseUrl()}/api/reservas/${encodeURIComponent(reservation.id)}/accion-correo?${params.toString()}`;
 }
 
 function actionLabel(reservation: Reservation): string {
