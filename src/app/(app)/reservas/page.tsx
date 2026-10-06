@@ -17,16 +17,9 @@ export default async function ReservasPage() {
   return (
     <section className="space-y-6">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {admin ? "Todas las reservas" : "Mis reservas"}
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            {admin
-              ? "Consulta, modifica o cancela reservas de cualquier área."
-              : "Reservas activas de tu área."}
-          </p>
-        </div>
+        <h1 className="text-2xl font-semibold tracking-tight">
+          {admin ? "Todas las reservas" : "Mis reservas"}
+        </h1>
         <Button asChild className="shrink-0">
           <Link href="/reserva">Nueva reserva</Link>
         </Button>

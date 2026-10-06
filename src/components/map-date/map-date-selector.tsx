@@ -35,6 +35,8 @@ interface MapDateSelectorProps {
   spaces: Space[];
   defaultMapId?: string;
   initialDate?: string;
+  initialMapId?: string;
+  initialSpaceId?: string;
   initialSelection?: InitialMapSelection;
   showResourcePanel?: boolean;
   showCalendarLink?: boolean;
@@ -53,6 +55,8 @@ export function MapDateSelector({
   spaces,
   defaultMapId,
   initialDate,
+  initialMapId,
+  initialSpaceId,
   initialSelection,
   showResourcePanel = true,
   showCalendarLink = true,
@@ -84,10 +88,20 @@ export function MapDateSelector({
   const resourcesOpen = resourcesSheetOpen ?? internalResourcesOpen;
   const setResourcesOpen = onResourcesSheetOpenChange ?? setInternalResourcesOpen;
   const [mapId, setMapId] = React.useState(
-    initialSelection?.mapId ?? defaultMapId ?? maps[0]?.id ?? "",
+    initialSelection?.mapId ??
+      initialMapId ??
+      defaultMapId ??
+      maps[0]?.id ??
+      "",
   );
   const [selectedSpaceIds, setSelectedSpaceIds] = React.useState<string[]>(
-    initialSelection?.selectedSpaceIds ?? [],
+    () => {
+      if (initialSelection?.selectedSpaceIds?.length) {
+        return initialSelection.selectedSpaceIds;
+      }
+      if (initialSpaceId) return [initialSpaceId];
+      return [];
+    },
   );
   const [selectedResources, setSelectedResources] = React.useState<
     Record<string, number>
@@ -213,6 +227,15 @@ export function MapDateSelector({
     }));
   }
 
+  const calendarHref = React.useMemo(() => {
+    const params = new URLSearchParams({
+      date: formatDateISO(selectedDate),
+    });
+    if (mapId) params.set("mapId", mapId);
+    if (selectedSpaceIds[0]) params.set("spaceId", selectedSpaceIds[0]);
+    return `/calendario?${params.toString()}`;
+  }, [selectedDate, mapId, selectedSpaceIds]);
+
   if (maps.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
@@ -232,6 +255,7 @@ export function MapDateSelector({
         onEndTimeChange={setEndTime}
         showCalendarLink={showCalendarLink && !isReservationLayout}
         variant={isReservationLayout ? "reservation" : "default"}
+        calendarHref={isReservationLayout ? calendarHref : undefined}
       />
 
       {maps.length > 1 && (

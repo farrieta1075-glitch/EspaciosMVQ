@@ -42,6 +42,8 @@ interface CalendarDaySheetProps {
   areas: Area[];
   viewerAreaId: string | null;
   canReserve: boolean;
+  initialMapId?: string;
+  initialSpaceId?: string;
 }
 
 function reservationsOnDate(reservations: ReservationDetail[], date: Date) {
@@ -75,19 +77,29 @@ export function CalendarDaySheet({
   areas,
   viewerAreaId,
   canReserve,
+  initialMapId,
+  initialSpaceId,
 }: CalendarDaySheetProps) {
-  const [mapId, setMapId] = React.useState(maps[0]?.id ?? "");
+  const [mapId, setMapId] = React.useState(
+    initialMapId ?? maps[0]?.id ?? "",
+  );
   const [selectedSpaceId, setSelectedSpaceId] = React.useState<string | null>(
-    null,
+    initialSpaceId ?? null,
   );
   const [showAreaLegend, setShowAreaLegend] = React.useState(false);
 
   React.useEffect(() => {
-    if (open) {
-      setSelectedSpaceId(null);
-      setShowAreaLegend(false);
+    if (!open) return;
+    setShowAreaLegend(false);
+    if (initialMapId && maps.some((map) => map.id === initialMapId)) {
+      setMapId(initialMapId);
     }
-  }, [open, date]);
+    if (initialSpaceId) {
+      setSelectedSpaceId(initialSpaceId);
+    } else {
+      setSelectedSpaceId(null);
+    }
+  }, [open, date, initialMapId, initialSpaceId, maps]);
 
   const dayEvents = React.useMemo(
     () => (date ? reservationsOnDate(reservations, date) : []),
@@ -260,7 +272,14 @@ export function CalendarDaySheet({
           {selectionAction === "reserve" && (
             <Button asChild className="w-full">
               <Link
-                href={`/reserva?date=${formatDateISO(date)}`}
+                href={(() => {
+                  const params = new URLSearchParams({
+                    date: formatDateISO(date),
+                  });
+                  if (mapId) params.set("mapId", mapId);
+                  if (selectedSpaceId) params.set("spaceId", selectedSpaceId);
+                  return `/reserva?${params.toString()}`;
+                })()}
                 onClick={() => onOpenChange(false)}
               >
                 Reservar

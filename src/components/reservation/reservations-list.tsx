@@ -4,23 +4,23 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Calendar, Loader2, Pencil, Trash2 } from "lucide-react";
-import { formatReservationDateTimeRange } from "@/lib/date-utils";
+import {
+  formatReservationDateTimeRange,
+  formatTimeDisplay,
+} from "@/lib/date-utils";
 import type { ReservationDetail } from "@/types/reservation";
 import { reservationNeedsAdminAction } from "@/types/reservation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 interface ReservationsListProps {
   initialReservations: ReservationDetail[];
   isAdmin: boolean;
 }
+
+type ListFilter = "upcoming" | "past";
 
 function statusLabel(reservation: ReservationDetail): string {
   if (reservation.status === "PENDING") return "Pendiente de autorización";
@@ -39,6 +39,21 @@ function statusVariant(
   return "default";
 }
 
+function isPastReservation(reservation: ReservationDetail): boolean {
+  return new Date(reservation.endAt).getTime() < Date.now();
+}
+
+function summaryDateTime(reservation: ReservationDetail): string {
+  const start = new Date(reservation.startAt);
+  const end = new Date(reservation.endAt);
+  const datePart = start.toLocaleDateString("es-MX", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+  return `${datePart} · ${formatTimeDisplay(start)}–${formatTimeDisplay(end)}`;
+}
+
 export function ReservationsList({
   initialReservations,
   isAdmin,
@@ -46,15 +61,41 @@ export function ReservationsList({
   const router = useRouter();
   const [reservations, setReservations] =
     React.useState(initialReservations);
+  const [listFilter, setListFilter] = React.useState<ListFilter>("upcoming");
+  const [expandedIds, setExpandedIds] = React.useState<Set<string>>(
+    () => new Set(),
+  );
   const [loadingId, setLoadingId] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [success, setSuccess] = React.useState<string | null>(null);
+
+  const filtered = React.useMemo(() => {
+    const list = reservations.filter((reservation) =>
+      listFilter === "past"
+        ? isPastReservation(reservation)
+        : !isPastReservation(reservation),
+    );
+    return list.sort((a, b) => {
+      const diff =
+        new Date(a.startAt).getTime() - new Date(b.startAt).getTime();
+      return listFilter === "past" ? -diff : diff;
+    });
+  }, [reservations, listFilter]);
 
   async function refreshList() {
     const response = await fetch("/api/reservas");
     if (response.ok) {
       setReservations(await response.json());
     }
+  }
+
+  function toggleExpanded(id: string) {
+    setExpandedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   }
 
   async function handleCancel(id: string, eventName: string) {
@@ -92,29 +133,41 @@ export function ReservationsList({
     }
   }
 
-  if (reservations.length === 0) {
-    return (
-      <Card>
-        <CardContent className="flex flex-col items-center gap-4 py-12 text-center">
-          <Calendar className="h-10 w-10 text-muted-foreground" />
-          <div>
-            <p className="font-medium">No hay reservas activas</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {isAdmin
-                ? "Aún no se han registrado reservas en el sistema."
-                : "Tu área no tiene reservas activas por ahora."}
-            </p>
-          </div>
-          <Button asChild>
-            <Link href="/reserva">Crear reserva</Link>
-          </Button>
-        </CardContent>
-      </Card>
-    );
-  }
-
   return (
     <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <div
+          className="inline-flex rounded-lg border border-border p-0.5 text-xs sm:text-sm"
+          role="group"
+          aria-label="Filtrar reservas por periodo"
+        >
+          <button
+            type="button"
+            className={cn(
+              "rounded-md px-2.5 py-1.5 font-medium transition-colors sm:px-3",
+              listFilter === "upcoming"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+            onClick={() => setListFilter("upcoming")}
+          >
+            Actuales y futuras
+          </button>
+          <button
+            type="button"
+            className={cn(
+              "rounded-md px-2.5 py-1.5 font-medium transition-colors sm:px-3",
+              listFilter === "past"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+            onClick={() => setListFilter("past")}
+          >
+            Pasadas
+          </button>
+        </div>
+      </div>
+
       {error && (
         <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {error}
@@ -126,100 +179,140 @@ export function ReservationsList({
         </p>
       )}
 
-      <div className="grid gap-4 md:grid-cols-2">
-        {reservations.map((reservation) => (
-          <Card key={reservation.id}>
-            <CardHeader className="pb-3">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <CardTitle className="truncate text-lg">
-                    {reservation.eventName}
-                  </CardTitle>
-                  <CardDescription className="mt-1 line-clamp-2">
-                    {formatReservationDateTimeRange(
-                      reservation.startAt,
-                      reservation.endAt,
-                    )}
-                  </CardDescription>
-                </div>
-                <Badge variant={statusVariant(reservation)}>
-                  {statusLabel(reservation)}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {reservation.eventDescription && (
-                <p className="text-sm text-muted-foreground">
-                  {reservation.eventDescription}
-                </p>
-              )}
-              {reservationNeedsAdminAction(reservation) && (
-                <p className="rounded-md bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-200">
-                  {reservation.status === "PENDING"
-                    ? "Esta reserva espera autorización de un administrador."
-                    : reservation.pendingAction === "UPDATE"
-                      ? "Los cambios solicitados esperan autorización."
-                      : "La cancelación solicitada espera autorización."}
-                </p>
-              )}
-              <div className="space-y-1 text-sm">
-                <p className="font-medium text-foreground">
-                  <span className="font-normal text-muted-foreground">
-                    Fecha y horario:{" "}
-                  </span>
-                  {formatReservationDateTimeRange(
-                    reservation.startAt,
-                    reservation.endAt,
-                  )}
-                </p>
-                <p>
-                  <span className="text-muted-foreground">Espacios: </span>
-                  {reservation.spaceNames.join(", ") || "—"}
-                </p>
-                <p>
-                  <span className="text-muted-foreground">Recursos: </span>
-                  {reservation.resources.length > 0
-                    ? reservation.resources
-                        .map((r) => `${r.resourceName} ×${r.quantity}`)
-                        .join(", ")
-                    : "Ninguno"}
-                </p>
-                {isAdmin && (
-                  <p>
-                    <span className="text-muted-foreground">Área: </span>
-                    {reservation.areaName ?? reservation.areaId ?? "—"}
-                  </p>
-                )}
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                <Button asChild size="sm" variant="outline">
-                  <Link href={`/reservas/${reservation.id}/editar`}>
-                    <Pencil className="mr-1 h-4 w-4" />
-                    Modificar
-                  </Link>
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="text-destructive hover:text-destructive"
-                  disabled={loadingId === reservation.id}
-                  onClick={() =>
-                    handleCancel(reservation.id, reservation.eventName)
-                  }
+      {filtered.length === 0 ? (
+        <Card>
+          <CardContent className="flex flex-col items-center gap-4 py-12 text-center">
+            <Calendar className="h-10 w-10 text-muted-foreground" />
+            <div>
+              <p className="font-medium">
+                {listFilter === "past"
+                  ? "No hay reservas pasadas"
+                  : "No hay reservas actuales o futuras"}
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {listFilter === "past"
+                  ? "Las reservas anteriores aparecerán aquí."
+                  : isAdmin
+                    ? "Aún no hay reservas en este periodo."
+                    : "Tu área no tiene reservas en este periodo."}
+              </p>
+            </div>
+            {listFilter === "upcoming" && (
+              <Button asChild>
+                <Link href="/reserva">Crear reserva</Link>
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid gap-2 md:grid-cols-2 md:gap-3">
+          {filtered.map((reservation) => {
+            const expanded = expandedIds.has(reservation.id);
+            return (
+              <Card key={reservation.id} className="overflow-hidden">
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2 px-3 py-3 text-left transition-colors hover:bg-muted/40 sm:px-4"
+                  onClick={() => toggleExpanded(reservation.id)}
+                  aria-expanded={expanded}
                 >
-                  {loadingId === reservation.id ? (
-                    <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Trash2 className="mr-1 h-4 w-4" />
-                  )}
-                  Cancelar
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold sm:text-base">
+                      {reservation.eventName}
+                    </p>
+                    <p className="truncate text-xs text-muted-foreground sm:text-sm">
+                      {summaryDateTime(reservation)}
+                    </p>
+                  </div>
+                  <Badge
+                    variant={statusVariant(reservation)}
+                    className="shrink-0 text-[10px] sm:text-xs"
+                  >
+                    {statusLabel(reservation)}
+                  </Badge>
+                </button>
+
+                {expanded && (
+                  <CardContent className="space-y-4 border-t border-border pt-4">
+                    {reservation.eventDescription && (
+                      <p className="text-sm text-muted-foreground">
+                        {reservation.eventDescription}
+                      </p>
+                    )}
+                    {reservationNeedsAdminAction(reservation) && (
+                      <p className="rounded-md bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-200">
+                        {reservation.status === "PENDING"
+                          ? "Esta reserva espera autorización de un administrador."
+                          : reservation.pendingAction === "UPDATE"
+                            ? "Los cambios solicitados esperan autorización."
+                            : "La cancelación solicitada espera autorización."}
+                      </p>
+                    )}
+                    <div className="space-y-1 text-sm">
+                      <p className="font-medium text-foreground">
+                        <span className="font-normal text-muted-foreground">
+                          Fecha y horario:{" "}
+                        </span>
+                        {formatReservationDateTimeRange(
+                          reservation.startAt,
+                          reservation.endAt,
+                        )}
+                      </p>
+                      <p>
+                        <span className="text-muted-foreground">Espacios: </span>
+                        {reservation.spaceNames.join(", ") || "—"}
+                      </p>
+                      <p>
+                        <span className="text-muted-foreground">Recursos: </span>
+                        {reservation.resources.length > 0
+                          ? reservation.resources
+                              .map((r) => `${r.resourceName} ×${r.quantity}`)
+                              .join(", ")
+                          : "Ninguno"}
+                      </p>
+                      {isAdmin && (
+                        <p>
+                          <span className="text-muted-foreground">Área: </span>
+                          {reservation.areaName ?? reservation.areaId ?? "—"}
+                        </p>
+                      )}
+                    </div>
+
+                    <div
+                      className="flex flex-wrap gap-2"
+                      onClick={(event) => event.stopPropagation()}
+                      onKeyDown={(event) => event.stopPropagation()}
+                    >
+                      <Button asChild size="sm" variant="outline">
+                        <Link href={`/reservas/${reservation.id}/editar`}>
+                          <Pencil className="mr-1 h-4 w-4" />
+                          Modificar
+                        </Link>
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-destructive hover:text-destructive"
+                        disabled={loadingId === reservation.id}
+                        onClick={() =>
+                          handleCancel(reservation.id, reservation.eventName)
+                        }
+                      >
+                        {loadingId === reservation.id ? (
+                          <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="mr-1 h-4 w-4" />
+                        )}
+                        Cancelar
+                      </Button>
+                    </div>
+                  </CardContent>
+                )}
+              </Card>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

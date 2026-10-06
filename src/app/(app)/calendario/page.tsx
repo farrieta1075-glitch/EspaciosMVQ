@@ -5,7 +5,7 @@ import { listAllReservationDetails } from "@/lib/reservation-service";
 import { CalendarClient } from "@/components/calendar/calendar-client";
 
 interface CalendarioPageProps {
-  searchParams: Promise<{ date?: string }>;
+  searchParams: Promise<{ date?: string; mapId?: string; spaceId?: string }>;
 }
 
 export default async function CalendarioPage({
@@ -37,6 +37,8 @@ export default async function CalendarioPage({
         canReserve={canReserve}
         viewerAreaId={session?.user?.areaId ?? null}
         initialDate={params.date}
+        initialMapId={params.mapId}
+        initialSpaceId={params.spaceId}
       />
     </section>
   );

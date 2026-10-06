@@ -31,6 +31,7 @@ interface DateNavigatorProps {
   onEndTimeChange: (time: string) => void;
   showCalendarLink?: boolean;
   variant?: "default" | "reservation";
+  calendarHref?: string;
 }
 
 const navButtonClass = "h-8 w-8 shrink-0 sm:h-9 sm:w-9";
@@ -44,6 +45,7 @@ export function DateNavigator({
   onEndTimeChange,
   showCalendarLink = true,
   variant = "default",
+  calendarHref,
 }: DateNavigatorProps) {
   const isoDate = formatDateISO(date);
   const startParsed =
@@ -61,7 +63,7 @@ export function DateNavigator({
             Fecha seleccionada
           </p>
           <Link
-            href={`/calendario?date=${isoDate}`}
+            href={calendarHref ?? `/calendario?date=${isoDate}`}
             className={cn(
               "mt-0.5 block truncate text-base font-semibold capitalize",
               "text-primary underline-offset-4 hover:underline",

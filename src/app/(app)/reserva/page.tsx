@@ -7,7 +7,7 @@ import { ReservationFlow } from "@/components/reservation/reservation-flow";
 export default async function ReservaPage({
   searchParams,
 }: {
-  searchParams: Promise<{ date?: string }>;
+  searchParams: Promise<{ date?: string; mapId?: string; spaceId?: string }>;
 }) {
   const session = await auth();
   const readOnly = !can(session?.user ?? null, "create:reservation");
@@ -46,6 +46,8 @@ export default async function ReservaPage({
           isAdmin={admin}
           userAreaId={session?.user?.areaId ?? null}
           initialDate={params.date}
+          initialMapId={params.mapId}
+          initialSpaceId={params.spaceId}
         />
       )}
     </section>

@@ -17,6 +17,13 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Sheet,
   SheetContent,
   SheetHeader,
@@ -30,6 +37,8 @@ interface ReservationFlowProps {
   isAdmin: boolean;
   userAreaId: string | null;
   initialDate?: string;
+  initialMapId?: string;
+  initialSpaceId?: string;
 }
 
 export function ReservationFlow({
@@ -39,6 +48,8 @@ export function ReservationFlow({
   isAdmin,
   userAreaId,
   initialDate,
+  initialMapId,
+  initialSpaceId,
 }: ReservationFlowProps) {
   const router = useRouter();
   const [selection, setSelection] = React.useState<MapDateSelection | null>(
@@ -134,41 +145,6 @@ export function ReservationFlow({
     }
   }
 
-  if (successInfo !== null) {
-    return (
-      <Card className="border-green-500/30 bg-green-500/5">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-green-700 dark:text-green-400">
-            <CheckCircle2 className="h-5 w-5" />
-            {successInfo.pending ? "Solicitud enviada" : "Reserva confirmada"}
-          </CardTitle>
-          <CardDescription>
-            {successInfo.pending
-              ? `Se envió la solicitud de ${successInfo.count === 1 ? "1 reserva" : `${successInfo.count} reservas`} para autorización del administrador.`
-              : `Se ${successInfo.count === 1 ? "creó 1 reserva" : `crearon ${successInfo.count} reservas`} correctamente.`}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-wrap gap-2">
-          <Button onClick={() => router.push("/reservas")}>
-            Ver mis reservas
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => {
-              setSuccessInfo(null);
-              setEventName("");
-              setEventDescription("");
-              setRecurrenceType("NONE");
-              setRecurrenceUntil("");
-            }}
-          >
-            Crear otra reserva
-          </Button>
-        </CardContent>
-      </Card>
-    );
-  }
-
   const resourceCount =
     selection?.selectedResources.filter((item) => item.quantity > 0).length ?? 0;
 
@@ -178,6 +154,8 @@ export function ReservationFlow({
         maps={maps}
         spaces={spaces}
         initialDate={initialDate}
+        initialMapId={initialMapId}
+        initialSpaceId={initialSpaceId}
         layout="reservation"
         showResourcePanel
         showCalendarLink={false}
@@ -284,6 +262,52 @@ export function ReservationFlow({
           "Confirmar reserva"
         )}
       </Button>
+
+      <Dialog
+        open={successInfo !== null}
+        onOpenChange={() => {
+          /* Sin cierre por overlay ni Escape */
+        }}
+      >
+        <DialogContent
+          onPointerDownOutside={(event) => event.preventDefault()}
+          onEscapeKeyDown={(event) => event.preventDefault()}
+          onInteractOutside={(event) => event.preventDefault()}
+        >
+          <DialogHeader>
+            <DialogTitle className="flex items-center justify-center gap-2 text-green-700 dark:text-green-400 sm:justify-start">
+              <CheckCircle2 className="h-5 w-5 shrink-0" />
+              {successInfo?.pending ? "Solicitud enviada" : "Reserva confirmada"}
+            </DialogTitle>
+            <DialogDescription className="text-left">
+              {successInfo?.pending
+                ? `Se envió la solicitud de ${successInfo.count === 1 ? "1 reserva" : `${successInfo.count} reservas`} para autorización del administrador.`
+                : `Se ${successInfo?.count === 1 ? "creó 1 reserva" : `crearon ${successInfo?.count ?? 0} reservas`} correctamente.`}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+            <Button
+              className="flex-1"
+              onClick={() => router.push("/reservas")}
+            >
+              Ver mis reservas
+            </Button>
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => {
+                setSuccessInfo(null);
+                setEventName("");
+                setEventDescription("");
+                setRecurrenceType("NONE");
+                setRecurrenceUntil("");
+              }}
+            >
+              Crear otra reserva
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

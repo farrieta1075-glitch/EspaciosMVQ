@@ -23,6 +23,8 @@ interface CalendarClientProps {
   canReserve: boolean;
   viewerAreaId: string | null;
   initialDate?: string;
+  initialMapId?: string;
+  initialSpaceId?: string;
 }
 
 export function CalendarClient({
@@ -34,6 +36,8 @@ export function CalendarClient({
   canReserve,
   viewerAreaId,
   initialDate,
+  initialMapId,
+  initialSpaceId,
 }: CalendarClientProps) {
   const [viewMode, setViewMode] = React.useState<CalendarViewMode>("month");
   const [anchorDate, setAnchorDate] = React.useState(() => {
@@ -47,6 +51,10 @@ export function CalendarClient({
   });
   const [sheetDate, setSheetDate] = React.useState<Date | null>(null);
   const [sheetOpen, setSheetOpen] = React.useState(false);
+  const [sheetSelectionHint, setSheetSelectionHint] = React.useState<{
+    mapId?: string;
+    spaceId?: string;
+  } | null>(null);
 
   React.useEffect(() => {
     if (!initialDate) return;
@@ -54,8 +62,12 @@ export function CalendarClient({
     if (y && m && d) {
       setSheetDate(new Date(y, m - 1, d, 12));
       setSheetOpen(true);
+      setSheetSelectionHint({
+        mapId: initialMapId,
+        spaceId: initialSpaceId,
+      });
     }
-  }, [initialDate]);
+  }, [initialDate, initialMapId, initialSpaceId]);
 
   const pendingCount = React.useMemo(
     () => reservations.filter((reservation) => reservation.needsApproval).length,
@@ -85,6 +97,7 @@ export function CalendarClient({
 
   function openDaySheet(date: Date) {
     setSheetDate(date);
+    setSheetSelectionHint(null);
     setSheetOpen(true);
   }
 
@@ -176,6 +189,8 @@ export function CalendarClient({
         areas={areas}
         viewerAreaId={viewerAreaId}
         canReserve={canReserve}
+        initialMapId={sheetSelectionHint?.mapId}
+        initialSpaceId={sheetSelectionHint?.spaceId}
       />
     </div>
   );
