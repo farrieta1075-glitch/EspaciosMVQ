@@ -154,7 +154,10 @@ async function main() {
     urlColumnIndex: 4,
   });
 
-  console.log("Listo. Redeploy en Vercel si hace falta y recarga la app.");
+  console.log("");
+  console.log("Listo. En Vercel (tras git push) prueba:");
+  console.log("  /api/storage/health");
+  console.log("  /api/storage/maps/<id-del-archivo>.png  (nombre completo con extensión)");
 }
 
 main().catch((error) => {
