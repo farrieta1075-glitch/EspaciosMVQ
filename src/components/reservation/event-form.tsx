@@ -32,6 +32,7 @@ interface EventFormProps {
   isAdmin: boolean;
   disabled?: boolean;
   hideRecurrence?: boolean;
+  hideAdminArea?: boolean;
   bare?: boolean;
 }
 
@@ -51,6 +52,7 @@ export function EventForm({
   isAdmin,
   disabled = false,
   hideRecurrence = false,
+  hideAdminArea = false,
   bare = false,
 }: EventFormProps) {
   const [suggestions, setSuggestions] = React.useState<
@@ -182,7 +184,7 @@ export function EventForm({
           </p>
         )}
 
-        {isAdmin && (
+        {isAdmin && !hideAdminArea && (
           <div className="space-y-2">
             <Label htmlFor="areaId">Área</Label>
             <Select
@@ -212,7 +214,7 @@ export function EventForm({
       <CardHeader>
         <CardTitle>Datos del evento</CardTitle>
         <CardDescription>
-          Nombre, recurrencia y área responsable de la reserva.
+          Nombre, descripción y recurrencia de la reserva.
         </CardDescription>
       </CardHeader>
       <CardContent>{fields}</CardContent>

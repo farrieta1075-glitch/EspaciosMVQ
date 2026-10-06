@@ -1,6 +1,13 @@
 import "server-only";
 import { z } from "zod";
-import { appendSheetRow, getSheetRows, updateSheetRowById } from "@/lib/sheets/repository";
+import {
+  appendSheetRow,
+  deleteSheetRowByIndex,
+  findRowIndexById,
+  getSheetMeta,
+  getSheetRows,
+  updateSheetRowById,
+} from "@/lib/sheets/repository";
 import { SHEET_TABS } from "@/lib/sheets/tabs";
 import type { AppNotification, NotificationType } from "@/types/notification";
 
@@ -46,12 +53,35 @@ function notificationToRow(notification: AppNotification): string[] {
   ];
 }
 
+function parseNotificationRow(row: Record<string, string>): AppNotification | null {
+  if (!row.id?.trim()) return null;
+  const parsed = notificationRowSchema.safeParse(row);
+  if (!parsed.success) {
+    console.warn(
+      `[sheets] Fila de notificación ignorada (${row.id ?? "sin id"}):`,
+      parsed.error.flatten().fieldErrors,
+    );
+    return null;
+  }
+  return {
+    id: parsed.data.id,
+    userId: parsed.data.userId,
+    areaId: parsed.data.areaId,
+    reservationId: parsed.data.reservationId,
+    type: parsed.data.type as NotificationType,
+    message: parsed.data.message,
+    read: parsed.data.read,
+    createdAt: parsed.data.createdAt,
+  };
+}
+
 export async function getNotificationsForUser(
   userId: string,
 ): Promise<AppNotification[]> {
   const { rows } = await getSheetRows(SHEET_TABS.NOTIFICACIONES);
   return rows
-    .map(mapRowToNotification)
+    .map(parseNotificationRow)
+    .filter((item): item is AppNotification => item !== null)
     .filter((item) => item.userId === userId)
     .sort(
       (a, b) =>
@@ -127,4 +157,20 @@ export async function markAllNotificationsRead(userId: string): Promise<void> {
       );
     }
   }
+}
+
+export async function deleteNotificationForUser(
+  id: string,
+  userId: string,
+): Promise<boolean> {
+  const notifications = await getNotificationsForUser(userId);
+  const notification = notifications.find((item) => item.id === id);
+  if (!notification) return false;
+
+  const rowIndex = await findRowIndexById(SHEET_TABS.NOTIFICACIONES, id);
+  if (!rowIndex) return false;
+
+  const { sheetId } = await getSheetMeta(SHEET_TABS.NOTIFICACIONES);
+  await deleteSheetRowByIndex(SHEET_TABS.NOTIFICACIONES, rowIndex, sheetId);
+  return true;
 }

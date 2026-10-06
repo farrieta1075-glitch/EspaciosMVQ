@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Bell } from "lucide-react";
+import { Bell, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useHeaderSheet } from "@/components/layout/header-sheet-context";
 import {
@@ -17,6 +17,7 @@ export function NotificationsBell() {
   const { activeSheet, setSheetOpen } = useHeaderSheet();
   const [notifications, setNotifications] = React.useState<AppNotification[]>([]);
   const [unreadCount, setUnreadCount] = React.useState(0);
+  const [deletingId, setDeletingId] = React.useState<string | null>(null);
   const open = activeSheet === "notifications";
 
   async function loadNotifications() {
@@ -40,6 +41,20 @@ export function NotificationsBell() {
       body: JSON.stringify({ markAllRead: true }),
     });
     await loadNotifications();
+  }
+
+  async function deleteNotification(id: string) {
+    setDeletingId(id);
+    try {
+      await fetch("/api/notificaciones", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      await loadNotifications();
+    } finally {
+      setDeletingId(null);
+    }
   }
 
   return (
@@ -69,26 +84,45 @@ export function NotificationsBell() {
         </SheetHeader>
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
           <div className="space-y-3">
-          {unreadCount > 0 && (
-            <Button size="sm" variant="outline" onClick={markAllRead}>
-              Marcar todas como leídas
-            </Button>
-          )}
-          {notifications.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No tienes notificaciones.</p>
-          ) : (
-            notifications.map((notification) => (
-              <div
-                key={notification.id}
-                className={`rounded-lg border p-3 text-sm ${notification.read ? "opacity-70" : "border-primary/30 bg-primary/5"}`}
-              >
-                <p>{notification.message}</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {new Date(notification.createdAt).toLocaleString("es-MX")}
-                </p>
-              </div>
-            ))
-          )}
+            {unreadCount > 0 && (
+              <Button size="sm" variant="outline" onClick={markAllRead}>
+                Marcar todas como leídas
+              </Button>
+            )}
+            {notifications.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No tienes notificaciones.
+              </p>
+            ) : (
+              notifications.map((notification) => (
+                <div
+                  key={notification.id}
+                  className={`rounded-lg border p-3 text-sm ${notification.read ? "opacity-70" : "border-primary/30 bg-primary/5"}`}
+                >
+                  <div className="flex items-start gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p>{notification.message}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {new Date(notification.createdAt).toLocaleString(
+                          "es-MX",
+                        )}
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
+                      aria-label="Eliminar notificación"
+                      disabled={deletingId === notification.id}
+                      onClick={() => deleteNotification(notification.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </SheetContent>

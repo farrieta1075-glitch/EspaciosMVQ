@@ -26,23 +26,6 @@ const resourceRowSchema = z.object({
     .transform((value) => value.toLowerCase() !== "false"),
 });
 
-function mapRowToResource(
-  row: Record<string, string>,
-  restrictedSpaceIds: string[],
-): Resource {
-  const parsed = resourceRowSchema.parse(row);
-  return {
-    id: parsed.id,
-    name: parsed.name,
-    type: parsed.type as ResourceType,
-    totalQty: parsed.totalQty,
-    imageUrl: parsed.imageUrl,
-    scope: parsed.scope as ResourceScope,
-    active: parsed.active,
-    restrictedSpaceIds,
-  };
-}
-
 function resourceToRow(resource: Omit<Resource, "restrictedSpaceIds">): string[] {
   return [
     resource.id,
@@ -59,13 +42,34 @@ async function buildResourcesWithRestrictions(): Promise<Resource[]> {
   const { rows } = await getSheetRows(SHEET_TABS.RECURSOS);
   const links = await getResourceSpaceLinks();
 
-  return rows.map((row) => {
-    const resourceId = row.id ?? "";
+  const resources: Resource[] = [];
+
+  for (const row of rows) {
+    if (!row.id?.trim()) continue;
+    const parsed = resourceRowSchema.safeParse(row);
+    if (!parsed.success) {
+      console.warn(
+        `[sheets] Fila de recurso ignorada (${row.id ?? "sin id"}):`,
+        parsed.error.flatten().fieldErrors,
+      );
+      continue;
+    }
     const restrictedSpaceIds = links
-      .filter((link) => link.resourceId === resourceId)
+      .filter((link) => link.resourceId === parsed.data.id)
       .map((link) => link.spaceId);
-    return mapRowToResource(row, restrictedSpaceIds);
-  });
+    resources.push({
+      id: parsed.data.id,
+      name: parsed.data.name,
+      type: parsed.data.type as ResourceType,
+      totalQty: parsed.data.totalQty,
+      imageUrl: parsed.data.imageUrl,
+      scope: parsed.data.scope as ResourceScope,
+      active: parsed.data.active,
+      restrictedSpaceIds,
+    });
+  }
+
+  return resources;
 }
 
 export async function getAllResources(): Promise<Resource[]> {

@@ -20,18 +20,6 @@ const mapRowSchema = z.object({
   height: z.coerce.number().optional().default(600),
 });
 
-function mapRowToFloorMap(row: Record<string, string>): FloorMap {
-  const parsed = mapRowSchema.parse(row);
-  return {
-    id: parsed.id,
-    name: parsed.name,
-    backgroundType: parsed.backgroundType as BackgroundType,
-    backgroundUrl: parsed.backgroundUrl,
-    width: parsed.width,
-    height: parsed.height,
-  };
-}
-
 function floorMapToRow(map: FloorMap): string[] {
   return [
     map.id,
@@ -45,7 +33,29 @@ function floorMapToRow(map: FloorMap): string[] {
 
 export async function getAllMaps(): Promise<FloorMap[]> {
   const { rows } = await getSheetRows(SHEET_TABS.MAPAS);
-  return rows.map(mapRowToFloorMap);
+  const maps: FloorMap[] = [];
+
+  for (const row of rows) {
+    if (!row.id?.trim()) continue;
+    const parsed = mapRowSchema.safeParse(row);
+    if (!parsed.success) {
+      console.warn(
+        `[sheets] Fila de mapa ignorada (${row.id ?? "sin id"}):`,
+        parsed.error.flatten().fieldErrors,
+      );
+      continue;
+    }
+    maps.push({
+      id: parsed.data.id,
+      name: parsed.data.name,
+      backgroundType: parsed.data.backgroundType as BackgroundType,
+      backgroundUrl: parsed.data.backgroundUrl,
+      width: parsed.data.width,
+      height: parsed.data.height,
+    });
+  }
+
+  return maps;
 }
 
 export async function getMapById(id: string): Promise<FloorMap | null> {

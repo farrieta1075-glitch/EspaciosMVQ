@@ -14,7 +14,6 @@ import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -22,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { AssetImage } from "@/components/ui/asset-image";
+import { HelpHint } from "@/components/ui/help-hint";
 import { cn } from "@/lib/utils";
 
 interface AdminRecursosClientProps {
@@ -235,10 +235,8 @@ export function AdminRecursosClient({
                   Nuevo recurso
                 </>
               )}
+              <HelpHint text="Clasifica, define cantidad y restricciones de uso por espacio." />
             </CardTitle>
-            <CardDescription>
-              Clasifica, define cantidad y restricciones de uso por espacio.
-            </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">

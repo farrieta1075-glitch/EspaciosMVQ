@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth";
 import { getAllAreas } from "@/lib/sheets/areas";
 import { getAllUserRecords } from "@/lib/sheets/users";
 import { AdminUsuariosClient } from "@/components/admin/admin-usuarios-client";
+import { HelpHint } from "@/components/ui/help-hint";
 import type { PublicUser } from "@/types/user";
 
 export default async function AdminUsuariosPage() {
@@ -24,11 +25,9 @@ export default async function AdminUsuariosPage() {
 
   return (
     <section className="space-y-6">
-      <header>
+      <header className="flex items-center gap-2">
         <h1 className="text-2xl font-semibold tracking-tight">Usuarios</h1>
-        <p className="text-sm text-muted-foreground">
-          Administra cuentas, roles y áreas de acceso.
-        </p>
+        <HelpHint text="Administra cuentas, roles y áreas de acceso." />
       </header>
       <AdminUsuariosClient
         initialUsers={publicUsers}

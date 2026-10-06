@@ -34,19 +34,6 @@ function parseGeometry(raw: string): SpaceGeometry | null {
   }
 }
 
-function mapRowToSpace(row: Record<string, string>): Space {
-  const parsed = spaceRowSchema.parse(row);
-  return {
-    id: parsed.id,
-    name: parsed.name,
-    floor: parsed.floor,
-    capacity: parsed.capacity,
-    geometry: parseGeometry(parsed.geometryJson),
-    mapId: parsed.mapId,
-    active: parsed.active,
-  };
-}
-
 function spaceToRow(space: Space): string[] {
   return [
     space.id,
@@ -61,7 +48,30 @@ function spaceToRow(space: Space): string[] {
 
 export async function getAllSpaces(): Promise<Space[]> {
   const { rows } = await getSheetRows(SHEET_TABS.ESPACIOS);
-  return rows.map(mapRowToSpace);
+  const spaces: Space[] = [];
+
+  for (const row of rows) {
+    if (!row.id?.trim()) continue;
+    const parsed = spaceRowSchema.safeParse(row);
+    if (!parsed.success) {
+      console.warn(
+        `[sheets] Fila de espacio ignorada (${row.id ?? "sin id"}):`,
+        parsed.error.flatten().fieldErrors,
+      );
+      continue;
+    }
+    spaces.push({
+      id: parsed.data.id,
+      name: parsed.data.name,
+      floor: parsed.data.floor,
+      capacity: parsed.data.capacity,
+      geometry: parseGeometry(parsed.data.geometryJson),
+      mapId: parsed.data.mapId,
+      active: parsed.data.active,
+    });
+  }
+
+  return spaces;
 }
 
 export async function getSpacesByMapId(mapId: string): Promise<Space[]> {

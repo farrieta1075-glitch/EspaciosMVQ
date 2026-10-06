@@ -14,13 +14,13 @@ import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { HelpHint } from "@/components/ui/help-hint";
 import { cn } from "@/lib/utils";
 
 interface AdminUsuariosClientProps {
@@ -205,10 +205,8 @@ export function AdminUsuariosClient({
                   Nuevo usuario
                 </>
               )}
+              <HelpHint text="Define credenciales, rol y área de acceso." />
             </CardTitle>
-            <CardDescription>
-              Define credenciales, rol y área de acceso.
-            </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">

@@ -12,7 +12,7 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
-import { AdminSectionHint } from "@/components/admin/admin-section-hint";
+import { HelpHint } from "@/components/ui/help-hint";
 import type { FloorMap, Space } from "@/types/space";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -163,7 +163,7 @@ export function AdminEspaciosClient({
     <div className="space-y-8">
       <header className="flex items-center gap-2">
         <h1 className="text-2xl font-semibold tracking-tight">Espacios</h1>
-        <AdminSectionHint text="Administra mapas de planta y espacios reservables." />
+        <HelpHint text="Administra mapas de planta y espacios reservables." />
       </header>
 
       {error && (
@@ -189,7 +189,7 @@ export function AdminEspaciosClient({
               <Map className="h-5 w-5 shrink-0" />
               <CardTitle className="flex flex-1 items-center gap-2 text-lg">
                 Mapas de planta
-                <AdminSectionHint text="Crea un lienzo en blanco o sube PNG/JPG/PDF como fondo." />
+                <HelpHint text="Crea un lienzo en blanco o sube PNG/JPG/PDF como fondo." />
               </CardTitle>
             </button>
           </CardHeader>
@@ -302,7 +302,7 @@ export function AdminEspaciosClient({
               )}
               <CardTitle className="flex flex-1 items-center gap-2 text-lg">
                 Espacios reservables
-                <AdminSectionHint text="Define espacios y luego delímitalos en el editor gráfico." />
+                <HelpHint text="Define espacios y luego delímitalos en el editor gráfico." />
               </CardTitle>
             </button>
           </CardHeader>

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth/index";
 import {
+  deleteNotificationForUser,
   getNotificationsForUser,
   markAllNotificationsRead,
   markNotificationRead,
@@ -35,4 +36,24 @@ export async function PATCH(request: Request) {
   }
 
   return NextResponse.json({ error: "Solicitud inválida" }, { status: 400 });
+}
+
+export async function DELETE(request: Request) {
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+
+  const body = await request.json().catch(() => ({}));
+  const id = typeof body.id === "string" ? body.id : "";
+  if (!id) {
+    return NextResponse.json({ error: "ID requerido" }, { status: 400 });
+  }
+
+  const deleted = await deleteNotificationForUser(id, session.user.id);
+  if (!deleted) {
+    return NextResponse.json({ error: "No encontrada" }, { status: 404 });
+  }
+
+  return NextResponse.json({ ok: true });
 }

@@ -9,6 +9,8 @@ import type { MapDateSelection, RecurrenceType } from "@/types/reservation";
 import { MapDateSelector } from "@/components/map-date/map-date-selector";
 import { EventForm } from "@/components/reservation/event-form";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
 import {
   Card,
   CardContent,
@@ -166,6 +168,27 @@ export function ReservationFlow({
         onSelectionChange={handleSelectionChange}
       />
 
+      {isAdmin && (
+        <div className="space-y-1 pt-1">
+          <Label htmlFor="reservationAreaId" className="text-xs">
+            Área
+          </Label>
+          <Select
+            id="reservationAreaId"
+            value={areaId}
+            onChange={(event) => setAreaId(event.target.value)}
+            className="h-9"
+          >
+            <option value="">Selecciona área</option>
+            {areas.map((area) => (
+              <option key={area.id} value={area.id}>
+                {area.name}
+              </option>
+            ))}
+          </Select>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-2 pt-1">
         <Button
           type="button"
@@ -211,6 +234,7 @@ export function ReservationFlow({
               onAreaIdChange={setAreaId}
               areas={areas}
               isAdmin={isAdmin}
+              hideAdminArea
             />
           </div>
         </SheetContent>
