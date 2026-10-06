@@ -24,21 +24,26 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         password: { label: "Contraseña", type: "password" },
       },
       authorize: async (credentials) => {
-        const parsed = credentialsSchema.safeParse(credentials);
-        if (!parsed.success) return null;
+        try {
+          const parsed = credentialsSchema.safeParse(credentials);
+          if (!parsed.success) return null;
 
-        const { login, password } = parsed.data;
-        const isEmail = login.includes("@");
-        const user = isEmail
-          ? await findUserByEmail(login)
-          : await findUserByUsername(login);
+          const { login, password } = parsed.data;
+          const isEmail = login.includes("@");
+          const user = isEmail
+            ? await findUserByEmail(login)
+            : await findUserByUsername(login);
 
-        if (!user || !user.active) return null;
+          if (!user || !user.active) return null;
 
-        const valid = await verifyUserPassword(user, password);
-        if (!valid) return null;
+          const valid = await verifyUserPassword(user, password);
+          if (!valid) return null;
 
-        return toSessionUser(user);
+          return toSessionUser(user);
+        } catch (error) {
+          console.error("[auth] Error al validar credenciales:", error);
+          return null;
+        }
       },
     }),
   ],

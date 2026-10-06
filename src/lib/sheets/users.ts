@@ -14,7 +14,10 @@ const userRowSchema = z.object({
   email: z.string().optional().default(""),
   username: z.string().optional().default(""),
   passwordHash: z.string().optional().default(""),
-  role: z.enum(["ADMIN", "GENERAL", "VISUALIZACION"]),
+  role: z.preprocess(
+    (value) => (typeof value === "string" ? value.trim().toUpperCase() : value),
+    z.enum(["ADMIN", "GENERAL", "VISUALIZACION"]),
+  ),
   areaId: z.string().optional().default(""),
   active: z
     .string()
@@ -29,7 +32,7 @@ export function mapRowToUser(row: Record<string, string>): AppUser {
     id: parsed.id,
     email: parsed.email || null,
     username: parsed.username || null,
-    passwordHash: parsed.passwordHash || null,
+    passwordHash: parsed.passwordHash?.trim() || null,
     role: parsed.role as UserRole,
     areaId: parsed.areaId || null,
     active: parsed.active,

@@ -33,8 +33,9 @@ export async function verifyUserPassword(
   user: AppUser,
   password: string,
 ): Promise<boolean> {
-  if (!user.passwordHash) return false;
-  return bcrypt.compare(password, user.passwordHash);
+  const hash = user.passwordHash?.trim();
+  if (!hash) return false;
+  return bcrypt.compare(password.trim(), hash);
 }
 
 export function toSessionUser(user: AppUser) {
