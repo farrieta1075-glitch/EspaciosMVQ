@@ -11,7 +11,6 @@ export function isOwnAreaReservation(
 }
 
 export function reservationEventClassName(
-  color: AreaColorStyle,
   reservation: ReservationDetail,
 ): string {
   const pending =
@@ -21,14 +20,12 @@ export function reservationEventClassName(
 
   return cn(
     "border px-2 py-1.5 text-left text-xs transition-colors",
-    color.bg,
-    color.border,
     pending && "border-dashed opacity-80",
   );
 }
 
-export function reservationDotClassName(color: AreaColorStyle): string {
-  return cn("h-1.5 w-1.5 rounded-full", color.dot);
+export function reservationDotStyle(color: AreaColorStyle): { backgroundColor: string } {
+  return { backgroundColor: color.hex };
 }
 
 export function getReservationAreaColor(

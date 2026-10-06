@@ -2,9 +2,10 @@
 
 import type { Area } from "@/types/area";
 import type { ReservationDetail } from "@/types/reservation";
+import { areaCardStyle } from "@/lib/area-colors";
 import {
   getReservationAreaColor,
-  reservationDotClassName,
+  reservationDotStyle,
   reservationEventClassName,
   reservationStatusLabel,
 } from "@/lib/calendar-utils";
@@ -90,7 +91,8 @@ export function WeekView({
                     {dayEvents.slice(0, 3).map((event) => (
                       <span
                         key={event.id}
-                        className={reservationDotClassName(
+                        className="h-1.5 w-1.5 shrink-0 rounded-full"
+                        style={reservationDotStyle(
                           getReservationAreaColor(event, areas),
                         )}
                       />
@@ -105,7 +107,8 @@ export function WeekView({
                     {dayEvents.slice(0, 4).map((event) => (
                       <span
                         key={event.id}
-                        className={reservationDotClassName(
+                        className="h-1.5 w-1.5 shrink-0 rounded-full"
+                        style={reservationDotStyle(
                           getReservationAreaColor(event, areas),
                         )}
                         title={event.eventName}
@@ -124,8 +127,9 @@ export function WeekView({
                       onClick={() => onSelectDate(day)}
                       className={cn(
                         "hidden w-full rounded-md sm:block",
-                        reservationEventClassName(color, event),
+                        reservationEventClassName(event),
                       )}
+                      style={areaCardStyle(color)}
                     >
                       <p className="truncate font-medium">{event.eventName}</p>
                       <p className="truncate text-[10px] text-muted-foreground">

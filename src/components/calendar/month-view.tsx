@@ -4,7 +4,7 @@ import type { Area } from "@/types/area";
 import type { ReservationDetail } from "@/types/reservation";
 import {
   getReservationAreaColor,
-  reservationDotClassName,
+  reservationDotStyle,
 } from "@/lib/calendar-utils";
 import {
   formatDateISO,
@@ -114,7 +114,8 @@ export function MonthView({
                     {dotEvents.map((event) => (
                       <span
                         key={event.id}
-                        className={reservationDotClassName(
+                        className="h-1.5 w-1.5 shrink-0 rounded-full"
+                        style={reservationDotStyle(
                           getReservationAreaColor(event, areas),
                         )}
                       />

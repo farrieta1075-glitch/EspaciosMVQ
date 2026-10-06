@@ -4,7 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import type { ReservationDetail } from "@/types/reservation";
-import { getAreaColor } from "@/lib/area-colors";
+import { areaCardStyle, getAreaColor } from "@/lib/area-colors";
 import type { Area } from "@/types/area";
 import { reservationStatusLabel } from "@/lib/calendar-utils";
 import { Badge } from "@/components/ui/badge";
@@ -16,8 +16,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
-
 interface AdminApprovalsClientProps {
   initialReservations: ReservationDetail[];
   areas: Area[];
@@ -78,7 +76,11 @@ export function AdminApprovalsClient({
           const statusLabel = reservationStatusLabel(reservation);
 
           return (
-            <Card key={reservation.id} className={cn("border", color.border, color.bg)}>
+            <Card
+              key={reservation.id}
+              className="border"
+              style={areaCardStyle(color)}
+            >
               <CardHeader>
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>

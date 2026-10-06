@@ -41,6 +41,10 @@ const SheetContent = React.forwardRef<
           "inset-y-0 right-0 h-full w-[min(100vw,20rem)] border-l data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right sm:w-[min(85vw,20rem)] lg:w-80",
         side === "left" &&
           "inset-y-0 left-0 h-full w-[min(100vw,20rem)] border-r data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left",
+        side === "bottom" &&
+          "inset-x-0 bottom-0 max-h-[92dvh] w-full border-t data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom",
+        side === "top" &&
+          "inset-x-0 top-0 max-h-[92dvh] w-full border-b data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top",
         className,
       )}
       {...props}

@@ -7,6 +7,11 @@ import { Loader2 } from "lucide-react";
 import { Stage, Layer, Rect, Line, Image as KonvaImage, Text } from "react-konva";
 import type { FloorMap, Space } from "@/types/space";
 import type { SpaceAvailabilityStatus } from "@/types/reservation";
+import {
+  MAP_AVAILABLE_HEX,
+  MAP_AVAILABLE_STROKE,
+  hexToRgba,
+} from "@/lib/area-colors";
 import { loadImage } from "@/lib/load-image";
 import { resolveAssetUrl } from "@/lib/storage/resolve-asset-url";
 
@@ -19,6 +24,12 @@ const STATUS_COLORS: Record<
   selected: { fill: "rgba(59, 130, 246, 0.45)", stroke: "#2563eb" },
 };
 
+export interface SpacePaintStyle {
+  fill: string;
+  stroke: string;
+  listening: boolean;
+}
+
 interface SpaceMapViewerProps {
   map: FloorMap;
   spaces: Space[];
@@ -27,6 +38,13 @@ interface SpaceMapViewerProps {
   onSpaceToggle?: (spaceId: string) => void;
   readOnly?: boolean;
   compact?: boolean;
+  showDefaultLegend?: boolean;
+  headerExtra?: React.ReactNode;
+  getSpacePaintStyle?: (
+    spaceId: string,
+    availability: SpaceAvailabilityStatus,
+    isSelected: boolean,
+  ) => SpacePaintStyle;
 }
 
 export function SpaceMapViewer({
@@ -37,6 +55,9 @@ export function SpaceMapViewer({
   onSpaceToggle,
   readOnly = false,
   compact = false,
+  showDefaultLegend = true,
+  headerExtra,
+  getSpacePaintStyle,
 }: SpaceMapViewerProps) {
   const stageRef = React.useRef<Konva.Stage>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
@@ -92,18 +113,38 @@ export function SpaceMapViewer({
     loadBackground();
   }, [map.backgroundType, map.backgroundUrl]);
 
-  function getSpaceVisualStatus(spaceId: string): keyof typeof STATUS_COLORS {
-    if (selectedSpaceIds.includes(spaceId)) return "selected";
-    return spaceStatuses[spaceId] ?? "available";
+  function resolvePaintStyle(
+    spaceId: string,
+    availability: SpaceAvailabilityStatus,
+    isSelected: boolean,
+  ): SpacePaintStyle {
+    if (getSpacePaintStyle) {
+      return getSpacePaintStyle(spaceId, availability, isSelected);
+    }
+
+    const visualStatus = isSelected
+      ? "selected"
+      : availability === "occupied"
+        ? "occupied"
+        : "available";
+    const colors = STATUS_COLORS[visualStatus];
+    const interactive =
+      !readOnly && (availability !== "occupied" || isSelected);
+
+    return {
+      fill: colors.fill,
+      stroke: colors.stroke,
+      listening: interactive && Boolean(onSpaceToggle),
+    };
   }
 
   function handleSpaceClick(
     spaceId: string,
-    status: SpaceAvailabilityStatus,
+    paint: SpacePaintStyle,
     event: KonvaEventObject<MouseEvent | TouchEvent>,
   ) {
     event.cancelBubble = true;
-    if (readOnly || status === "occupied" || !onSpaceToggle) return;
+    if (!paint.listening || !onSpaceToggle) return;
     onSpaceToggle(spaceId);
   }
 
@@ -114,20 +155,33 @@ export function SpaceMapViewer({
       ref={containerRef}
       className="max-w-full overflow-hidden rounded-xl border border-border bg-muted/20 p-2"
     >
-      <div className="mb-2 flex flex-wrap gap-3 text-xs text-muted-foreground">
-        <span className="flex items-center gap-1.5">
-          <span className="h-3 w-3 rounded-sm bg-green-500/40 ring-1 ring-green-600" />
-          Disponible
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="h-3 w-3 rounded-sm bg-red-500/40 ring-1 ring-red-600" />
-          Ocupado
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="h-3 w-3 rounded-sm bg-blue-500/40 ring-1 ring-blue-600" />
-          Seleccionado
-        </span>
-      </div>
+      {(showDefaultLegend || headerExtra) && (
+        <div className="mb-2 space-y-2">
+          {showDefaultLegend && (
+            <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1.5">
+                <span
+                  className="h-3 w-3 rounded-sm ring-1"
+                  style={{
+                    backgroundColor: hexToRgba(MAP_AVAILABLE_HEX, 0.65),
+                    borderColor: MAP_AVAILABLE_STROKE,
+                  }}
+                />
+                Disponible
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="h-3 w-3 rounded-sm bg-red-500/40 ring-1 ring-red-600" />
+                Ocupado
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="h-3 w-3 rounded-sm bg-blue-500/40 ring-1 ring-blue-600" />
+                Seleccionado
+              </span>
+            </div>
+          )}
+          {headerExtra}
+        </div>
+      )}
 
       {loadingBg || displayScale === 0 ? (
         <div className="flex h-64 items-center justify-center">
@@ -179,10 +233,9 @@ export function SpaceMapViewer({
               {drawableSpaces.map((space) => {
                 if (!space.geometry) return null;
 
-                const visualStatus = getSpaceVisualStatus(space.id);
                 const availability = spaceStatuses[space.id] ?? "available";
-                const colors = STATUS_COLORS[visualStatus];
-                const interactive = !readOnly && availability !== "occupied";
+                const isSelected = selectedSpaceIds.includes(space.id);
+                const paint = resolvePaintStyle(space.id, availability, isSelected);
 
                 if (space.geometry.type === "rect") {
                   const [x, y, w, h] = space.geometry.points;
@@ -193,16 +246,12 @@ export function SpaceMapViewer({
                         y={y}
                         width={w}
                         height={h}
-                        fill={colors.fill}
-                        stroke={colors.stroke}
-                        strokeWidth={2}
-                        onClick={(event) =>
-                          handleSpaceClick(space.id, availability, event)
-                        }
-                        onTap={(event) =>
-                          handleSpaceClick(space.id, availability, event)
-                        }
-                        listening={interactive}
+                        fill={paint.fill}
+                        stroke={paint.stroke}
+                        strokeWidth={isSelected ? 3 : 2}
+                        onClick={(event) => handleSpaceClick(space.id, paint, event)}
+                        onTap={(event) => handleSpaceClick(space.id, paint, event)}
+                        listening={paint.listening}
                       />
                       <Text
                         x={x + 8}
@@ -221,16 +270,12 @@ export function SpaceMapViewer({
                     <Line
                       points={space.geometry.points}
                       closed
-                      fill={colors.fill}
-                      stroke={colors.stroke}
-                      strokeWidth={2}
-                      onClick={(event) =>
-                        handleSpaceClick(space.id, availability, event)
-                      }
-                      onTap={(event) =>
-                        handleSpaceClick(space.id, availability, event)
-                      }
-                      listening={interactive}
+                      fill={paint.fill}
+                      stroke={paint.stroke}
+                      strokeWidth={isSelected ? 3 : 2}
+                      onClick={(event) => handleSpaceClick(space.id, paint, event)}
+                      onTap={(event) => handleSpaceClick(space.id, paint, event)}
+                      listening={paint.listening}
                     />
                     <Text
                       x={space.geometry.points[0] + 8}
