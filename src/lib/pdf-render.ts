@@ -27,7 +27,10 @@ export async function renderPdfFirstPage(source: string | ArrayBuffer): Promise<
 
   const loadingTask =
     typeof source === "string"
-      ? pdfjs.getDocument({ url: source })
+      ? pdfjs.getDocument({
+          url: source,
+          withCredentials: source.startsWith("/"),
+        })
       : pdfjs.getDocument({ data: source });
 
   const pdf = await loadingTask.promise;

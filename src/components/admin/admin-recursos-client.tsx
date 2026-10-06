@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Loader2, Package, Pencil, Plus, Trash2, X } from "lucide-react";
 import type { Space } from "@/types/space";
@@ -22,7 +21,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import { resolveAssetUrl } from "@/lib/storage/resolve-asset-url";
+import { AssetImage } from "@/components/ui/asset-image";
 import { cn } from "@/lib/utils";
 
 interface AdminRecursosClientProps {
@@ -409,8 +408,8 @@ export function AdminRecursosClient({
                 <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-start">
                   <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg border border-border bg-muted">
                     {resource.imageUrl ? (
-                      <Image
-                        src={resolveAssetUrl(resource.imageUrl)}
+                      <AssetImage
+                        src={resource.imageUrl}
                         alt={resource.name}
                         fill
                         className="object-cover"

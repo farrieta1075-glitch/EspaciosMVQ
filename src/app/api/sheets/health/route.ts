@@ -9,6 +9,7 @@ export async function GET() {
       process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL?.trim() &&
       process.env.GOOGLE_PRIVATE_KEY?.trim(),
   );
+  const blobConfigured = Boolean(process.env.BLOB_READ_WRITE_TOKEN?.trim());
 
   const result = await testSheetsConnection();
 
@@ -28,6 +29,8 @@ export async function GET() {
     ...result,
     authSecretConfigured,
     googleConfigured,
+    blobConfigured,
+    blobAccess: process.env.BLOB_ACCESS?.trim() || "private",
     activeUsers,
     usersLoadError,
     sheetsIdSuffix: process.env.GOOGLE_SHEETS_ID?.trim().slice(-6) ?? null,

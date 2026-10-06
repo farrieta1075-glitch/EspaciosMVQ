@@ -1,19 +1,17 @@
 import { get } from "@vercel/blob";
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth/index";
 import { getBlobAccessMode } from "@/lib/storage/blob-access";
 
 const PATH_PATTERN = /^(maps|resources)\/.+$/;
 
+/**
+ * Sirve mapas e imágenes de recursos desde Vercel Blob.
+ * Lectura pública (solo rutas maps/* y resources/*); la subida sigue siendo solo admin.
+ */
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ path?: string[] }> },
 ) {
-  const session = await auth();
-  if (!session?.user) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-  }
-
   const token = process.env.BLOB_READ_WRITE_TOKEN?.trim();
   if (!token) {
     return NextResponse.json(
@@ -41,7 +39,7 @@ export async function GET(
   return new Response(result.stream, {
     headers: {
       "Content-Type": result.blob.contentType ?? "application/octet-stream",
-      "Cache-Control": "private, max-age=3600",
+      "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
     },
   });
 }

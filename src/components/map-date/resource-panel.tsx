@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import Image from "next/image";
 import { ChevronDown, ChevronUp, Package } from "lucide-react";
 import type { ResourceAvailability } from "@/types/reservation";
 import type { ResourceType } from "@/types/resource";
@@ -17,7 +16,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { resolveAssetUrl } from "@/lib/storage/resolve-asset-url";
+import { AssetImage } from "@/components/ui/asset-image";
 import { cn } from "@/lib/utils";
 
 type ResourceFilter = "ALL" | ResourceType;
@@ -76,8 +75,8 @@ export function ResourcePanel({
             >
               <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-md bg-muted">
                 {resource.imageUrl ? (
-                  <Image
-                    src={resolveAssetUrl(resource.imageUrl)}
+                  <AssetImage
+                    src={resource.imageUrl}
                     alt={resource.name}
                     fill
                     className="object-cover"
