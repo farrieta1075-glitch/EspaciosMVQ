@@ -147,7 +147,7 @@ export function ReservationsList({
   const [reservations, setReservations] =
     React.useState(initialReservations);
   const [listFilter, setListFilter] = React.useState<ListFilter>("upcoming");
-  const [collapsedUpcomingIds, setCollapsedUpcomingIds] = React.useState<
+  const [expandedUpcomingIds, setExpandedUpcomingIds] = React.useState<
     Set<string>
   >(() => new Set());
   const [expandedPastYears, setExpandedPastYears] = React.useState<
@@ -194,7 +194,7 @@ export function ReservationsList({
   }
 
   function toggleUpcomingExpanded(id: string) {
-    setCollapsedUpcomingIds((current) => {
+    setExpandedUpcomingIds((current) => {
       const next = new Set(current);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -481,7 +481,7 @@ export function ReservationsList({
           {filtered.map((reservation) =>
             renderReservationCard(
               reservation,
-              !collapsedUpcomingIds.has(reservation.id),
+              expandedUpcomingIds.has(reservation.id),
               () => toggleUpcomingExpanded(reservation.id),
             ),
           )}
