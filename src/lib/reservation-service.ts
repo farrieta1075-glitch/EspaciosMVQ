@@ -277,6 +277,18 @@ export async function createReservation(
       SHEET_TABS.RESERVAS,
       reservationToRow({ ...reservation, spaceIds: input.spaceIds }),
     );
+
+    let persisted = await getReservationById(id);
+    if (!persisted) {
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      persisted = await getReservationById(id);
+    }
+    if (!persisted) {
+      throw new Error(
+        "La reserva se escribió en la hoja pero no se pudo leer. Revisa que la pestaña Reservas tenga las columnas estimatedAttendees, attendeeJustificationCode, attendeeJustificationNote, actualAttendees y attendanceComment al final (después de approvalToken).",
+      );
+    }
+
     createdIds.push(id);
 
     for (const resource of input.resources) {

@@ -24,8 +24,8 @@ import {
   saveReservationDraft,
 } from "@/lib/reservation-draft-storage";
 import {
-  isLikelyTransientFetchError,
   readJsonResponse,
+  shouldRetryMutationRequest,
   sleep,
 } from "@/lib/read-json-response";
 import { EventForm } from "@/components/reservation/event-form";
@@ -257,7 +257,7 @@ export function ReservationEditFlow({
           data = await readJsonResponse(response);
           break;
         } catch (err) {
-          if (attempt === 0 && isLikelyTransientFetchError(err)) {
+          if (attempt === 0 && shouldRetryMutationRequest(response, err)) {
             await sleep(2000);
             continue;
           }

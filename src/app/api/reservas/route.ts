@@ -58,6 +58,7 @@ const createSchema = z.object({
 });
 
 export async function POST(request: Request) {
+  try {
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
@@ -66,8 +67,16 @@ export async function POST(request: Request) {
   const body = await request.json();
   const parsed = createSchema.safeParse(body);
   if (!parsed.success) {
+    const fieldErrors = parsed.error.flatten().fieldErrors;
+    const firstField = Object.keys(fieldErrors)[0];
+    const firstMessage = firstField
+      ? fieldErrors[firstField as keyof typeof fieldErrors]?.[0]
+      : undefined;
     return NextResponse.json(
-      { error: "Datos inválidos", details: parsed.error.flatten() },
+      {
+        error: firstMessage ?? "Datos inválidos",
+        details: fieldErrors,
+      },
       { status: 400 },
     );
   }
@@ -162,5 +171,15 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ error: message }, { status: 400 });
+  }
+  } catch (error) {
+    console.error("[reservas POST]", error);
+    return NextResponse.json(
+      {
+        error:
+          "No se pudo completar la reserva. Intenta de nuevo en unos segundos.",
+      },
+      { status: 500 },
+    );
   }
 }

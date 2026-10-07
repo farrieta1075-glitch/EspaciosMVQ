@@ -20,8 +20,8 @@ import {
 } from "@/lib/reservation-draft-storage";
 import { formatDateISO } from "@/lib/date-utils";
 import {
-  isLikelyTransientFetchError,
   readJsonResponse,
+  shouldRetryMutationRequest,
   sleep,
 } from "@/lib/read-json-response";
 import { EventForm } from "@/components/reservation/event-form";
@@ -209,6 +209,7 @@ export function ReservationFlow({
         similarity?: number;
         pending?: boolean;
         count?: number;
+        ids?: string[];
       };
 
       for (let attempt = 0; attempt < 2; attempt++) {
@@ -221,7 +222,7 @@ export function ReservationFlow({
           data = await readJsonResponse(response);
           break;
         } catch (err) {
-          if (attempt === 0 && isLikelyTransientFetchError(err)) {
+          if (attempt === 0 && shouldRetryMutationRequest(response, err)) {
             await sleep(2000);
             continue;
           }
@@ -238,12 +239,22 @@ export function ReservationFlow({
       }
 
       if (!response.ok) {
-        throw new Error(data.error ?? "No se pudo crear la reserva");
+        const details =
+          data.error === "Datos inválidos"
+            ? " Revisa asistentes estimados, fecha y espacios seleccionados."
+            : "";
+        throw new Error((data.error ?? "No se pudo crear la reserva") + details);
+      }
+
+      if (!Array.isArray(data.ids) || data.ids.length === 0) {
+        throw new Error(
+          "No se recibió confirmación del servidor. Revisa Mis reservas antes de volver a intentar.",
+        );
       }
 
       setSimilarPrompt(null);
       setSuccessInfo({
-        count: data.count ?? 1,
+        count: data.count ?? data.ids.length,
         pending: Boolean(data.pending),
       });
     } catch (err) {

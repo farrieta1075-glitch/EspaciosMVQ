@@ -8,6 +8,10 @@ import {
   updateSheetRowById,
 } from "@/lib/sheets/repository";
 import { serializeReservationDateTime } from "@/lib/date-utils";
+import {
+  normalizeReservationStatusValue,
+  remapLegacyShiftedReservationRow,
+} from "@/lib/sheets/reservation-row-parse";
 import { SHEET_TABS } from "@/lib/sheets/tabs";
 import type {
   PendingAction,
@@ -26,11 +30,8 @@ const reservationRowSchema = z.object({
   endAt: z.string().optional().default(""),
   recurrenceRule: z.string().optional().default(""),
   status: z.preprocess(
-    (value) => (value === "" || value == null ? undefined : value),
-    z
-      .enum(["CONFIRMED", "CANCELLED", "PENDING"])
-      .optional()
-      .default("CONFIRMED"),
+    (value) => normalizeReservationStatusValue(value),
+    z.enum(["CONFIRMED", "CANCELLED", "PENDING"]),
   ),
   eventDescription: z.string().optional().default(""),
   pendingAction: z.string().optional().default(""),
@@ -132,7 +133,8 @@ export async function getAllReservations(): Promise<Reservation[]> {
   for (const row of rows) {
     if (!isReservationDataRow(row)) continue;
 
-    const parsed = reservationRowSchema.safeParse(row);
+    const normalized = remapLegacyShiftedReservationRow(row);
+    const parsed = reservationRowSchema.safeParse(normalized);
     if (!parsed.success) {
       console.warn(
         `[sheets] Fila de reserva ignorada (${row.id ?? "sin id"}):`,

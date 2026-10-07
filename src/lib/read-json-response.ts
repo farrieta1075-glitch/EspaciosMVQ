@@ -26,7 +26,9 @@ export async function readJsonResponse<T = Record<string, unknown>>(
         `Error del servidor (${response.status}). Intenta de nuevo.`,
       );
     }
-    return {} as T;
+    throw new Error(
+      "El servidor respondió sin datos. Revisa Mis reservas por si la operación se completó antes de intentar de nuevo.",
+    );
   }
 
   try {
@@ -48,6 +50,17 @@ export function isLikelyTransientFetchError(error: unknown): boolean {
     message.includes("failed to fetch") ||
     message.includes("network")
   );
+}
+
+/** No reintentar POST/PATCH si el servidor ya aceptó la operación (evita duplicados). */
+export function shouldRetryMutationRequest(
+  response: Response | undefined,
+  error: unknown,
+): boolean {
+  if (!isLikelyTransientFetchError(error)) return false;
+  const status = response?.status ?? 0;
+  if (status >= 200 && status < 300) return false;
+  return true;
 }
 
 export async function sleep(ms: number): Promise<void> {
