@@ -89,7 +89,7 @@ export function AttendanceConfirmFlow({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="actualAttendees">Asistentes que asistieron</Label>
+        <Label htmlFor="actualAttendees">Cantidad de asistentes</Label>
         <Input
           id="actualAttendees"
           type="number"
