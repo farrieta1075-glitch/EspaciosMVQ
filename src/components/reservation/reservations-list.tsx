@@ -3,7 +3,14 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Calendar, Loader2, Pencil, Trash2 } from "lucide-react";
+import {
+  Calendar,
+  ChevronDown,
+  ChevronRight,
+  Loader2,
+  Pencil,
+  Trash2,
+} from "lucide-react";
 import {
   formatReservationDateTimeRange,
   formatTimeDisplay,
@@ -66,6 +73,71 @@ function summaryDateTime(reservation: ReservationDetail): string {
   return `${datePart} · ${formatTimeDisplay(start)}–${formatTimeDisplay(end)}`;
 }
 
+interface PastYearGroup {
+  year: number;
+  months: PastMonthGroup[];
+}
+
+interface PastMonthGroup {
+  monthKey: string;
+  label: string;
+  reservations: ReservationDetail[];
+}
+
+function buildPastYearMonthGroups(
+  reservations: ReservationDetail[],
+): PastYearGroup[] {
+  const byYearMonth = new Map<string, ReservationDetail[]>();
+
+  for (const reservation of reservations) {
+    const start = new Date(reservation.startAt);
+    const year = start.getFullYear();
+    const month = start.getMonth();
+    const monthKey = `${year}-${String(month + 1).padStart(2, "0")}`;
+    const list = byYearMonth.get(monthKey) ?? [];
+    list.push(reservation);
+    byYearMonth.set(monthKey, list);
+  }
+
+  const yearMap = new Map<number, PastMonthGroup[]>();
+
+  for (const [monthKey, monthReservations] of byYearMonth) {
+    const [yearStr, monthStr] = monthKey.split("-");
+    const year = Number(yearStr);
+    const monthIndex = Number(monthStr) - 1;
+    const label = new Date(year, monthIndex, 1).toLocaleDateString("es-MX", {
+      month: "long",
+      year: "numeric",
+    });
+    const labelCapitalized =
+      label.charAt(0).toUpperCase() + label.slice(1).toLowerCase();
+
+    monthReservations.sort(
+      (a, b) =>
+        new Date(b.startAt).getTime() - new Date(a.startAt).getTime(),
+    );
+
+    const months = yearMap.get(year) ?? [];
+    months.push({
+      monthKey,
+      label: labelCapitalized,
+      reservations: monthReservations,
+    });
+    yearMap.set(year, months);
+  }
+
+  return [...yearMap.entries()]
+    .sort(([yearA], [yearB]) => yearB - yearA)
+    .map(([year, months]) => ({
+      year,
+      months: months.sort((a, b) => b.monthKey.localeCompare(a.monthKey)),
+    }));
+}
+
+function reservationCountLabel(count: number): string {
+  return `${count} reserva${count === 1 ? "" : "s"}`;
+}
+
 export function ReservationsList({
   initialReservations,
   isAdmin,
@@ -75,7 +147,16 @@ export function ReservationsList({
   const [reservations, setReservations] =
     React.useState(initialReservations);
   const [listFilter, setListFilter] = React.useState<ListFilter>("upcoming");
-  const [expandedIds, setExpandedIds] = React.useState<Set<string>>(
+  const [collapsedUpcomingIds, setCollapsedUpcomingIds] = React.useState<
+    Set<string>
+  >(() => new Set());
+  const [expandedPastYears, setExpandedPastYears] = React.useState<
+    Set<string>
+  >(() => new Set());
+  const [expandedPastMonths, setExpandedPastMonths] = React.useState<
+    Set<string>
+  >(() => new Set());
+  const [expandedPastIds, setExpandedPastIds] = React.useState<Set<string>>(
     () => new Set(),
   );
   const [loadingId, setLoadingId] = React.useState<string | null>(null);
@@ -99,6 +180,12 @@ export function ReservationsList({
     });
   }, [reservations, listFilter]);
 
+  const pastGroups = React.useMemo(
+    () =>
+      listFilter === "past" ? buildPastYearMonthGroups(filtered) : [],
+    [filtered, listFilter],
+  );
+
   async function refreshList() {
     const response = await fetch("/api/reservas");
     if (response.ok) {
@@ -106,13 +193,179 @@ export function ReservationsList({
     }
   }
 
-  function toggleExpanded(id: string) {
-    setExpandedIds((current) => {
+  function toggleUpcomingExpanded(id: string) {
+    setCollapsedUpcomingIds((current) => {
       const next = new Set(current);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
+  }
+
+  function togglePastExpanded(id: string) {
+    setExpandedPastIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function togglePastYear(year: number) {
+    const key = String(year);
+    setExpandedPastYears((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  function togglePastMonth(monthKey: string) {
+    setExpandedPastMonths((current) => {
+      const next = new Set(current);
+      if (next.has(monthKey)) next.delete(monthKey);
+      else next.add(monthKey);
+      return next;
+    });
+  }
+
+  function renderReservationCard(
+    reservation: ReservationDetail,
+    expanded: boolean,
+    onToggle: () => void,
+  ) {
+    return (
+      <Card key={reservation.id} className="overflow-hidden">
+        <button
+          type="button"
+          className="flex w-full items-center gap-2 px-3 py-3 text-left transition-colors hover:bg-muted/40 sm:px-4"
+          onClick={onToggle}
+          aria-expanded={expanded}
+        >
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold sm:text-base">
+              {reservation.eventName}
+            </p>
+            <p className="truncate text-xs text-muted-foreground sm:text-sm">
+              {summaryDateTime(reservation)}
+            </p>
+          </div>
+          <Badge
+            variant={statusVariant(reservation)}
+            className="shrink-0 text-[10px] sm:text-xs"
+          >
+            {statusLabel(reservation)}
+          </Badge>
+        </button>
+
+        {expanded && (
+          <CardContent className="space-y-4 border-t border-border pt-4">
+            {reservation.eventDescription && (
+              <p className="text-sm text-muted-foreground">
+                {reservation.eventDescription}
+              </p>
+            )}
+            {reservationNeedsAdminAction(reservation) && (
+              <p className="rounded-md bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-200">
+                {reservation.status === "PENDING"
+                  ? "Esta reserva espera autorización de un administrador."
+                  : reservation.pendingAction === "UPDATE"
+                    ? "Los cambios solicitados esperan autorización."
+                    : "La cancelación solicitada espera autorización."}
+              </p>
+            )}
+            <div className="space-y-1 text-sm">
+              <p className="font-medium text-foreground">
+                <span className="font-normal text-muted-foreground">
+                  Fecha y horario:{" "}
+                </span>
+                {formatReservationDateTimeRange(
+                  reservation.startAt,
+                  reservation.endAt,
+                )}
+              </p>
+              <p>
+                <span className="text-muted-foreground">Espacios: </span>
+                {reservation.spaceNames.join(", ") || "—"}
+              </p>
+              <p>
+                <span className="text-muted-foreground">Recursos: </span>
+                {reservation.resources.length > 0
+                  ? reservation.resources
+                      .map((r) => `${r.resourceName} ×${r.quantity}`)
+                      .join(", ")
+                  : "Ninguno"}
+              </p>
+              {reservation.estimatedAttendees > 0 && (
+                <p>
+                  <span className="text-muted-foreground">
+                    Asistentes estimados:{" "}
+                  </span>
+                  {reservation.estimatedAttendees}
+                </p>
+              )}
+              {reservation.actualAttendees != null && (
+                <p>
+                  <span className="text-muted-foreground">
+                    Asistentes registrados:{" "}
+                  </span>
+                  {reservation.actualAttendees}
+                </p>
+              )}
+              {isAdmin && (
+                <p>
+                  <span className="text-muted-foreground">Área: </span>
+                  {reservation.areaName ?? reservation.areaId ?? "—"}
+                </p>
+              )}
+            </div>
+
+            <div
+              className="flex flex-wrap gap-2"
+              onClick={(event) => event.stopPropagation()}
+              onKeyDown={(event) => event.stopPropagation()}
+            >
+              {canConfirmAttendance(viewerUser, reservation) &&
+                isPastReservation(reservation) &&
+                !isAdmin && (
+                  <Button asChild size="sm" variant="default">
+                    <Link href={`/reservas/${reservation.id}/editar`}>
+                      Registrar asistencia
+                    </Link>
+                  </Button>
+                )}
+              {canModifyReservation(viewerUser, reservation) && (
+                <Button asChild size="sm" variant="outline">
+                  <Link href={`/reservas/${reservation.id}/editar`}>
+                    <Pencil className="mr-1 h-4 w-4" />
+                    Modificar
+                  </Link>
+                </Button>
+              )}
+              {canCancelReservation(viewerUser, reservation) && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-destructive hover:text-destructive"
+                  disabled={loadingId === reservation.id}
+                  onClick={() =>
+                    requestCancel(reservation.id, reservation.eventName)
+                  }
+                >
+                  {loadingId === reservation.id ? (
+                    <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="mr-1 h-4 w-4" />
+                  )}
+                  Cancelar
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        )}
+      </Card>
+    );
   }
 
   function requestCancel(id: string, eventName: string) {
@@ -223,143 +476,100 @@ export function ReservationsList({
             )}
           </CardContent>
         </Card>
-      ) : (
+      ) : listFilter === "upcoming" ? (
         <div className="grid gap-2 md:grid-cols-2 md:gap-3">
-          {filtered.map((reservation) => {
-            const expanded = expandedIds.has(reservation.id);
+          {filtered.map((reservation) =>
+            renderReservationCard(
+              reservation,
+              !collapsedUpcomingIds.has(reservation.id),
+              () => toggleUpcomingExpanded(reservation.id),
+            ),
+          )}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {pastGroups.map((yearGroup) => {
+            const yearKey = String(yearGroup.year);
+            const yearExpanded = expandedPastYears.has(yearKey);
+            const yearCount = yearGroup.months.reduce(
+              (sum, month) => sum + month.reservations.length,
+              0,
+            );
+
             return (
-              <Card key={reservation.id} className="overflow-hidden">
+              <div
+                key={yearKey}
+                className="overflow-hidden rounded-lg border border-border"
+              >
                 <button
                   type="button"
-                  className="flex w-full items-center gap-2 px-3 py-3 text-left transition-colors hover:bg-muted/40 sm:px-4"
-                  onClick={() => toggleExpanded(reservation.id)}
-                  aria-expanded={expanded}
+                  className="flex w-full items-center gap-2 bg-muted/30 px-3 py-3 text-left hover:bg-muted/50 sm:px-4"
+                  onClick={() => togglePastYear(yearGroup.year)}
+                  aria-expanded={yearExpanded}
                 >
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold sm:text-base">
-                      {reservation.eventName}
-                    </p>
-                    <p className="truncate text-xs text-muted-foreground sm:text-sm">
-                      {summaryDateTime(reservation)}
-                    </p>
-                  </div>
-                  <Badge
-                    variant={statusVariant(reservation)}
-                    className="shrink-0 text-[10px] sm:text-xs"
-                  >
-                    {statusLabel(reservation)}
-                  </Badge>
+                  {yearExpanded ? (
+                    <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  )}
+                  <span className="flex-1 text-base font-semibold">
+                    {yearGroup.year}
+                  </span>
+                  <span className="text-xs text-muted-foreground sm:text-sm">
+                    {reservationCountLabel(yearCount)}
+                  </span>
                 </button>
 
-                {expanded && (
-                  <CardContent className="space-y-4 border-t border-border pt-4">
-                    {reservation.eventDescription && (
-                      <p className="text-sm text-muted-foreground">
-                        {reservation.eventDescription}
-                      </p>
-                    )}
-                    {reservationNeedsAdminAction(reservation) && (
-                      <p className="rounded-md bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-200">
-                        {reservation.status === "PENDING"
-                          ? "Esta reserva espera autorización de un administrador."
-                          : reservation.pendingAction === "UPDATE"
-                            ? "Los cambios solicitados esperan autorización."
-                            : "La cancelación solicitada espera autorización."}
-                      </p>
-                    )}
-                    <div className="space-y-1 text-sm">
-                      <p className="font-medium text-foreground">
-                        <span className="font-normal text-muted-foreground">
-                          Fecha y horario:{" "}
-                        </span>
-                        {formatReservationDateTimeRange(
-                          reservation.startAt,
-                          reservation.endAt,
-                        )}
-                      </p>
-                      <p>
-                        <span className="text-muted-foreground">Espacios: </span>
-                        {reservation.spaceNames.join(", ") || "—"}
-                      </p>
-                      <p>
-                        <span className="text-muted-foreground">Recursos: </span>
-                        {reservation.resources.length > 0
-                          ? reservation.resources
-                              .map((r) => `${r.resourceName} ×${r.quantity}`)
-                              .join(", ")
-                          : "Ninguno"}
-                      </p>
-                      {reservation.estimatedAttendees > 0 && (
-                        <p>
-                          <span className="text-muted-foreground">
-                            Asistentes estimados:{" "}
-                          </span>
-                          {reservation.estimatedAttendees}
-                        </p>
-                      )}
-                      {reservation.actualAttendees != null && (
-                        <p>
-                          <span className="text-muted-foreground">
-                            Asistentes registrados:{" "}
-                          </span>
-                          {reservation.actualAttendees}
-                        </p>
-                      )}
-                      {isAdmin && (
-                        <p>
-                          <span className="text-muted-foreground">Área: </span>
-                          {reservation.areaName ?? reservation.areaId ?? "—"}
-                        </p>
-                      )}
-                    </div>
+                {yearExpanded && (
+                  <div className="space-y-2 border-t border-border p-2 sm:p-3">
+                    {yearGroup.months.map((monthGroup) => {
+                      const monthExpanded = expandedPastMonths.has(
+                        monthGroup.monthKey,
+                      );
 
-                    <div
-                      className="flex flex-wrap gap-2"
-                      onClick={(event) => event.stopPropagation()}
-                      onKeyDown={(event) => event.stopPropagation()}
-                    >
-                      {canConfirmAttendance(viewerUser, reservation) &&
-                        isPastReservation(reservation) &&
-                        !isAdmin && (
-                          <Button asChild size="sm" variant="default">
-                            <Link href={`/reservas/${reservation.id}/editar`}>
-                              Registrar asistencia
-                            </Link>
-                          </Button>
-                        )}
-                      {canModifyReservation(viewerUser, reservation) && (
-                        <Button asChild size="sm" variant="outline">
-                          <Link href={`/reservas/${reservation.id}/editar`}>
-                            <Pencil className="mr-1 h-4 w-4" />
-                            Modificar
-                          </Link>
-                        </Button>
-                      )}
-                      {canCancelReservation(viewerUser, reservation) && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="text-destructive hover:text-destructive"
-                          disabled={loadingId === reservation.id}
-                          onClick={() =>
-                            requestCancel(
-                              reservation.id,
-                              reservation.eventName,
-                            )
-                          }
+                      return (
+                        <div
+                          key={monthGroup.monthKey}
+                          className="overflow-hidden rounded-md border border-border/80"
                         >
-                          {loadingId === reservation.id ? (
-                            <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-                          ) : (
-                            <Trash2 className="mr-1 h-4 w-4" />
+                          <button
+                            type="button"
+                            className="flex w-full items-center gap-2 px-3 py-2.5 text-left hover:bg-muted/40"
+                            onClick={() => togglePastMonth(monthGroup.monthKey)}
+                            aria-expanded={monthExpanded}
+                          >
+                            {monthExpanded ? (
+                              <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                            )}
+                            <span className="flex-1 text-sm font-medium">
+                              {monthGroup.label}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {reservationCountLabel(
+                                monthGroup.reservations.length,
+                              )}
+                            </span>
+                          </button>
+
+                          {monthExpanded && (
+                            <div className="grid gap-2 border-t border-border p-2 md:grid-cols-2 md:gap-3 md:p-3">
+                              {monthGroup.reservations.map((reservation) =>
+                                renderReservationCard(
+                                  reservation,
+                                  expandedPastIds.has(reservation.id),
+                                  () => togglePastExpanded(reservation.id),
+                                ),
+                              )}
+                            </div>
                           )}
-                          Cancelar
-                        </Button>
-                      )}
-                    </div>
-                  </CardContent>
+                        </div>
+                      );
+                    })}
+                  </div>
                 )}
-              </Card>
+              </div>
             );
           })}
         </div>
