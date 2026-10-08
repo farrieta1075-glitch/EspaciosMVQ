@@ -15,6 +15,8 @@ export interface AppUser {
   areaId: string | null;
   areaName?: string | null;
   active: boolean;
+  /** Solo aplica a ADMIN: recibir correos de autorización de reservas. */
+  receiveApprovalEmails: boolean;
 }
 
 export interface SessionUser {
@@ -26,4 +28,6 @@ export interface SessionUser {
   areaName?: string | null;
 }
 
-export type PublicUser = Omit<AppUser, "passwordHash">;
+export type PublicUser = Omit<AppUser, "passwordHash"> & {
+  passwordConfigured?: boolean;
+};

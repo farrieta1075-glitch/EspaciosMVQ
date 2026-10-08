@@ -8,6 +8,8 @@ import {
   Loader2,
   Pencil,
   Plus,
+  Eye,
+  EyeOff,
   Trash2,
   UserCog,
 } from "lucide-react";
@@ -49,6 +51,7 @@ interface UserFormState {
   role: UserRole;
   areaId: string;
   active: boolean;
+  receiveApprovalEmails: boolean;
 }
 
 const emptyForm: UserFormState = {
@@ -58,6 +61,7 @@ const emptyForm: UserFormState = {
   role: "GENERAL",
   areaId: "",
   active: true,
+  receiveApprovalEmails: true,
 };
 
 export function AdminUsuariosClient({
@@ -77,6 +81,9 @@ export function AdminUsuariosClient({
   );
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [showPassword, setShowPassword] = React.useState(false);
+  const [editPasswordConfigured, setEditPasswordConfigured] =
+    React.useState(false);
 
   const [filterUsername, setFilterUsername] = React.useState("");
   const [filterRole, setFilterRole] = React.useState<UserRole | "">("");
@@ -115,7 +122,10 @@ export function AdminUsuariosClient({
       role: user.role,
       areaId: user.areaId ?? "",
       active: user.active,
+      receiveApprovalEmails: user.receiveApprovalEmails,
     });
+    setEditPasswordConfigured(Boolean(user.passwordConfigured));
+    setShowPassword(false);
     setError(null);
     setEditOpen(true);
   }
@@ -138,6 +148,9 @@ export function AdminUsuariosClient({
       role: form.role,
       areaId: form.areaId || null,
       active: form.active,
+      ...(form.role === "ADMIN"
+        ? { receiveApprovalEmails: form.receiveApprovalEmails }
+        : {}),
       ...(form.password.trim() ? { password: form.password } : {}),
     };
 
@@ -231,27 +244,67 @@ export function AdminUsuariosClient({
             onChange={(e) => setForm({ ...form, username: e.target.value })}
           />
         </div>
+        {isEdit && editPasswordConfigured && !form.password && (
+          <div className="space-y-1">
+            <Label>Contraseña actual</Label>
+            <Input
+              readOnly
+              value="••••••••"
+              className="bg-muted/50 font-mono"
+            />
+            <p className="text-xs text-muted-foreground">
+              Por seguridad no se puede mostrar. Escribe una nueva abajo para
+              cambiarla.
+            </p>
+          </div>
+        )}
         <div className="space-y-2">
           <Label htmlFor="userPassword">
-            Contraseña{isEdit ? " (opcional)" : ""}
+            {isEdit ? "Nueva contraseña (opcional)" : "Contraseña"}
           </Label>
-          <Input
-            id="userPassword"
-            type="password"
-            value={form.password}
-            onChange={(e) => setForm({ ...form, password: e.target.value })}
-            required={!isEdit}
-            minLength={isEdit ? undefined : 6}
-          />
+          <div className="relative">
+            <Input
+              id="userPassword"
+              type={showPassword ? "text" : "password"}
+              value={form.password}
+              onChange={(e) => setForm({ ...form, password: e.target.value })}
+              required={!isEdit}
+              minLength={isEdit ? undefined : 6}
+              className="pr-10"
+              autoComplete="new-password"
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="absolute right-0 top-0 h-full w-10"
+              onClick={() => setShowPassword((value) => !value)}
+              aria-label={
+                showPassword ? "Ocultar contraseña" : "Mostrar contraseña"
+              }
+            >
+              {showPassword ? (
+                <EyeOff className="h-4 w-4" />
+              ) : (
+                <Eye className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
         </div>
         <div className="space-y-2">
           <Label htmlFor="userRole">Rol</Label>
           <Select
             id="userRole"
             value={form.role}
-            onChange={(e) =>
-              setForm({ ...form, role: e.target.value as UserRole })
-            }
+            onChange={(e) => {
+              const role = e.target.value as UserRole;
+              setForm({
+                ...form,
+                role,
+                receiveApprovalEmails:
+                  role === "ADMIN" ? form.receiveApprovalEmails : false,
+              });
+            }}
           >
             <option value="ADMIN">Administrador</option>
             <option value="GENERAL">General</option>
@@ -283,6 +336,25 @@ export function AdminUsuariosClient({
           />
           Usuario activo
         </label>
+        {form.role === "ADMIN" && (
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={form.receiveApprovalEmails}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  receiveApprovalEmails: e.target.checked,
+                })
+              }
+              className="mt-0.5 rounded border-border"
+            />
+            <span>
+              Recibir correos para autorizar reservas (nuevas, cambios y
+              cancelaciones)
+            </span>
+          </label>
+        )}
       </>
     );
   }
@@ -410,6 +482,12 @@ export function AdminUsuariosClient({
                       )}
                       {user.id === currentUserId && (
                         <Badge variant="outline">Tú</Badge>
+                      )}
+                      {user.role === "ADMIN" && (
+                        <Badge variant="outline">
+                          Correos autorización:{" "}
+                          {user.receiveApprovalEmails ? "Sí" : "No"}
+                        </Badge>
                       )}
                     </div>
                     <div className="flex flex-wrap gap-2">

@@ -18,6 +18,7 @@ const updateUserSchema = z
     role: z.enum(["ADMIN", "GENERAL", "VISUALIZACION"]).optional(),
     areaId: z.string().optional().nullable(),
     active: z.boolean().optional(),
+    receiveApprovalEmails: z.boolean().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.email?.trim()) {
@@ -32,15 +33,19 @@ const updateUserSchema = z
     }
   });
 
-function toPublicUser(user: {
-  id: string;
-  email: string | null;
-  username: string | null;
-  role: PublicUser["role"];
-  areaId: string | null;
-  active: boolean;
-  areaName?: string | null;
-}): PublicUser {
+function toPublicUser(
+  user: {
+    id: string;
+    email: string | null;
+    username: string | null;
+    role: PublicUser["role"];
+    areaId: string | null;
+    active: boolean;
+    receiveApprovalEmails: boolean;
+    areaName?: string | null;
+  },
+  passwordConfigured = false,
+): PublicUser {
   return {
     id: user.id,
     email: user.email,
@@ -48,17 +53,22 @@ function toPublicUser(user: {
     role: user.role,
     areaId: user.areaId,
     active: user.active,
+    receiveApprovalEmails: user.receiveApprovalEmails,
     areaName: user.areaName,
+    passwordConfigured,
   };
 }
 
 async function enrichUser(user: NonNullable<Awaited<ReturnType<typeof getUserById>>>) {
   const areas = await getAllAreas();
   const areaMap = new Map(areas.map((area) => [area.id, area.name]));
-  return toPublicUser({
-    ...user,
-    areaName: user.areaId ? areaMap.get(user.areaId) ?? null : null,
-  });
+  return toPublicUser(
+    {
+      ...user,
+      areaName: user.areaId ? areaMap.get(user.areaId) ?? null : null,
+    },
+    Boolean(user.passwordHash),
+  );
 }
 
 export async function GET(

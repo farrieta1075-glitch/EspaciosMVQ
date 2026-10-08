@@ -66,6 +66,13 @@ export async function getAdminNotificationEmails(): Promise<{
       });
       continue;
     }
+    if (!admin.receiveApprovalEmails) {
+      skipped.push({
+        id: admin.id,
+        reason: "notificaciones de autorización desactivadas",
+      });
+      continue;
+    }
     emails.push(email);
   }
 

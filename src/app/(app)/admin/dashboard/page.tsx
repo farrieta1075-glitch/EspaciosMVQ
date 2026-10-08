@@ -8,9 +8,6 @@ export default async function AdminDashboardPage() {
     <section className="space-y-6">
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-        <p className="text-sm text-muted-foreground">
-          Estadísticas de uso de espacios, recursos y reservas.
-        </p>
       </header>
       <AdminDashboardClient initialStats={stats} />
     </section>

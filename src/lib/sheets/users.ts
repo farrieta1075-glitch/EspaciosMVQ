@@ -24,6 +24,11 @@ const userRowSchema = z.object({
     .optional()
     .default("true")
     .transform((value) => value.toLowerCase() !== "false"),
+  receiveApprovalEmails: z
+    .string()
+    .optional()
+    .default("true")
+    .transform((value) => value.toLowerCase() !== "false"),
 });
 
 export function mapRowToUser(row: Record<string, string>): AppUser {
@@ -36,6 +41,7 @@ export function mapRowToUser(row: Record<string, string>): AppUser {
     role: parsed.role as UserRole,
     areaId: parsed.areaId || null,
     active: parsed.active,
+    receiveApprovalEmails: parsed.receiveApprovalEmails,
   };
 }
 
@@ -48,6 +54,7 @@ function userToRow(user: AppUser): string[] {
     user.role,
     user.areaId ?? "",
     user.active ? "true" : "false",
+    user.role === "ADMIN" && user.receiveApprovalEmails ? "true" : "false",
   ];
 }
 
@@ -119,6 +126,7 @@ export async function createUser(input: {
   role: UserRole;
   areaId?: string | null;
   active?: boolean;
+  receiveApprovalEmails?: boolean;
 }): Promise<AppUser> {
   await assertUniqueCredentials(input);
 
@@ -131,6 +139,8 @@ export async function createUser(input: {
     role: input.role,
     areaId: input.areaId?.trim() || null,
     active: input.active ?? true,
+    receiveApprovalEmails:
+      input.role === "ADMIN" ? (input.receiveApprovalEmails ?? true) : false,
   };
 
   await appendSheetRow(SHEET_TABS.USUARIOS, userToRow(user));
@@ -146,6 +156,7 @@ export async function updateUser(
     role: UserRole;
     areaId: string | null;
     active: boolean;
+    receiveApprovalEmails: boolean;
   }>,
 ): Promise<AppUser | null> {
   const existing = await getUserById(id);
@@ -173,6 +184,11 @@ export async function updateUser(
         ? input.areaId?.trim() || null
         : existing.areaId,
     active: input.active ?? existing.active,
+    receiveApprovalEmails:
+      (input.role ?? existing.role) === "ADMIN"
+        ? (input.receiveApprovalEmails ??
+          (existing.role === "ADMIN" ? existing.receiveApprovalEmails : true))
+        : false,
     passwordHash:
       input.password && input.password.trim()
         ? await bcrypt.hash(input.password, 10)

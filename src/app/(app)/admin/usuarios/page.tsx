@@ -20,6 +20,8 @@ export default async function AdminUsuariosPage() {
     role: user.role,
     areaId: user.areaId,
     active: user.active,
+    receiveApprovalEmails: user.receiveApprovalEmails,
+    passwordConfigured: Boolean(user.passwordHash),
     areaName: user.areaId ? areaMap.get(user.areaId) ?? null : null,
   }));
 
