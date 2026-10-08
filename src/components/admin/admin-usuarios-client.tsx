@@ -64,6 +64,176 @@ const emptyForm: UserFormState = {
   receiveApprovalEmails: true,
 };
 
+interface UserFormFieldsProps {
+  formIdPrefix: "create" | "edit";
+  isEdit: boolean;
+  form: UserFormState;
+  onPatch: (patch: Partial<UserFormState>) => void;
+  areas: Area[];
+  editingId: string | null;
+  currentUserId: string;
+  showPassword: boolean;
+  onToggleShowPassword: () => void;
+  editPasswordConfigured: boolean;
+}
+
+function UserFormFields({
+  formIdPrefix,
+  isEdit,
+  form,
+  onPatch,
+  areas,
+  editingId,
+  currentUserId,
+  showPassword,
+  onToggleShowPassword,
+  editPasswordConfigured,
+}: UserFormFieldsProps) {
+  return (
+    <>
+      <div className="space-y-2">
+        <Label htmlFor={`${formIdPrefix}-userEmail`}>Correo</Label>
+        <Input
+          id={`${formIdPrefix}-userEmail`}
+          type="email"
+          value={form.email}
+          onChange={(e) => onPatch({ email: e.target.value })}
+          autoComplete="email"
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor={`${formIdPrefix}-userUsername`}>Usuario</Label>
+        <Input
+          id={`${formIdPrefix}-userUsername`}
+          value={form.username}
+          onChange={(e) => onPatch({ username: e.target.value })}
+          autoComplete="username"
+        />
+      </div>
+      {isEdit && editPasswordConfigured && !form.password && (
+        <p className="text-xs text-muted-foreground">
+          Este usuario ya tiene contraseña configurada (no se puede recuperar).
+          Escribe una nueva abajo para cambiarla.
+        </p>
+      )}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <Label htmlFor={`${formIdPrefix}-userPassword`}>
+            {isEdit ? "Nueva contraseña (opcional)" : "Contraseña"}
+          </Label>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 shrink-0 px-2 text-xs text-muted-foreground"
+            onClick={onToggleShowPassword}
+          >
+            {showPassword ? (
+              <>
+                <EyeOff className="mr-1 h-3.5 w-3.5" />
+                Ocultar
+              </>
+            ) : (
+              <>
+                <Eye className="mr-1 h-3.5 w-3.5" />
+                Ver contraseña
+              </>
+            )}
+          </Button>
+        </div>
+        <div className="relative">
+          <Input
+            id={`${formIdPrefix}-userPassword`}
+            type={showPassword ? "text" : "password"}
+            value={form.password}
+            onChange={(e) => onPatch({ password: e.target.value })}
+            required={!isEdit}
+            minLength={isEdit ? undefined : 6}
+            className="pr-10"
+            autoComplete="new-password"
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="absolute right-0 top-0 h-full w-10"
+            onClick={onToggleShowPassword}
+            aria-label={
+              showPassword ? "Ocultar contraseña" : "Mostrar contraseña"
+            }
+          >
+            {showPassword ? (
+              <EyeOff className="h-4 w-4" />
+            ) : (
+              <Eye className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor={`${formIdPrefix}-userRole`}>Rol</Label>
+        <Select
+          id={`${formIdPrefix}-userRole`}
+          value={form.role}
+          onChange={(e) => {
+            const role = e.target.value as UserRole;
+            onPatch({
+              role,
+              receiveApprovalEmails:
+                role === "ADMIN" ? form.receiveApprovalEmails : false,
+            });
+          }}
+        >
+          <option value="ADMIN">Administrador</option>
+          <option value="GENERAL">General</option>
+          <option value="VISUALIZACION">Visualización</option>
+        </Select>
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor={`${formIdPrefix}-userArea`}>Área</Label>
+        <Select
+          id={`${formIdPrefix}-userArea`}
+          value={form.areaId}
+          onChange={(e) => onPatch({ areaId: e.target.value })}
+        >
+          <option value="">Sin área</option>
+          {areas.map((area) => (
+            <option key={area.id} value={area.id}>
+              {area.name}
+            </option>
+          ))}
+        </Select>
+      </div>
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={form.active}
+          onChange={(e) => onPatch({ active: e.target.checked })}
+          className="rounded border-border"
+          disabled={isEdit && editingId === currentUserId}
+        />
+        Usuario activo
+      </label>
+      {form.role === "ADMIN" && (
+        <label className="flex items-start gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={form.receiveApprovalEmails}
+            onChange={(e) =>
+              onPatch({ receiveApprovalEmails: e.target.checked })
+            }
+            className="mt-0.5 rounded border-border"
+          />
+          <span>
+            Recibir correos para autorizar reservas (nuevas, cambios y
+            cancelaciones)
+          </span>
+        </label>
+      )}
+    </>
+  );
+}
+
 export function AdminUsuariosClient({
   initialUsers,
   areas,
@@ -224,140 +394,13 @@ export function AdminUsuariosClient({
     setLoading(false);
   }
 
-  function UserFormFields({ isEdit }: { isEdit: boolean }) {
-    return (
-      <>
-        <div className="space-y-2">
-          <Label htmlFor="userEmail">Correo</Label>
-          <Input
-            id="userEmail"
-            type="email"
-            value={form.email}
-            onChange={(e) => setForm({ ...form, email: e.target.value })}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="userUsername">Usuario</Label>
-          <Input
-            id="userUsername"
-            value={form.username}
-            onChange={(e) => setForm({ ...form, username: e.target.value })}
-          />
-        </div>
-        {isEdit && editPasswordConfigured && !form.password && (
-          <div className="space-y-1">
-            <Label>Contraseña actual</Label>
-            <Input
-              readOnly
-              value="••••••••"
-              className="bg-muted/50 font-mono"
-            />
-            <p className="text-xs text-muted-foreground">
-              Por seguridad no se puede mostrar. Escribe una nueva abajo para
-              cambiarla.
-            </p>
-          </div>
-        )}
-        <div className="space-y-2">
-          <Label htmlFor="userPassword">
-            {isEdit ? "Nueva contraseña (opcional)" : "Contraseña"}
-          </Label>
-          <div className="relative">
-            <Input
-              id="userPassword"
-              type={showPassword ? "text" : "password"}
-              value={form.password}
-              onChange={(e) => setForm({ ...form, password: e.target.value })}
-              required={!isEdit}
-              minLength={isEdit ? undefined : 6}
-              className="pr-10"
-              autoComplete="new-password"
-            />
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="absolute right-0 top-0 h-full w-10"
-              onClick={() => setShowPassword((value) => !value)}
-              aria-label={
-                showPassword ? "Ocultar contraseña" : "Mostrar contraseña"
-              }
-            >
-              {showPassword ? (
-                <EyeOff className="h-4 w-4" />
-              ) : (
-                <Eye className="h-4 w-4" />
-              )}
-            </Button>
-          </div>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="userRole">Rol</Label>
-          <Select
-            id="userRole"
-            value={form.role}
-            onChange={(e) => {
-              const role = e.target.value as UserRole;
-              setForm({
-                ...form,
-                role,
-                receiveApprovalEmails:
-                  role === "ADMIN" ? form.receiveApprovalEmails : false,
-              });
-            }}
-          >
-            <option value="ADMIN">Administrador</option>
-            <option value="GENERAL">General</option>
-            <option value="VISUALIZACION">Visualización</option>
-          </Select>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="userArea">Área</Label>
-          <Select
-            id="userArea"
-            value={form.areaId}
-            onChange={(e) => setForm({ ...form, areaId: e.target.value })}
-          >
-            <option value="">Sin área</option>
-            {areas.map((area) => (
-              <option key={area.id} value={area.id}>
-                {area.name}
-              </option>
-            ))}
-          </Select>
-        </div>
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={form.active}
-            onChange={(e) => setForm({ ...form, active: e.target.checked })}
-            className="rounded border-border"
-            disabled={isEdit && editingId === currentUserId}
-          />
-          Usuario activo
-        </label>
-        {form.role === "ADMIN" && (
-          <label className="flex items-start gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={form.receiveApprovalEmails}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  receiveApprovalEmails: e.target.checked,
-                })
-              }
-              className="mt-0.5 rounded border-border"
-            />
-            <span>
-              Recibir correos para autorizar reservas (nuevas, cambios y
-              cancelaciones)
-            </span>
-          </label>
-        )}
-      </>
-    );
-  }
+  const patchForm = React.useCallback((patch: Partial<UserFormState>) => {
+    setForm((current) => ({ ...current, ...patch }));
+  }, []);
+
+  const toggleShowPassword = React.useCallback(() => {
+    setShowPassword((value) => !value);
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -526,7 +569,18 @@ export function AdminUsuariosClient({
             <DialogTitle>Nuevo usuario</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <UserFormFields isEdit={false} />
+            <UserFormFields
+              formIdPrefix="create"
+              isEdit={false}
+              form={form}
+              onPatch={patchForm}
+              areas={areas}
+              editingId={editingId}
+              currentUserId={currentUserId}
+              showPassword={showPassword}
+              onToggleShowPassword={toggleShowPassword}
+              editPasswordConfigured={editPasswordConfigured}
+            />
             <div className="flex gap-2">
               <Button
                 type="button"
@@ -554,7 +608,18 @@ export function AdminUsuariosClient({
             <DialogTitle>Editar usuario</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <UserFormFields isEdit />
+            <UserFormFields
+              formIdPrefix="edit"
+              isEdit
+              form={form}
+              onPatch={patchForm}
+              areas={areas}
+              editingId={editingId}
+              currentUserId={currentUserId}
+              showPassword={showPassword}
+              onToggleShowPassword={toggleShowPassword}
+              editPasswordConfigured={editPasswordConfigured}
+            />
             <div className="flex gap-2">
               <Button
                 type="button"
