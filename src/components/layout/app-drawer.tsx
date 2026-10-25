@@ -103,12 +103,12 @@ export function AppDrawer({ user }: AppDrawerProps) {
           <Menu className="h-5 w-5" />
         </Button>
       </SheetTrigger>
-      <SheetContent side="right" className="flex h-full flex-col gap-0 p-0">
-        <SheetHeader className="shrink-0 space-y-1 border-b px-6 py-5 pr-14">
+      <SheetContent side="left" className="flex h-full flex-col gap-0 p-0">
+        <SheetHeader className="shrink-0 space-y-1 border-b px-4 py-4 pr-12 sm:px-5 sm:py-5">
           <SheetTitle>Menú</SheetTitle>
         </SheetHeader>
 
-        <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
+        <nav className="min-h-0 flex-1 overflow-y-auto px-2 py-3 sm:px-3">
           <div className="flex flex-col gap-1">
             {navItems.map((item) => (
               <Link
@@ -129,7 +129,7 @@ export function AppDrawer({ user }: AppDrawerProps) {
           </div>
         </nav>
 
-        <div className="safe-area-pb shrink-0 border-t px-6 py-4">
+        <div className="safe-area-pb shrink-0 border-t px-4 py-3 sm:px-5 sm:py-4">
           <Button
             type="button"
             variant="outline"
