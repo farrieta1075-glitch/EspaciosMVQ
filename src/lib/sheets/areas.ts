@@ -5,7 +5,7 @@ import {
   deleteSheetRowByIndex,
   findRowIndexById,
   getSheetMeta,
-  getSheetRows,
+  getSheetRowsCanonical,
   updateSheetRowById,
 } from "@/lib/sheets/repository";
 import { parseEventPresets, serializeEventPresets } from "@/lib/area-scope";
@@ -44,10 +44,23 @@ function areaToRow(area: Area): string[] {
 }
 
 export async function getAllAreas(): Promise<Area[]> {
-  const { rows } = await getSheetRows(SHEET_TABS.AREAS);
-  return rows
-    .filter((row) => row.id?.trim())
-    .map((row) => mapRowToArea(areaRowSchema.parse(row)));
+  const { rows } = await getSheetRowsCanonical(SHEET_TABS.AREAS);
+  const areas: Area[] = [];
+
+  for (const row of rows) {
+    if (!row.id?.trim()) continue;
+    const parsed = areaRowSchema.safeParse(row);
+    if (!parsed.success) {
+      console.warn(
+        `[sheets] Fila de área ignorada (${row.id ?? "sin id"}):`,
+        parsed.error.flatten().fieldErrors,
+      );
+      continue;
+    }
+    areas.push(mapRowToArea(parsed.data));
+  }
+
+  return areas;
 }
 
 export async function getAreaById(id: string): Promise<Area | null> {
@@ -81,7 +94,19 @@ export async function createArea(input: {
   };
 
   await appendSheetRow(SHEET_TABS.AREAS, areaToRow(area));
-  return area;
+
+  let persisted = await getAreaById(area.id);
+  if (!persisted) {
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    persisted = await getAreaById(area.id);
+  }
+  if (!persisted) {
+    throw new Error(
+      "El área se guardó en la hoja pero no se pudo leer. Revisa que la pestaña Areas tenga las columnas: id, name, code, parentId, colorHex, eventPresets (en ese orden, fila 1).",
+    );
+  }
+
+  return persisted;
 }
 
 export async function updateArea(
