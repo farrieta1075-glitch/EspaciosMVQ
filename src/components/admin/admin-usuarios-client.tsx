@@ -36,6 +36,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { HelpHint } from "@/components/ui/help-hint";
+import {
+  areaSelectOptionLabel,
+  buildAreaHierarchy,
+} from "@/lib/area-scope";
 import { cn } from "@/lib/utils";
 
 interface AdminUsuariosClientProps {
@@ -66,12 +70,6 @@ const emptyForm: UserFormState = {
   receiveApprovalEmails: true,
 };
 
-function areaOptionLabel(area: Area, areasById: Map<string, Area>): string {
-  if (!area.parentId) return area.name;
-  const parent = areasById.get(area.parentId);
-  return parent ? `${parent.name} · ${area.name}` : area.name;
-}
-
 interface UserFormFieldsProps {
   formIdPrefix: "create" | "edit";
   isEdit: boolean;
@@ -97,19 +95,9 @@ function UserFormFields({
   onToggleShowPassword,
   editPasswordConfigured,
 }: UserFormFieldsProps) {
-  const areasById = React.useMemo(
-    () => new Map(areas.map((area) => [area.id, area])),
+  const { childrenByParent, roots } = React.useMemo(
+    () => buildAreaHierarchy(areas),
     [areas],
-  );
-  const sortedAreas = React.useMemo(
-    () =>
-      [...areas].sort((a, b) =>
-        areaOptionLabel(a, areasById).localeCompare(
-          areaOptionLabel(b, areasById),
-          "es",
-        ),
-      ),
-    [areas, areasById],
   );
 
   function toggleScope(areaId: string, checked: boolean) {
@@ -239,31 +227,56 @@ function UserFormFields({
           }}
         >
           <option value="">Sin área</option>
-          {sortedAreas.map((area) => (
-            <option key={area.id} value={area.id}>
-              {areaOptionLabel(area, areasById)}
-            </option>
-          ))}
+          {roots.map((root) => {
+            const children = childrenByParent.get(root.id) ?? [];
+            return (
+              <React.Fragment key={root.id}>
+                <option value={root.id}>{root.name}</option>
+                {children.map((child) => (
+                  <option key={child.id} value={child.id}>
+                    {areaSelectOptionLabel(child, 1)}
+                  </option>
+                ))}
+              </React.Fragment>
+            );
+          })}
         </Select>
       </div>
       <div className="space-y-2">
         <Label>Áreas y subáreas asignadas</Label>
-        <div className="max-h-44 space-y-1 overflow-y-auto rounded-md border border-border p-2">
-          {sortedAreas.map((area) => (
-            <label
-              key={area.id}
-              className="flex items-center gap-2 text-sm"
-              style={{ paddingLeft: area.parentId ? 12 : 0 }}
-            >
-              <input
-                type="checkbox"
-                checked={form.areaScopeIds.includes(area.id)}
-                onChange={(e) => toggleScope(area.id, e.target.checked)}
-                className="rounded border-border"
-              />
-              <span>{areaOptionLabel(area, areasById)}</span>
-            </label>
-          ))}
+        <div className="max-h-52 space-y-2 overflow-y-auto rounded-md border border-border p-2">
+          {roots.map((root) => {
+            const children = childrenByParent.get(root.id) ?? [];
+            return (
+              <div key={root.id} className="space-y-1">
+                <label className="flex items-center gap-2 text-sm font-medium">
+                  <input
+                    type="checkbox"
+                    checked={form.areaScopeIds.includes(root.id)}
+                    onChange={(e) => toggleScope(root.id, e.target.checked)}
+                    className="rounded border-border"
+                  />
+                  <span>{root.name}</span>
+                </label>
+                {children.map((child) => (
+                  <label
+                    key={child.id}
+                    className="flex items-center gap-2 pl-6 text-sm text-muted-foreground"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={form.areaScopeIds.includes(child.id)}
+                      onChange={(e) =>
+                        toggleScope(child.id, e.target.checked)
+                      }
+                      className="rounded border-border"
+                    />
+                    <span>{child.name}</span>
+                  </label>
+                ))}
+              </div>
+            );
+          })}
         </div>
         <p className="text-xs text-muted-foreground">
           Define qué subáreas puede usar al reservar y qué eventos precargados

@@ -2,8 +2,17 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Layers, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  Layers,
+  Loader2,
+  Pencil,
+  Plus,
+  Trash2,
+} from "lucide-react";
 import type { Area } from "@/types/area";
+import { buildAreaHierarchy } from "@/lib/area-scope";
 import { getAreaHex } from "@/lib/area-colors";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,8 +26,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { HelpHint } from "@/components/ui/help-hint";
-import { cn } from "@/lib/utils";
-
 interface AdminAreasClientProps {
   initialAreas: Area[];
 }
@@ -50,6 +57,12 @@ function textToPresets(text: string): string[] {
     .filter(Boolean);
 }
 
+function subareaCountLabel(count: number): string {
+  if (count === 0) return "Sin subáreas";
+  if (count === 1) return "1 subárea";
+  return `${count} subáreas`;
+}
+
 export function AdminAreasClient({ initialAreas }: AdminAreasClientProps) {
   const router = useRouter();
   const [areas, setAreas] = React.useState(initialAreas);
@@ -58,30 +71,25 @@ export function AdminAreasClient({ initialAreas }: AdminAreasClientProps) {
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
-
-  const areasById = React.useMemo(
-    () => new Map(areas.map((area) => [area.id, area])),
-    [areas],
+  const [expandedIds, setExpandedIds] = React.useState<Record<string, boolean>>(
+    {},
   );
 
-  const roots = areas.filter((area) => !area.parentId);
-  const childrenByParent = React.useMemo(() => {
-    const map = new Map<string, Area[]>();
-    for (const area of areas) {
-      if (!area.parentId) continue;
-      const list = map.get(area.parentId) ?? [];
-      list.push(area);
-      map.set(area.parentId, list);
-    }
-    for (const list of map.values()) {
-      list.sort((a, b) => a.name.localeCompare(b.name, "es"));
-    }
-    return map;
-  }, [areas]);
+  const { areasById, childrenByParent, roots } = React.useMemo(
+    () => buildAreaHierarchy(areas),
+    [areas],
+  );
 
   async function refreshAreas() {
     const response = await fetch("/api/admin/areas");
     if (response.ok) setAreas(await response.json());
+  }
+
+  function toggleExpanded(id: string) {
+    setExpandedIds((current) => ({
+      ...current,
+      [id]: !current[id],
+    }));
   }
 
   function openCreate(parentId?: string) {
@@ -89,6 +97,9 @@ export function AdminAreasClient({ initialAreas }: AdminAreasClientProps) {
     setForm({ ...emptyForm, parentId: parentId ?? "" });
     setError(null);
     setDialogOpen(true);
+    if (parentId) {
+      setExpandedIds((current) => ({ ...current, [parentId]: true }));
+    }
   }
 
   function openEdit(area: Area) {
@@ -163,45 +174,115 @@ export function AdminAreasClient({ initialAreas }: AdminAreasClientProps) {
     setLoading(false);
   }
 
-  function renderAreaRow(area: Area, depth = 0) {
-    const children = childrenByParent.get(area.id) ?? [];
+  function renderSubareaRow(area: Area) {
     const hex = area.colorHex || getAreaHex(area);
+    const presetCount = area.eventPresets?.length ?? 0;
+
     return (
-      <React.Fragment key={area.id}>
-        <div
-          className={cn(
-            "flex flex-wrap items-center gap-2 rounded-lg border border-border px-3 py-2",
-            depth > 0 && "ml-4 sm:ml-6",
-          )}
-        >
+      <div
+        key={area.id}
+        className="flex flex-wrap items-center gap-2 border-t border-border bg-muted/20 px-3 py-2 pl-10 sm:pl-12"
+      >
+        <span
+          className="h-2.5 w-2.5 shrink-0 rounded-full ring-1 ring-border"
+          style={{ backgroundColor: hex }}
+        />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium">{area.name}</p>
+          <p className="truncate text-xs text-muted-foreground">
+            {presetCount > 0
+              ? `${presetCount} evento(s) precargado(s)`
+              : "Sin eventos precargados"}
+          </p>
+        </div>
+        <Badge variant="outline" className="shrink-0 text-[10px]">
+          Subárea
+        </Badge>
+        <div className="flex gap-1">
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            className="h-8 w-8"
+            onClick={() => openEdit(area)}
+          >
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            className="h-8 w-8 text-destructive"
+            onClick={() => handleDelete(area)}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  function renderRootArea(area: Area) {
+    const children = childrenByParent.get(area.id) ?? [];
+    const expanded = expandedIds[area.id] ?? false;
+    const hex = area.colorHex || getAreaHex(area);
+    const isRoot = !area.parentId;
+
+    return (
+      <div
+        key={area.id}
+        className="overflow-hidden rounded-lg border border-border"
+      >
+        <div className="flex flex-wrap items-center gap-2 px-3 py-2.5">
+          <button
+            type="button"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md hover:bg-muted/60"
+            onClick={() => toggleExpanded(area.id)}
+            aria-expanded={expanded}
+            aria-label={expanded ? "Ocultar subáreas" : "Mostrar subáreas"}
+          >
+            {children.length > 0 ? (
+              expanded ? (
+                <ChevronDown className="h-4 w-4" />
+              ) : (
+                <ChevronRight className="h-4 w-4" />
+              )
+            ) : (
+              <span className="inline-block w-4" />
+            )}
+          </button>
           <span
             className="h-3 w-3 shrink-0 rounded-full ring-1 ring-border"
             style={{ backgroundColor: hex }}
           />
-          <div className="min-w-0 flex-1">
+          <button
+            type="button"
+            className="min-w-0 flex-1 text-left"
+            onClick={() => children.length > 0 && toggleExpanded(area.id)}
+          >
             <p className="truncate font-medium">{area.name}</p>
             <p className="truncate text-xs text-muted-foreground">
-              {area.code ? `Código: ${area.code}` : "Sin código"}
+              {isRoot
+                ? subareaCountLabel(children.length)
+                : "Subárea sin área padre en hoja"}
               {(area.eventPresets?.length ?? 0) > 0
-                ? ` · ${area.eventPresets.length} evento(s) precargado(s)`
+                ? ` · ${area.eventPresets.length} evento(s) en área`
                 : ""}
             </p>
-          </div>
-          {area.parentId && (
-            <Badge variant="outline" className="text-[10px]">
-              Subárea
-            </Badge>
-          )}
-          <div className="flex gap-1">
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={() => openCreate(area.id)}
-            >
-              <Plus className="mr-1 h-3.5 w-3.5" />
-              Subárea
-            </Button>
+          </button>
+          <div className="flex flex-wrap gap-1">
+            {isRoot && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-8"
+                onClick={() => openCreate(area.id)}
+              >
+                <Plus className="mr-1 h-3.5 w-3.5" />
+                Subárea
+              </Button>
+            )}
             <Button
               type="button"
               size="icon"
@@ -222,8 +303,12 @@ export function AdminAreasClient({ initialAreas }: AdminAreasClientProps) {
             </Button>
           </div>
         </div>
-        {children.map((child) => renderAreaRow(child, depth + 1))}
-      </React.Fragment>
+        {expanded && children.length > 0 && (
+          <div className="border-t border-border">
+            {children.map((child) => renderSubareaRow(child))}
+          </div>
+        )}
+      </div>
     );
   }
 
@@ -257,10 +342,7 @@ export function AdminAreasClient({ initialAreas }: AdminAreasClientProps) {
         </div>
       ) : (
         <div className="space-y-2">
-          {roots.map((area) => renderAreaRow(area))}
-          {areas
-            .filter((area) => area.parentId && !areasById.has(area.parentId))
-            .map((area) => renderAreaRow(area))}
+          {roots.map((area) => renderRootArea(area))}
         </div>
       )}
 
@@ -319,16 +401,6 @@ export function AdminAreasClient({ initialAreas }: AdminAreasClientProps) {
                       {area.name}
                     </option>
                   ))}
-                {parentOptions
-                  .filter((area) => area.parentId)
-                  .map((area) => {
-                    const parent = areasById.get(area.parentId ?? "");
-                    return (
-                      <option key={area.id} value={area.id}>
-                        {parent ? `${parent.name} · ${area.name}` : area.name}
-                      </option>
-                    );
-                  })}
               </Select>
             </div>
             <div className="space-y-2">
