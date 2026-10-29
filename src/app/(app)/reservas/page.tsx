@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { auth } from "@/lib/auth/index";
 import { isAdmin } from "@/lib/auth/permissions";
+import { resolveUserAreaScopeIds } from "@/lib/area-scope";
 import { listReservationDetails } from "@/lib/reservation-service";
+import { getUserById } from "@/lib/sheets/users";
 import { ReservationsList } from "@/components/reservation/reservations-list";
 import { Button } from "@/components/ui/button";
 
@@ -9,10 +11,14 @@ export default async function ReservasPage() {
   const session = await auth();
   const admin = isAdmin(session?.user ?? null);
 
-  const reservations = await listReservationDetails(
-    session?.user?.areaId ?? null,
-    admin,
-  );
+  const userRecord = session?.user?.id
+    ? await getUserById(session.user.id)
+    : null;
+  const scopeAreaIds = userRecord
+    ? resolveUserAreaScopeIds(userRecord)
+    : [];
+
+  const reservations = await listReservationDetails(scopeAreaIds, admin);
 
   return (
     <section className="space-y-6">

@@ -69,7 +69,12 @@ export function hexToRgba(hex: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-function resolveAreaHex(area: Pick<Area, "id" | "name" | "code">): string {
+function resolveAreaHex(
+  area: Pick<Area, "id" | "name" | "code" | "colorHex">,
+): string {
+  if (area.colorHex?.trim() && /^#[0-9A-Fa-f]{6}$/.test(area.colorHex.trim())) {
+    return area.colorHex.trim();
+  }
   const key = normalizeAreaKey(area.name, area.code ?? "");
   for (const [needle, hex] of Object.entries(AREA_HEX_BY_KEY)) {
     if (key.includes(needle)) return hex;
@@ -88,7 +93,7 @@ function styleFromHex(hex: string): AreaColorStyle {
 }
 
 export function getAreaColor(
-  area: Pick<Area, "id" | "name" | "code"> | null | undefined,
+  area: Pick<Area, "id" | "name" | "code" | "colorHex"> | null | undefined,
 ): AreaColorStyle {
   if (!area) {
     return {
@@ -103,7 +108,7 @@ export function getAreaColor(
 }
 
 export function getAreaHex(
-  area: Pick<Area, "id" | "name" | "code"> | null | undefined,
+  area: Pick<Area, "id" | "name" | "code" | "colorHex"> | null | undefined,
 ): string {
   return getAreaColor(area).hex;
 }

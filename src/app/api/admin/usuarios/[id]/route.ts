@@ -17,6 +17,7 @@ const updateUserSchema = z
     password: z.string().min(6).optional(),
     role: z.enum(["ADMIN", "GENERAL", "VISUALIZACION"]).optional(),
     areaId: z.string().optional().nullable(),
+    areaScopeIds: z.array(z.string()).optional(),
     active: z.boolean().optional(),
     receiveApprovalEmails: z.boolean().optional(),
   })
@@ -40,6 +41,7 @@ function toPublicUser(
     username: string | null;
     role: PublicUser["role"];
     areaId: string | null;
+    areaScopeIds: string[];
     active: boolean;
     receiveApprovalEmails: boolean;
     areaName?: string | null;
@@ -52,6 +54,7 @@ function toPublicUser(
     username: user.username,
     role: user.role,
     areaId: user.areaId,
+    areaScopeIds: user.areaScopeIds ?? [],
     active: user.active,
     receiveApprovalEmails: user.receiveApprovalEmails,
     areaName: user.areaName,
@@ -110,8 +113,14 @@ export async function PATCH(
   }
 
   const nextRole = parsed.data.role ?? existing.role;
-  const nextAreaId =
+  const nextScopeIds =
+    parsed.data.areaScopeIds !== undefined
+      ? [...new Set(parsed.data.areaScopeIds.filter(Boolean))]
+      : existing.areaScopeIds;
+  const nextAreaIdRaw =
     parsed.data.areaId !== undefined ? parsed.data.areaId : existing.areaId;
+  const nextAreaId =
+    nextAreaIdRaw?.trim() || nextScopeIds[0] || null;
   const nextActive =
     parsed.data.active !== undefined ? parsed.data.active : existing.active;
   const nextEmail =
@@ -128,7 +137,10 @@ export async function PATCH(
 
   if (nextRole === "GENERAL" && !nextAreaId) {
     return NextResponse.json(
-      { error: "Los usuarios General deben tener un área asignada." },
+      {
+        error:
+          "Los usuarios General deben tener al menos un área o subárea asignada.",
+      },
       { status: 400 },
     );
   }
@@ -161,7 +173,16 @@ export async function PATCH(
   }
 
   try {
-    const updated = await updateUser(id, parsed.data);
+    const updated = await updateUser(id, {
+      ...parsed.data,
+      areaId: nextAreaId,
+      areaScopeIds:
+        nextScopeIds.length > 0
+          ? nextScopeIds
+          : nextAreaId
+            ? [nextAreaId]
+            : [],
+    });
     if (!updated) {
       return NextResponse.json({ error: "Usuario no encontrado" }, { status: 404 });
     }

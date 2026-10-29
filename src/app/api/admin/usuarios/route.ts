@@ -15,6 +15,7 @@ const createUserSchema = z
     password: z.string().min(6),
     role: z.enum(["ADMIN", "GENERAL", "VISUALIZACION"]),
     areaId: z.string().optional().nullable(),
+    areaScopeIds: z.array(z.string()).optional().default([]),
     active: z.boolean().optional().default(true),
     receiveApprovalEmails: z.boolean().optional(),
   })
@@ -38,6 +39,7 @@ function toPublicUser(
     username: string | null;
     role: PublicUser["role"];
     areaId: string | null;
+    areaScopeIds: string[];
     active: boolean;
     receiveApprovalEmails: boolean;
     areaName?: string | null;
@@ -50,6 +52,7 @@ function toPublicUser(
     username: user.username,
     role: user.role,
     areaId: user.areaId,
+    areaScopeIds: user.areaScopeIds ?? [],
     active: user.active,
     receiveApprovalEmails: user.receiveApprovalEmails,
     areaName: user.areaName,
@@ -92,8 +95,18 @@ export async function POST(request: Request) {
     );
   }
 
-  const { email, username, password, role, areaId, active, receiveApprovalEmails } =
-    parsed.data;
+  const {
+    email,
+    username,
+    password,
+    role,
+    areaId,
+    areaScopeIds,
+    active,
+    receiveApprovalEmails,
+  } = parsed.data;
+  const scopeIds = [...new Set(areaScopeIds.filter(Boolean))];
+  const primaryAreaId = areaId?.trim() || scopeIds[0] || null;
   if (!email && !username) {
     return NextResponse.json(
       { error: "Indica al menos un correo o nombre de usuario." },
@@ -101,9 +114,12 @@ export async function POST(request: Request) {
     );
   }
 
-  if (role === "GENERAL" && !areaId) {
+  if (role === "GENERAL" && !primaryAreaId) {
     return NextResponse.json(
-      { error: "Los usuarios General deben tener un área asignada." },
+      {
+        error:
+          "Los usuarios General deben tener al menos un área o subárea asignada.",
+      },
       { status: 400 },
     );
   }
@@ -114,7 +130,8 @@ export async function POST(request: Request) {
       username,
       password,
       role,
-      areaId,
+      areaId: primaryAreaId,
+      areaScopeIds: scopeIds.length > 0 ? scopeIds : primaryAreaId ? [primaryAreaId] : [],
       active,
       receiveApprovalEmails,
     });

@@ -3,10 +3,12 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/lib/auth/index";
 import { isAdmin } from "@/lib/auth/permissions";
+import { resolveUserAreaScopeIds, userHasAreaScope } from "@/lib/area-scope";
 import {
   createReservation,
   listReservationDetails,
 } from "@/lib/reservation-service";
+import { getUserById } from "@/lib/sheets/users";
 
 export async function GET() {
   const session = await auth();
@@ -15,10 +17,12 @@ export async function GET() {
   }
 
   const admin = isAdmin(session.user);
-  const reservations = await listReservationDetails(
-    session.user.areaId ?? null,
-    admin,
-  );
+  const userRecord = await getUserById(session.user.id);
+  const scopeAreaIds = userRecord
+    ? resolveUserAreaScopeIds(userRecord)
+    : [];
+
+  const reservations = await listReservationDetails(scopeAreaIds, admin);
 
   return NextResponse.json(
     reservations.sort(
@@ -98,20 +102,25 @@ export async function POST(request: Request) {
       );
     }
   } else {
-    if (!sessionAreaId) {
+    const userRecord = await getUserById(user.id);
+    const scopes = userRecord ? resolveUserAreaScopeIds(userRecord) : [];
+    if (scopes.length === 0) {
       return NextResponse.json(
-        { error: "Tu usuario no tiene un área asignada." },
+        { error: "Tu usuario no tiene un área o subárea asignada." },
         { status: 400 },
       );
     }
     const requestedAreaId = parsed.data.areaId?.trim();
-    if (requestedAreaId && requestedAreaId !== sessionAreaId) {
+    if (requestedAreaId && userHasAreaScope(userRecord!, requestedAreaId)) {
+      areaId = requestedAreaId;
+    } else if (requestedAreaId && !userHasAreaScope(userRecord!, requestedAreaId)) {
       return NextResponse.json(
-        { error: "No puedes reservar para otra área." },
+        { error: "No puedes reservar para un área no asignada." },
         { status: 403 },
       );
+    } else {
+      areaId = scopes[0];
     }
-    areaId = sessionAreaId;
   }
 
   const recurrence = {

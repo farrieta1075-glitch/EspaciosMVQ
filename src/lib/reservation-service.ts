@@ -11,6 +11,7 @@ import { recordEventUsage, getAllEventNames } from "@/lib/sheets/event-history";
 import {
   notifyAreaUsers,
 } from "@/lib/sheets/notifications";
+import { userHasAreaScope } from "@/lib/area-scope";
 import { getAllUserRecords } from "@/lib/sheets/users";
 import { appendSheetRow } from "@/lib/sheets/repository";
 import {
@@ -157,7 +158,7 @@ async function validateAvailability(
 async function getAreaUserIds(areaId: string): Promise<string[]> {
   const users = await getAllUserRecords();
   return users
-    .filter((user) => user.active && user.areaId === areaId)
+    .filter((user) => user.active && userHasAreaScope(user, areaId))
     .map((user) => user.id);
 }
 
@@ -322,13 +323,14 @@ export async function createReservation(
 }
 
 export async function getReservationsForUserAreaFilter(
-  areaId: string | null,
+  scopeAreaIds: string[],
   isAdmin: boolean,
 ) {
   const reservations = await getActiveReservations();
   if (isAdmin) return reservations;
-  if (!areaId) return [];
-  return reservations.filter((reservation) => reservation.areaId === areaId);
+  if (scopeAreaIds.length === 0) return [];
+  const scope = new Set(scopeAreaIds);
+  return reservations.filter((reservation) => scope.has(reservation.areaId));
 }
 
 function reservationNeedsApprovalFlag(reservation: Reservation): boolean {
@@ -397,10 +399,13 @@ export async function listPendingReservationDetails(): Promise<ReservationDetail
 }
 
 export async function listReservationDetails(
-  areaId: string | null,
+  scopeAreaIds: string[],
   isAdmin: boolean,
 ): Promise<ReservationDetail[]> {
-  const reservations = await getReservationsForUserAreaFilter(areaId, isAdmin);
+  const reservations = await getReservationsForUserAreaFilter(
+    scopeAreaIds,
+    isAdmin,
+  );
   return buildReservationDetailsBatch(reservations);
 }
 

@@ -1,6 +1,8 @@
 import { auth } from "@/lib/auth/index";
 import { can, isAdmin } from "@/lib/auth/permissions";
+import { resolveUserAreaScopeIds } from "@/lib/area-scope";
 import { getCachedCatalogBundle } from "@/lib/sheets/cached-catalog";
+import { getUserById } from "@/lib/sheets/users";
 import { MapDateSelectorWrapper } from "@/components/map-date/map-date-selector-wrapper";
 import { ReservationFlow } from "@/components/reservation/reservation-flow";
 
@@ -15,6 +17,12 @@ export default async function ReservaPage({
   const params = await searchParams;
 
   const [maps, spaces, areas] = await getCachedCatalogBundle();
+  const userRecord = session?.user?.id
+    ? await getUserById(session.user.id)
+    : null;
+  const userAreaScopeIds = userRecord
+    ? resolveUserAreaScopeIds(userRecord)
+    : [];
 
   return (
     <section className="space-y-3">
@@ -45,6 +53,7 @@ export default async function ReservaPage({
           areas={areas}
           isAdmin={admin}
           userAreaId={session?.user?.areaId ?? null}
+          userAreaScopeIds={userAreaScopeIds}
           initialDate={params.date}
           initialMapId={params.mapId}
           initialSpaceId={params.spaceId}

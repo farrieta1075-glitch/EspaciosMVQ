@@ -13,6 +13,7 @@ export interface AppUser {
   passwordHash: string | null;
   role: UserRole;
   areaId: string | null;
+  areaScopeIds: string[];
   areaName?: string | null;
   active: boolean;
   /** Solo aplica a ADMIN: recibir correos de autorización de reservas. */
@@ -25,6 +26,7 @@ export interface SessionUser {
   name?: string | null;
   role: UserRole;
   areaId?: string | null;
+  areaScopeIds?: string[];
   areaName?: string | null;
 }
 

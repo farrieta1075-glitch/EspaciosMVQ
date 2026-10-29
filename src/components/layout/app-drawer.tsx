@@ -47,6 +47,11 @@ function buildNavItems(user: SessionUser | null): NavItem[] {
       show: isAdmin(user),
     },
     {
+      href: "/admin/areas",
+      label: "Áreas",
+      show: isAdmin(user),
+    },
+    {
       href: "/admin/espacios",
       label: "Espacios",
       show: isAdmin(user),

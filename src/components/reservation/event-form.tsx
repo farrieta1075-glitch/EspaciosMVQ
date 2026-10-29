@@ -15,10 +15,20 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { getAreaHex } from "@/lib/area-colors";
 import { cn } from "@/lib/utils";
+
+export interface EventPresetGroup {
+  id: string;
+  label: string;
+  parentLabel: string | null;
+  colorHex: string;
+  events: string[];
+}
 
 interface EventFormProps {
   eventName: string;
@@ -51,6 +61,7 @@ interface EventFormProps {
   onAttendeeJustificationNoteChange: (value: string) => void;
   selectedSpaceIds?: string[];
   spaces?: Space[];
+  eventPresetGroups?: EventPresetGroup[];
 }
 
 export function EventForm({
@@ -84,6 +95,7 @@ export function EventForm({
   onAttendeeJustificationNoteChange,
   selectedSpaceIds = [],
   spaces = [],
+  eventPresetGroups = [],
 }: EventFormProps) {
   const [suggestions, setSuggestions] = React.useState<
     { eventName: string; count: number }[]
@@ -164,6 +176,57 @@ export function EventForm({
 
   const fields = (
         <div className="space-y-4">
+        {eventPresetGroups.length > 0 && (
+          <div className="space-y-2">
+            <Label>Eventos sugeridos por área</Label>
+            <div className="space-y-3">
+              {eventPresetGroups.map((group) => {
+                const hex =
+                  group.colorHex ||
+                  getAreaHex({
+                    id: group.id,
+                    name: group.label,
+                    code: "",
+                    colorHex: "",
+                  });
+                return (
+                  <div key={group.id} className="space-y-1.5">
+                    <p className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                      <span
+                        className="h-2.5 w-2.5 rounded-full ring-1 ring-border"
+                        style={{ backgroundColor: hex }}
+                      />
+                      {group.parentLabel
+                        ? `${group.parentLabel} · ${group.label}`
+                        : group.label}
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {group.events.map((preset) => (
+                        <Button
+                          key={`${group.id}-${preset}`}
+                          type="button"
+                          size="sm"
+                          variant={
+                            eventName.trim() === preset ? "default" : "outline"
+                          }
+                          className="h-7 text-xs"
+                          disabled={disabled}
+                          onClick={() => onEventNameChange(preset)}
+                        >
+                          {preset}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              También puedes escribir otro nombre manualmente abajo.
+            </p>
+          </div>
+        )}
+
         <div className="relative space-y-2">
           <Label htmlFor="eventName">Nombre del evento</Label>
           <Input
@@ -417,11 +480,19 @@ export function EventForm({
               onChange={(event) => onAreaIdChange(event.target.value)}
             >
               <option value="">Selecciona área</option>
-              {areas.map((area) => (
-                <option key={area.id} value={area.id}>
-                  {area.name}
-                </option>
-              ))}
+              {areas.map((area) => {
+                const parent = area.parentId
+                  ? areas.find((item) => item.id === area.parentId)
+                  : null;
+                const label = parent
+                  ? `${parent.name} · ${area.name}`
+                  : area.name;
+                return (
+                  <option key={area.id} value={area.id}>
+                    {label}
+                  </option>
+                );
+              })}
             </Select>
           </div>
         )}

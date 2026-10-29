@@ -50,6 +50,7 @@ interface UserFormState {
   password: string;
   role: UserRole;
   areaId: string;
+  areaScopeIds: string[];
   active: boolean;
   receiveApprovalEmails: boolean;
 }
@@ -60,9 +61,16 @@ const emptyForm: UserFormState = {
   password: "",
   role: "GENERAL",
   areaId: "",
+  areaScopeIds: [],
   active: true,
   receiveApprovalEmails: true,
 };
+
+function areaOptionLabel(area: Area, areasById: Map<string, Area>): string {
+  if (!area.parentId) return area.name;
+  const parent = areasById.get(area.parentId);
+  return parent ? `${parent.name} · ${area.name}` : area.name;
+}
 
 interface UserFormFieldsProps {
   formIdPrefix: "create" | "edit";
@@ -89,6 +97,35 @@ function UserFormFields({
   onToggleShowPassword,
   editPasswordConfigured,
 }: UserFormFieldsProps) {
+  const areasById = React.useMemo(
+    () => new Map(areas.map((area) => [area.id, area])),
+    [areas],
+  );
+  const sortedAreas = React.useMemo(
+    () =>
+      [...areas].sort((a, b) =>
+        areaOptionLabel(a, areasById).localeCompare(
+          areaOptionLabel(b, areasById),
+          "es",
+        ),
+      ),
+    [areas, areasById],
+  );
+
+  function toggleScope(areaId: string, checked: boolean) {
+    const next = new Set(form.areaScopeIds);
+    if (checked) next.add(areaId);
+    else next.delete(areaId);
+    const areaScopeIds = [...next];
+    onPatch({
+      areaScopeIds,
+      areaId:
+        form.areaId && areaScopeIds.includes(form.areaId)
+          ? form.areaId
+          : areaScopeIds[0] ?? form.areaId,
+    });
+  }
+
   return (
     <>
       <div className="space-y-2">
@@ -190,19 +227,48 @@ function UserFormFields({
         </Select>
       </div>
       <div className="space-y-2">
-        <Label htmlFor={`${formIdPrefix}-userArea`}>Área</Label>
+        <Label htmlFor={`${formIdPrefix}-userArea`}>Área principal</Label>
         <Select
           id={`${formIdPrefix}-userArea`}
           value={form.areaId}
-          onChange={(e) => onPatch({ areaId: e.target.value })}
+          onChange={(e) => {
+            const areaId = e.target.value;
+            const scope = new Set(form.areaScopeIds);
+            if (areaId) scope.add(areaId);
+            onPatch({ areaId, areaScopeIds: [...scope] });
+          }}
         >
           <option value="">Sin área</option>
-          {areas.map((area) => (
+          {sortedAreas.map((area) => (
             <option key={area.id} value={area.id}>
-              {area.name}
+              {areaOptionLabel(area, areasById)}
             </option>
           ))}
         </Select>
+      </div>
+      <div className="space-y-2">
+        <Label>Áreas y subáreas asignadas</Label>
+        <div className="max-h-44 space-y-1 overflow-y-auto rounded-md border border-border p-2">
+          {sortedAreas.map((area) => (
+            <label
+              key={area.id}
+              className="flex items-center gap-2 text-sm"
+              style={{ paddingLeft: area.parentId ? 12 : 0 }}
+            >
+              <input
+                type="checkbox"
+                checked={form.areaScopeIds.includes(area.id)}
+                onChange={(e) => toggleScope(area.id, e.target.checked)}
+                className="rounded border-border"
+              />
+              <span>{areaOptionLabel(area, areasById)}</span>
+            </label>
+          ))}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Define qué subáreas puede usar al reservar y qué eventos precargados
+          verá.
+        </p>
       </div>
       <label className="flex items-center gap-2 text-sm">
         <input
@@ -261,7 +327,13 @@ export function AdminUsuariosClient({
 
   const filteredUsers = users.filter((user) => {
     if (filterRole && user.role !== filterRole) return false;
-    if (filterAreaId && user.areaId !== filterAreaId) return false;
+    if (
+      filterAreaId &&
+      user.areaId !== filterAreaId &&
+      !(user.areaScopeIds ?? []).includes(filterAreaId)
+    ) {
+      return false;
+    }
     if (filterUsername.trim()) {
       const q = filterUsername.trim().toLowerCase();
       const username = (user.username ?? "").toLowerCase();
@@ -291,6 +363,7 @@ export function AdminUsuariosClient({
       password: "",
       role: user.role,
       areaId: user.areaId ?? "",
+      areaScopeIds: user.areaScopeIds ?? (user.areaId ? [user.areaId] : []),
       active: user.active,
       receiveApprovalEmails: user.receiveApprovalEmails,
     });
@@ -312,11 +385,16 @@ export function AdminUsuariosClient({
     setLoading(true);
     setError(null);
 
+    const areaScopeIds = [...new Set(form.areaScopeIds.filter(Boolean))];
+    const primaryAreaId =
+      form.areaId || areaScopeIds[0] || null;
+
     const payload = {
       email: form.email.trim() || null,
       username: form.username.trim() || null,
       role: form.role,
-      areaId: form.areaId || null,
+      areaId: primaryAreaId,
+      areaScopeIds,
       active: form.active,
       ...(form.role === "ADMIN"
         ? { receiveApprovalEmails: form.receiveApprovalEmails }
@@ -329,8 +407,10 @@ export function AdminUsuariosClient({
         throw new Error("Indica al menos un correo o nombre de usuario.");
       }
 
-      if (form.role === "GENERAL" && !form.areaId) {
-        throw new Error("Los usuarios General deben tener un área asignada.");
+      if (form.role === "GENERAL" && !primaryAreaId) {
+        throw new Error(
+          "Los usuarios General deben tener al menos un área o subárea asignada.",
+        );
       }
 
       if (editingId) {

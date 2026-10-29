@@ -23,8 +23,9 @@ export const SHEET_HEADERS: Record<SheetTab, string[]> = {
     "areaId",
     "active",
     "receiveApprovalEmails",
+    "areaScopeIds",
   ],
-  Areas: ["id", "name", "code"],
+  Areas: ["id", "name", "code", "parentId", "colorHex", "eventPresets"],
   Espacios: [
     "id",
     "name",

@@ -29,7 +29,35 @@ const userRowSchema = z.object({
     .optional()
     .default("true")
     .transform((value) => value.toLowerCase() !== "false"),
+  areaScopeIds: z.string().optional().default(""),
 });
+
+function parseAreaScopeIds(raw: string): string[] {
+  const trimmed = raw?.trim();
+  if (!trimmed) return [];
+  if (trimmed.startsWith("[")) {
+    try {
+      const parsed = JSON.parse(trimmed) as unknown;
+      if (!Array.isArray(parsed)) return [];
+      return [...new Set(parsed.map((item) => String(item).trim()).filter(Boolean))];
+    } catch {
+      return [];
+    }
+  }
+  return [
+    ...new Set(
+      trimmed
+        .split(/[,;|]+/)
+        .map((item) => item.trim())
+        .filter(Boolean),
+    ),
+  ];
+}
+
+function serializeAreaScopeIds(ids: string[]): string {
+  const unique = [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
+  return JSON.stringify(unique);
+}
 
 export function mapRowToUser(row: Record<string, string>): AppUser {
   const parsed = userRowSchema.parse(row);
@@ -42,6 +70,7 @@ export function mapRowToUser(row: Record<string, string>): AppUser {
     areaId: parsed.areaId || null,
     active: parsed.active,
     receiveApprovalEmails: parsed.receiveApprovalEmails,
+    areaScopeIds: parseAreaScopeIds(parsed.areaScopeIds),
   };
 }
 
@@ -55,6 +84,7 @@ function userToRow(user: AppUser): string[] {
     user.areaId ?? "",
     user.active ? "true" : "false",
     user.role === "ADMIN" && user.receiveApprovalEmails ? "true" : "false",
+    serializeAreaScopeIds(user.areaScopeIds ?? []),
   ];
 }
 
@@ -125,6 +155,7 @@ export async function createUser(input: {
   password: string;
   role: UserRole;
   areaId?: string | null;
+  areaScopeIds?: string[];
   active?: boolean;
   receiveApprovalEmails?: boolean;
 }): Promise<AppUser> {
@@ -138,6 +169,7 @@ export async function createUser(input: {
     passwordHash: await bcrypt.hash(input.password, 10),
     role: input.role,
     areaId: input.areaId?.trim() || null,
+    areaScopeIds: input.areaScopeIds ?? [],
     active: input.active ?? true,
     receiveApprovalEmails:
       input.role === "ADMIN" ? (input.receiveApprovalEmails ?? true) : false,
@@ -155,6 +187,7 @@ export async function updateUser(
     password: string;
     role: UserRole;
     areaId: string | null;
+    areaScopeIds: string[];
     active: boolean;
     receiveApprovalEmails: boolean;
   }>,
@@ -183,6 +216,10 @@ export async function updateUser(
       input.areaId !== undefined
         ? input.areaId?.trim() || null
         : existing.areaId,
+    areaScopeIds:
+      input.areaScopeIds !== undefined
+        ? input.areaScopeIds
+        : existing.areaScopeIds,
     active: input.active ?? existing.active,
     receiveApprovalEmails:
       (input.role ?? existing.role) === "ADMIN"

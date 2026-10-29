@@ -33,7 +33,14 @@ export function getReservationAreaColor(
   areas: Area[],
 ): AreaColorStyle {
   const area = areas.find((item) => item.id === reservation.areaId);
-  return getAreaColor(area ?? { id: reservation.areaId, name: reservation.areaName ?? "", code: "" });
+  return getAreaColor(
+    area ?? {
+      id: reservation.areaId,
+      name: reservation.areaName ?? "",
+      code: "",
+      colorHex: "",
+    },
+  );
 }
 
 export function reservationStatusLabel(reservation: ReservationDetail): string | null {

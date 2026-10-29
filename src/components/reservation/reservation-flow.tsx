@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { CheckCircle2, Loader2 } from "lucide-react";
 import type { Area } from "@/types/area";
 import type { FloorMap, Space } from "@/types/space";
+import type { EventPresetGroup } from "@/components/reservation/event-form";
 import type { MapDateSelection, RecurrenceType } from "@/types/reservation";
 import { reservationNeedsAttendeeJustification } from "@/lib/capacity-validation";
 import {
@@ -55,6 +56,7 @@ interface ReservationFlowProps {
   areas: Area[];
   isAdmin: boolean;
   userAreaId: string | null;
+  userAreaScopeIds: string[];
   initialDate?: string;
   initialMapId?: string;
   initialSpaceId?: string;
@@ -66,6 +68,7 @@ export function ReservationFlow({
   areas,
   isAdmin,
   userAreaId,
+  userAreaScopeIds,
   initialDate,
   initialMapId,
   initialSpaceId,
@@ -89,8 +92,14 @@ export function ReservationFlow({
   >([]);
   const [sendEventReminder, setSendEventReminder] = React.useState(true);
   const [areaId, setAreaId] = React.useState(
-    userAreaId ?? areas[0]?.id ?? "",
+    userAreaId ?? userAreaScopeIds[0] ?? areas[0]?.id ?? "",
   );
+  const [reservationAreaId, setReservationAreaId] = React.useState(
+    userAreaScopeIds[0] ?? userAreaId ?? "",
+  );
+  const [eventPresetGroups, setEventPresetGroups] = React.useState<
+    EventPresetGroup[]
+  >([]);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [resourcesOpen, setResourcesOpen] = React.useState(false);
@@ -107,6 +116,24 @@ export function ReservationFlow({
   const [restoredSelection, setRestoredSelection] = React.useState<
     InitialMapSelection | undefined
   >(undefined);
+
+  React.useEffect(() => {
+    const scopeQuery = userAreaScopeIds.join(",");
+    if (!scopeQuery && !isAdmin) return;
+    void fetch(
+      `/api/areas/event-presets${scopeQuery ? `?scopeIds=${encodeURIComponent(scopeQuery)}` : ""}`,
+    )
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        if (data?.groups) setEventPresetGroups(data.groups);
+      });
+  }, [userAreaScopeIds, isAdmin]);
+
+  const activeHighlightAreaId = isAdmin
+    ? areaId
+    : userAreaScopeIds.length > 1
+      ? reservationAreaId
+      : userAreaScopeIds[0] ?? userAreaId;
 
   React.useEffect(() => {
     const draft = loadReservationDraft();
@@ -175,7 +202,11 @@ export function ReservationFlow({
       (Boolean(attendeeJustificationCode) &&
         (attendeeJustificationCode !== "OTHER" ||
           attendeeJustificationNote.trim().length > 0))) &&
-    (!isAdmin || Boolean(areaId));
+    (isAdmin
+      ? Boolean(areaId)
+      : Boolean(
+          reservationAreaId || userAreaScopeIds[0] || userAreaId,
+        ));
 
   async function submitReservation(confirmSimilarName = false) {
     if (!selection || !canSubmit) return;
@@ -187,7 +218,9 @@ export function ReservationFlow({
       eventName: eventName.trim(),
       eventDescription: eventDescription.trim(),
       spaceIds: selection.selectedSpaceIds,
-      areaId: isAdmin ? areaId : userAreaId,
+      areaId: isAdmin
+        ? areaId
+        : reservationAreaId || userAreaScopeIds[0] || userAreaId,
       date: selection.date,
       startTime: selection.startTime,
       endTime: selection.endTime,
@@ -310,7 +343,7 @@ export function ReservationFlow({
         initialSpaceId={initialSpaceId}
         initialSelection={restoredSelection}
         areas={areas}
-        highlightAreaId={isAdmin ? areaId : userAreaId}
+        highlightAreaId={activeHighlightAreaId}
         layout="reservation"
         showResourcePanel
         showCalendarLink={false}
@@ -320,23 +353,38 @@ export function ReservationFlow({
         onReservationDatePick={handleReservationDatePick}
       />
 
-      {isAdmin && (
+      {(isAdmin || userAreaScopeIds.length > 1) && (
         <div className="space-y-1 pt-1">
           <Label htmlFor="reservationAreaId" className="text-xs">
-            Área
+            {isAdmin ? "Área de la reserva" : "Perfil / subárea para esta reserva"}
           </Label>
           <Select
             id="reservationAreaId"
-            value={areaId}
-            onChange={(event) => setAreaId(event.target.value)}
+            value={isAdmin ? areaId : reservationAreaId}
+            onChange={(event) => {
+              const value = event.target.value;
+              if (isAdmin) setAreaId(value);
+              else setReservationAreaId(value);
+            }}
             className="h-9"
           >
             <option value="">Selecciona área</option>
-            {areas.map((area) => (
-              <option key={area.id} value={area.id}>
-                {area.name}
-              </option>
-            ))}
+            {(isAdmin
+              ? areas
+              : areas.filter((area) => userAreaScopeIds.includes(area.id))
+            ).map((area) => {
+              const parent = area.parentId
+                ? areas.find((item) => item.id === area.parentId)
+                : null;
+              const label = parent
+                ? `${parent.name} · ${area.name}`
+                : area.name;
+              return (
+                <option key={area.id} value={area.id}>
+                  {label}
+                </option>
+              );
+            })}
           </Select>
         </div>
       )}
@@ -399,6 +447,7 @@ export function ReservationFlow({
               onAttendeeJustificationNoteChange={setAttendeeJustificationNote}
               selectedSpaceIds={selection?.selectedSpaceIds ?? []}
               spaces={spaces}
+              eventPresetGroups={eventPresetGroups}
             />
           </div>
         </SheetContent>
