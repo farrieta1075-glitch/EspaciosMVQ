@@ -181,42 +181,46 @@ export function AdminAreasClient({ initialAreas }: AdminAreasClientProps) {
     return (
       <div
         key={area.id}
-        className="flex flex-col gap-2 border-t border-border bg-muted/20 px-3 py-2 pl-8 sm:flex-row sm:items-center sm:pl-10"
+        className="flex items-start gap-2 border-t border-border bg-muted/20 py-2 pl-8 pr-3 sm:pl-10"
       >
         <span
-          className="hidden h-2.5 w-2.5 shrink-0 rounded-full ring-1 ring-border sm:inline-block"
+          className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ring-1 ring-border"
           style={{ backgroundColor: hex }}
         />
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium leading-snug">{area.name}</p>
-          <p className="text-xs text-muted-foreground">
-            {presetCount > 0
-              ? `${presetCount} evento(s) precargado(s)`
-              : "Sin eventos precargados"}
-          </p>
-        </div>
-        <Badge variant="outline" className="shrink-0 text-[10px]">
-          Subárea
-        </Badge>
-        <div className="flex gap-1">
-          <Button
-            type="button"
-            size="icon"
-            variant="ghost"
-            className="h-8 w-8"
-            onClick={() => openEdit(area)}
-          >
-            <Pencil className="h-4 w-4" />
-          </Button>
-          <Button
-            type="button"
-            size="icon"
-            variant="ghost"
-            className="h-8 w-8 text-destructive"
-            onClick={() => handleDelete(area)}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+        <div className="flex min-w-0 flex-1 items-start gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-sm font-medium leading-snug">{area.name}</p>
+              <Badge variant="outline" className="text-[10px]">
+                Subárea
+              </Badge>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {presetCount > 0
+                ? `${presetCount} evento(s) precargado(s)`
+                : "Sin eventos precargados"}
+            </p>
+          </div>
+          <div className="flex shrink-0 gap-0.5">
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              className="h-8 w-8"
+              onClick={() => openEdit(area)}
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              className="h-8 w-8 text-destructive"
+              onClick={() => handleDelete(area)}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </div>
     );
@@ -233,11 +237,11 @@ export function AdminAreasClient({ initialAreas }: AdminAreasClientProps) {
         key={area.id}
         className="overflow-hidden rounded-lg border border-border"
       >
-        <div className="flex gap-2 px-3 py-3">
+        <div className="flex items-start gap-2 px-3 py-3">
           {isRoot ? (
             <button
               type="button"
-              className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md hover:bg-muted/60"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md hover:bg-muted/60"
               onClick={() => toggleExpanded(area.id)}
               aria-expanded={expanded}
               aria-label={expanded ? "Ocultar subáreas" : "Mostrar subáreas"}
@@ -252,33 +256,35 @@ export function AdminAreasClient({ initialAreas }: AdminAreasClientProps) {
             <span className="w-8 shrink-0" />
           )}
           <span
-            className="mt-1.5 h-3 w-3 shrink-0 rounded-full ring-1 ring-border"
+            className="mt-2.5 h-3 w-3 shrink-0 rounded-full ring-1 ring-border"
             style={{ backgroundColor: hex }}
           />
-          <div className="min-w-0 flex-1">
-            {isRoot ? (
-              <button
-                type="button"
-                className="w-full text-left"
-                onClick={() => toggleExpanded(area.id)}
-              >
-                <p className="font-medium leading-snug">{area.name}</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  {subareaCountLabel(children.length)}
-                  {(area.eventPresets?.length ?? 0) > 0
-                    ? ` · ${area.eventPresets.length} evento(s) en área`
-                    : ""}
-                </p>
-              </button>
-            ) : (
-              <>
-                <p className="font-medium leading-snug">{area.name}</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  Subárea sin área padre en hoja
-                </p>
-              </>
-            )}
-            <div className="mt-2 flex gap-1">
+          <div className="flex min-w-0 flex-1 items-start gap-2">
+            <div className="min-w-0 flex-1">
+              {isRoot ? (
+                <button
+                  type="button"
+                  className="w-full text-left"
+                  onClick={() => toggleExpanded(area.id)}
+                >
+                  <p className="font-medium leading-snug">{area.name}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {subareaCountLabel(children.length)}
+                    {(area.eventPresets?.length ?? 0) > 0
+                      ? ` · ${area.eventPresets.length} evento(s) en área`
+                      : ""}
+                  </p>
+                </button>
+              ) : (
+                <>
+                  <p className="font-medium leading-snug">{area.name}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    Subárea sin área padre en hoja
+                  </p>
+                </>
+              )}
+            </div>
+            <div className="flex shrink-0 gap-0.5 self-start">
               <Button
                 type="button"
                 size="icon"
