@@ -12,8 +12,7 @@ import {
   MAP_AVAILABLE_STROKE,
   hexToRgba,
 } from "@/lib/area-colors";
-import { loadImage } from "@/lib/load-image";
-import { resolveAssetUrl } from "@/lib/storage/resolve-asset-url";
+import { getCachedMapBackground } from "@/lib/map-background-cache";
 
 const STATUS_COLORS: Record<
   SpaceAvailabilityStatus | "selected",
@@ -95,27 +94,21 @@ export function SpaceMapViewer({
   }, [mapWidth]);
 
   React.useEffect(() => {
+    let cancelled = false;
     async function loadBackground() {
       setLoadingBg(true);
       try {
-        if (map.backgroundType === "blank" || !map.backgroundUrl) {
-          setBackgroundImage(null);
-          return;
-        }
-        const assetUrl = resolveAssetUrl(map.backgroundUrl);
-        if (map.backgroundType === "pdf") {
-          const { renderPdfFirstPage } = await import("@/lib/pdf-render");
-          const rendered = await renderPdfFirstPage(assetUrl);
-          setBackgroundImage(await loadImage(rendered.dataUrl));
-          return;
-        }
-        setBackgroundImage(await loadImage(assetUrl));
+        const image = await getCachedMapBackground(map);
+        if (!cancelled) setBackgroundImage(image);
       } finally {
-        setLoadingBg(false);
+        if (!cancelled) setLoadingBg(false);
       }
     }
-    loadBackground();
-  }, [map.backgroundType, map.backgroundUrl]);
+    void loadBackground();
+    return () => {
+      cancelled = true;
+    };
+  }, [map.backgroundType, map.backgroundUrl, map.id]);
 
   function resolvePaintStyle(
     spaceId: string,

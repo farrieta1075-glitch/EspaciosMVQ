@@ -4,7 +4,8 @@ export type NotificationType =
   | "REJECTED_CANCEL"
   | "APPROVED_CREATE"
   | "APPROVED_UPDATE"
-  | "APPROVED_CANCEL";
+  | "APPROVED_CANCEL"
+  | "EVENT_REMINDER";
 
 export interface AppNotification {
   id: string;

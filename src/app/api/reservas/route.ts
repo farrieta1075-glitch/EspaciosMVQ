@@ -31,6 +31,7 @@ export async function GET() {
 const recurrenceSchema = z.object({
   type: z.enum(["NONE", "DAILY", "WEEKLY"]),
   until: z.string().optional().default(""),
+  exceptDates: z.array(z.string()).optional().default([]),
 });
 
 const createSchema = z.object({
@@ -55,6 +56,7 @@ const createSchema = z.object({
   estimatedAttendees: z.coerce.number().min(1),
   attendeeJustificationCode: z.string().optional().default(""),
   attendeeJustificationNote: z.string().optional().default(""),
+  sendEventReminder: z.boolean().optional().default(true),
 });
 
 export async function POST(request: Request) {
@@ -118,6 +120,7 @@ export async function POST(request: Request) {
       parsed.data.recurrence.type === "NONE"
         ? parsed.data.date
         : parsed.data.recurrence.until || parsed.data.date,
+    exceptDates: parsed.data.recurrence.exceptDates ?? [],
   };
 
   if (
@@ -147,6 +150,7 @@ export async function POST(request: Request) {
       estimatedAttendees: parsed.data.estimatedAttendees,
       attendeeJustificationCode: parsed.data.attendeeJustificationCode,
       attendeeJustificationNote: parsed.data.attendeeJustificationNote,
+      sendEventReminder: parsed.data.sendEventReminder,
     });
 
     revalidatePath("/calendario");

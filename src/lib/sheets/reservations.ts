@@ -51,6 +51,11 @@ const reservationRowSchema = z.object({
       return Number.isFinite(num) ? num : null;
     }),
   attendanceComment: z.string().optional().default(""),
+  sendEventReminder: z
+    .string()
+    .optional()
+    .default("true")
+    .transform((value) => value.trim().toLowerCase() !== "false"),
 });
 
 export function parseSpaceIds(raw: string): string[] {
@@ -94,6 +99,7 @@ function mapParsedRowToReservation(parsed: ParsedReservationRow): Reservation {
     attendeeJustificationNote: parsed.attendeeJustificationNote,
     actualAttendees: parsed.actualAttendees,
     attendanceComment: parsed.attendanceComment,
+    sendEventReminder: parsed.sendEventReminder,
   };
 }
 
@@ -119,6 +125,7 @@ export function reservationToRow(reservation: Reservation): string[] {
       ? String(reservation.actualAttendees)
       : "",
     reservation.attendanceComment ?? "",
+    reservation.sendEventReminder === false ? "false" : "true",
   ];
 }
 

@@ -21,6 +21,8 @@ export interface Reservation {
   attendeeJustificationNote: string;
   actualAttendees: number | null;
   attendanceComment: string;
+  /** Recordatorio in-app 1 día antes (columna al final en Reservas). */
+  sendEventReminder: boolean;
 }
 
 export interface PendingUpdatePayload {
@@ -81,6 +83,7 @@ export type RecurrenceType = "NONE" | "DAILY" | "WEEKLY";
 export interface RecurrenceConfig {
   type: RecurrenceType;
   until: string;
+  exceptDates?: string[];
 }
 
 export interface CreateReservationInput {
@@ -99,6 +102,7 @@ export interface CreateReservationInput {
   estimatedAttendees?: number;
   attendeeJustificationCode?: string;
   attendeeJustificationNote?: string;
+  sendEventReminder?: boolean;
 }
 
 export interface EventSuggestion {

@@ -1,9 +1,7 @@
 import "server-only";
-import { getAllResources } from "@/lib/sheets/resources";
-import { getSpacesByMapId } from "@/lib/sheets/spaces";
+import { getCachedAvailabilityData } from "@/lib/sheets/cached-availability-data";
+import { getCachedCatalogSpaces } from "@/lib/sheets/cached-catalog";
 import {
-  getActiveReservations,
-  getAllReservationResources,
   parseDateTime,
   reservationsOverlap,
 } from "@/lib/sheets/reservations";
@@ -29,13 +27,12 @@ export async function getAvailability(
   const rangeStart = parseDateTime(query.date, query.startTime);
   const rangeEnd = parseDateTime(query.date, query.endTime);
 
-  const [spaces, reservations, reservationResources, resources] =
-    await Promise.all([
-      getSpacesByMapId(query.mapId),
-      getActiveReservations(),
-      getAllReservationResources(),
-      getAllResources(),
-    ]);
+  const [allSpaces, availabilityData] = await Promise.all([
+    getCachedCatalogSpaces(),
+    getCachedAvailabilityData(),
+  ]);
+  const spaces = allSpaces.filter((space) => space.mapId === query.mapId);
+  const { reservations, reservationResources, resources } = availabilityData;
 
   const activeSpaceIds = new Set(
     spaces.filter((space) => space.active).map((space) => space.id),

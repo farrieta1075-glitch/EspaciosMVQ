@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import Link from "next/link";
 import {
   CalendarDays,
@@ -15,6 +16,7 @@ import {
   addDays,
   addMonths,
   addWeeks,
+  addMinutesToTimeHHmm,
   formatDateDisplay,
   formatDateISO,
   formatTimeDisplay,
@@ -49,6 +51,8 @@ export function DateNavigator({
   calendarHref,
   onReservationDatePick,
 }: DateNavigatorProps) {
+  const endTimeRef = React.useRef<HTMLInputElement>(null);
+  const endTimeManualRef = React.useRef(false);
   const isoDate = formatDateISO(date);
   const startParsed =
     startTime &&
@@ -56,6 +60,31 @@ export function DateNavigator({
   const endParsed =
     endTime && parseReservationDateTime(`${isoDate}T${endTime}:00`);
   const isReservation = variant === "reservation";
+
+  function handleReservationStartFocus() {
+    if (!startTime) {
+      onStartTimeChange("08:00");
+      if (!endTimeManualRef.current || !endTime) {
+        onEndTimeChange(addMinutesToTimeHHmm("08:00", 60));
+      }
+    }
+  }
+
+  function handleReservationStartChange(value: string) {
+    onStartTimeChange(value);
+    if (!value) return;
+    if (!endTimeManualRef.current || !endTime) {
+      onEndTimeChange(addMinutesToTimeHHmm(value, 60));
+    }
+    window.requestAnimationFrame(() => {
+      endTimeRef.current?.focus();
+    });
+  }
+
+  function handleReservationEndChange(value: string) {
+    endTimeManualRef.current = Boolean(value);
+    onEndTimeChange(value);
+  }
 
   if (isReservation) {
     return (
@@ -97,7 +126,10 @@ export function DateNavigator({
               id="startTime"
               type="time"
               value={startTime}
-              onChange={(event) => onStartTimeChange(event.target.value)}
+              onFocus={handleReservationStartFocus}
+              onChange={(event) =>
+                handleReservationStartChange(event.target.value)
+              }
               className="h-9"
             />
           </div>
@@ -106,10 +138,13 @@ export function DateNavigator({
               Hora fin
             </Label>
             <Input
+              ref={endTimeRef}
               id="endTime"
               type="time"
               value={endTime}
-              onChange={(event) => onEndTimeChange(event.target.value)}
+              onChange={(event) =>
+                handleReservationEndChange(event.target.value)
+              }
               className="h-9"
             />
           </div>

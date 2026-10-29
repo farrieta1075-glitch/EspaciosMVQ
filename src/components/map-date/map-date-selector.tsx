@@ -27,6 +27,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { formatDateISO } from "@/lib/date-utils";
+import { preloadMapBackgrounds } from "@/lib/map-background-cache";
 import { readJsonResponse } from "@/lib/read-json-response";
 
 export interface InitialMapSelection {
@@ -140,6 +141,10 @@ export function MapDateSelector({
   }, [availability?.spaces]);
 
   React.useEffect(() => {
+    preloadMapBackgrounds(maps);
+  }, [maps]);
+
+  React.useEffect(() => {
     if (initialSelection?.mapId) return;
     if (!mapId && maps[0]?.id) setMapId(maps[0].id);
   }, [mapId, maps, initialSelection?.mapId]);
@@ -219,8 +224,9 @@ export function MapDateSelector({
     }
 
     const controller = new AbortController();
+    const debounceMs = 280;
 
-    async function fetchAvailability() {
+    const timer = window.setTimeout(async () => {
       setLoading(true);
       try {
         const params = new URLSearchParams({
@@ -252,10 +258,12 @@ export function MapDateSelector({
       } finally {
         setLoading(false);
       }
-    }
+    }, debounceMs);
 
-    fetchAvailability();
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      window.clearTimeout(timer);
+    };
   }, [
     selectedDate,
     startTime,

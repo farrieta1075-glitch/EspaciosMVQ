@@ -92,6 +92,16 @@ export function formatTimeHHmm(date: Date): string {
   return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 }
 
+export function addMinutesToTimeHHmm(time: string, minutesToAdd: number): string {
+  const match = time.match(/^(\d{2}):(\d{2})$/);
+  if (!match) return time;
+  const total = Number(match[1]) * 60 + Number(match[2]) + minutesToAdd;
+  const wrapped = ((total % (24 * 60)) + 24 * 60) % (24 * 60);
+  const hours = Math.floor(wrapped / 60);
+  const minutes = wrapped % 60;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
 /** Formato legible 12 h (es-MX): 10:00 a.m. */
 export function formatTimeDisplay(date: Date): string {
   return date.toLocaleTimeString("es-MX", {

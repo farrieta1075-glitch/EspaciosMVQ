@@ -66,6 +66,7 @@ export const SHEET_HEADERS: Record<SheetTab, string[]> = {
     "attendeeJustificationNote",
     "actualAttendees",
     "attendanceComment",
+    "sendEventReminder",
   ],
   ReservaRecursos: ["reservationId", "resourceId", "quantity"],
   EventoHistorico: ["eventName", "areaId", "count", "lastUsedAt"],

@@ -6,7 +6,8 @@ import type { Space } from "@/types/space";
 import type { RecurrenceType } from "@/types/reservation";
 import { ATTENDEE_JUSTIFICATION_OPTIONS } from "@/lib/attendee-justification";
 import { reservationNeedsAttendeeJustification } from "@/lib/capacity-validation";
-import { addMonths, formatDateISO } from "@/lib/date-utils";
+import { addMonths, formatDateISO, formatDateDisplay } from "@/lib/date-utils";
+import { listRecurrenceDates } from "@/lib/recurrence";
 import {
   Card,
   CardContent,
@@ -28,6 +29,10 @@ interface EventFormProps {
   onRecurrenceTypeChange: (value: RecurrenceType) => void;
   recurrenceUntil: string;
   onRecurrenceUntilChange: (value: string) => void;
+  recurrenceExceptDates: string[];
+  onRecurrenceExceptDatesChange: (value: string[]) => void;
+  sendEventReminder: boolean;
+  onSendEventReminderChange: (value: boolean) => void;
   baseDate: string;
   areaId: string;
   onAreaIdChange: (value: string) => void;
@@ -35,6 +40,7 @@ interface EventFormProps {
   isAdmin: boolean;
   disabled?: boolean;
   hideRecurrence?: boolean;
+  hideEventReminder?: boolean;
   hideAdminArea?: boolean;
   bare?: boolean;
   estimatedAttendees: string;
@@ -56,6 +62,10 @@ export function EventForm({
   onRecurrenceTypeChange,
   recurrenceUntil,
   onRecurrenceUntilChange,
+  recurrenceExceptDates,
+  onRecurrenceExceptDatesChange,
+  sendEventReminder,
+  onSendEventReminderChange,
   baseDate,
   areaId,
   onAreaIdChange,
@@ -63,6 +73,7 @@ export function EventForm({
   isAdmin,
   disabled = false,
   hideRecurrence = false,
+  hideEventReminder = false,
   hideAdminArea = false,
   bare = false,
   estimatedAttendees,
@@ -78,6 +89,24 @@ export function EventForm({
     { eventName: string; count: number }[]
   >([]);
   const [showSuggestions, setShowSuggestions] = React.useState(false);
+  const [showExceptionPicker, setShowExceptionPicker] = React.useState(false);
+
+  const plannedDates = React.useMemo(
+    () =>
+      recurrenceType === "NONE" || !baseDate || !recurrenceUntil
+        ? []
+        : listRecurrenceDates(baseDate, recurrenceType, recurrenceUntil),
+    [baseDate, recurrenceType, recurrenceUntil],
+  );
+
+  const exceptSet = React.useMemo(
+    () => new Set(recurrenceExceptDates),
+    [recurrenceExceptDates],
+  );
+
+  const selectedSpacesCapacity = React.useMemo(() => {
+    return spaces.filter((space) => selectedSpaceIds.includes(space.id));
+  }, [spaces, selectedSpaceIds]);
 
   React.useEffect(() => {
     if (eventName.length < 2) {
@@ -107,6 +136,24 @@ export function EventForm({
       onRecurrenceUntilChange(formatDateISO(addMonths(base, 1)));
     }
   }, [recurrenceType, recurrenceUntil, baseDate, onRecurrenceUntilChange]);
+
+  React.useEffect(() => {
+    if (plannedDates.length === 0) {
+      if (recurrenceExceptDates.length > 0) {
+        onRecurrenceExceptDatesChange([]);
+      }
+      return;
+    }
+    const allowed = new Set(plannedDates);
+    const filtered = recurrenceExceptDates.filter((date) => allowed.has(date));
+    if (filtered.length !== recurrenceExceptDates.length) {
+      onRecurrenceExceptDatesChange(filtered);
+    }
+  }, [
+    plannedDates,
+    recurrenceExceptDates,
+    onRecurrenceExceptDatesChange,
+  ]);
 
   const estimatedNumber = Number(estimatedAttendees);
   const showJustification = reservationNeedsAttendeeJustification(
@@ -190,6 +237,20 @@ export function EventForm({
               La estimación está fuera de la capacidad mínima o máxima de al
               menos un espacio seleccionado.
             </p>
+            {selectedSpacesCapacity.length > 0 && (
+              <ul className="space-y-1 text-xs text-muted-foreground">
+                {selectedSpacesCapacity.map((space) => {
+                  const max =
+                    space.capacity > 0 ? space.capacity : "sin máximo";
+                  const min = space.minCapacity > 0 ? space.minCapacity : 1;
+                  return (
+                    <li key={space.id}>
+                      {space.name}: mín. {min}, máx. {max}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
             <div className="space-y-2">
               <Label htmlFor="attendeeJustification">Motivo</Label>
               <Select
@@ -267,9 +328,83 @@ export function EventForm({
         </div>
 
         {!hideRecurrence && recurrenceType !== "NONE" && (
-          <p className={cn("text-xs text-muted-foreground")}>
-            Se crearán reservas {recurrenceType === "DAILY" ? "diarias" : "semanales"} hasta la fecha indicada (máx. 52).
-          </p>
+          <div className="space-y-3 rounded-lg border border-border p-3">
+            <p className={cn("text-xs text-muted-foreground")}>
+              Se crearán reservas{" "}
+              {recurrenceType === "DAILY" ? "diarias" : "semanales"} hasta la
+              fecha indicada (máx. 52).
+              {exceptSet.size > 0
+                ? ` Excluidas: ${exceptSet.size} fecha(s).`
+                : ""}
+            </p>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={showExceptionPicker}
+                onChange={(event) => setShowExceptionPicker(event.target.checked)}
+                className="rounded border-border"
+                disabled={disabled || plannedDates.length === 0}
+              />
+              Definir excepciones (días sin reserva)
+            </label>
+            {showExceptionPicker && plannedDates.length > 0 && (
+              <ul className="max-h-44 space-y-1 overflow-y-auto rounded-md border border-border p-2">
+                {plannedDates.map((isoDate) => {
+                  const isException = exceptSet.has(isoDate);
+                  const [y, m, d] = isoDate.split("-").map(Number);
+                  const label = formatDateDisplay(new Date(y, m - 1, d));
+                  return (
+                    <li key={isoDate}>
+                      <label className="flex cursor-pointer items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={isException}
+                          disabled={disabled}
+                          onChange={(event) => {
+                            const next = new Set(recurrenceExceptDates);
+                            if (event.target.checked) next.add(isoDate);
+                            else next.delete(isoDate);
+                            onRecurrenceExceptDatesChange([...next]);
+                          }}
+                          className="rounded border-border"
+                        />
+                        <span
+                          className={cn(
+                            isException && "text-muted-foreground line-through",
+                          )}
+                        >
+                          {label}
+                          {isException ? " (excepción)" : ""}
+                        </span>
+                      </label>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            <p className="text-[11px] text-muted-foreground">
+              Marca las fechas que no deben generarse. Si luego necesitas
+              cancelar una reserva ya creada, hazlo de forma individual.
+            </p>
+          </div>
+        )}
+
+        {!hideEventReminder && (
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={sendEventReminder}
+              onChange={(event) =>
+                onSendEventReminderChange(event.target.checked)
+              }
+              className="mt-0.5 rounded border-border"
+              disabled={disabled}
+            />
+            <span>
+              Enviar recordatorio de reserva (notificación in-app 1 día antes,
+              con espacios, horario y asistentes estimados)
+            </span>
+          </label>
         )}
 
         {isAdmin && !hideAdminArea && (

@@ -84,6 +84,10 @@ export function ReservationFlow({
   const [recurrenceType, setRecurrenceType] =
     React.useState<RecurrenceType>("NONE");
   const [recurrenceUntil, setRecurrenceUntil] = React.useState("");
+  const [recurrenceExceptDates, setRecurrenceExceptDates] = React.useState<
+    string[]
+  >([]);
+  const [sendEventReminder, setSendEventReminder] = React.useState(true);
   const [areaId, setAreaId] = React.useState(
     userAreaId ?? areas[0]?.id ?? "",
   );
@@ -116,6 +120,8 @@ export function ReservationFlow({
     setAttendeeJustificationNote(draft.attendeeJustificationNote);
     setRecurrenceType(draft.recurrenceType);
     setRecurrenceUntil(draft.recurrenceUntil);
+    setRecurrenceExceptDates(draft.recurrenceExceptDates ?? []);
+    setSendEventReminder(draft.sendEventReminder ?? true);
     setAreaId(draft.areaId);
 
     if (draft.selection) {
@@ -188,7 +194,10 @@ export function ReservationFlow({
       recurrence: {
         type: recurrenceType,
         until: recurrenceType === "NONE" ? selection.date : recurrenceUntil,
+        exceptDates:
+          recurrenceType === "NONE" ? [] : recurrenceExceptDates,
       },
+      sendEventReminder,
       resources: selection.selectedResources,
       confirmSimilarName,
       estimatedAttendees: estimatedNumber,
@@ -277,6 +286,8 @@ export function ReservationFlow({
       attendeeJustificationNote,
       recurrenceType,
       recurrenceUntil,
+      recurrenceExceptDates,
+      sendEventReminder,
       areaId,
       selection,
     });
@@ -370,6 +381,10 @@ export function ReservationFlow({
               onRecurrenceTypeChange={setRecurrenceType}
               recurrenceUntil={recurrenceUntil}
               onRecurrenceUntilChange={setRecurrenceUntil}
+              recurrenceExceptDates={recurrenceExceptDates}
+              onRecurrenceExceptDatesChange={setRecurrenceExceptDates}
+              sendEventReminder={sendEventReminder}
+              onSendEventReminderChange={setSendEventReminder}
               baseDate={selection?.date ?? ""}
               areaId={areaId}
               onAreaIdChange={setAreaId}
@@ -479,6 +494,8 @@ export function ReservationFlow({
                 setAttendeeJustificationNote("");
                 setRecurrenceType("NONE");
                 setRecurrenceUntil("");
+                setRecurrenceExceptDates([]);
+                setSendEventReminder(true);
               }}
             >
               Crear otra reserva

@@ -13,6 +13,8 @@ export interface ReservationDraft {
   attendeeJustificationNote: string;
   recurrenceType: RecurrenceType;
   recurrenceUntil: string;
+  recurrenceExceptDates: string[];
+  sendEventReminder: boolean;
   areaId: string;
   selection: MapDateSelection | null;
 }

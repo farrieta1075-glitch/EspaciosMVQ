@@ -232,7 +232,9 @@ export async function createReservation(
   );
 
   if (occurrences.length === 0) {
-    throw new Error("No se pudieron generar fechas para la recurrencia.");
+    throw new Error(
+      "No quedan fechas para crear reservas. Revisa la recurrencia y las excepciones.",
+    );
   }
 
   const availabilityError = await validateAvailability(
@@ -271,6 +273,7 @@ export async function createReservation(
       attendeeJustificationNote: input.attendeeJustificationNote?.trim() ?? "",
       actualAttendees: null,
       attendanceComment: "",
+      sendEventReminder: input.sendEventReminder !== false,
     };
 
     await appendSheetRow(

@@ -305,6 +305,8 @@ export function ReservationEditFlow({
       attendeeJustificationNote,
       recurrenceType: "NONE",
       recurrenceUntil: "",
+      recurrenceExceptDates: [],
+      sendEventReminder: true,
       areaId,
       selection: selection ?? {
         date: mapInitialSelection.date ?? initialDate,
@@ -397,6 +399,7 @@ export function ReservationEditFlow({
             <EventForm
               bare
               hideRecurrence
+              hideEventReminder
               eventName={eventName}
               onEventNameChange={setEventName}
               eventDescription={eventDescription}
@@ -405,6 +408,10 @@ export function ReservationEditFlow({
               onRecurrenceTypeChange={() => undefined}
               recurrenceUntil=""
               onRecurrenceUntilChange={() => undefined}
+              recurrenceExceptDates={[]}
+              onRecurrenceExceptDatesChange={() => undefined}
+              sendEventReminder
+              onSendEventReminderChange={() => undefined}
               baseDate={activeSelection.date}
               areaId={areaId}
               onAreaIdChange={setAreaId}
