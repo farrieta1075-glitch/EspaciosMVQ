@@ -30,7 +30,7 @@ const withPWA = withPWAInit({
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
-  serverExternalPackages: ["pdfjs-dist"],
+  serverExternalPackages: ["pdfjs-dist", "@prisma/client", "prisma"],
   images: {
     remotePatterns: [
       {

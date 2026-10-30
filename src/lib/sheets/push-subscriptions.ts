@@ -1,5 +1,11 @@
 import "server-only";
 import { z } from "zod";
+import { isSqlDatabaseEnabled } from "@/lib/db/config";
+import {
+  getPushSubscriptionsForUserSql,
+  removePushSubscriptionByEndpointSql,
+  upsertPushSubscriptionSql,
+} from "@/lib/db/push-subscriptions";
 import {
   appendSheetRow,
   findRowIndexById,
@@ -7,17 +13,9 @@ import {
   updateSheetRowByIndex,
 } from "@/lib/sheets/repository";
 import { SHEET_TABS } from "@/lib/sheets/tabs";
+import type { PushSubscriptionRecord } from "@/types/push-subscription";
 
-export interface PushSubscriptionRecord {
-  id: string;
-  userId: string;
-  deviceId: string;
-  endpoint: string;
-  p256dh: string;
-  auth: string;
-  userAgent: string;
-  updatedAt: string;
-}
+export type { PushSubscriptionRecord };
 
 const rowSchema = z.object({
   id: z.string().min(1),
@@ -58,7 +56,7 @@ function toRow(record: PushSubscriptionRecord): string[] {
   ];
 }
 
-async function listAll(): Promise<PushSubscriptionRecord[]> {
+async function listAllSheets(): Promise<PushSubscriptionRecord[]> {
   const { rows } = await getSheetRows(SHEET_TABS.PUSH_SUBSCRIPTIONS);
   return rows
     .map(mapRow)
@@ -73,9 +71,13 @@ export async function upsertPushSubscription(input: {
   auth: string;
   userAgent?: string;
 }): Promise<PushSubscriptionRecord> {
+  if (isSqlDatabaseEnabled()) {
+    return upsertPushSubscriptionSql(input);
+  }
+
   const { createId } = await import("@/lib/id");
   const now = new Date().toISOString();
-  const all = await listAll();
+  const all = await listAllSheets();
 
   const byEndpoint = all.find((item) => item.endpoint === input.endpoint);
   const byDevice = all.find((item) => item.deviceId === input.deviceId);
@@ -114,15 +116,21 @@ export async function upsertPushSubscription(input: {
 export async function getPushSubscriptionsForUser(
   userId: string,
 ): Promise<PushSubscriptionRecord[]> {
+  if (isSqlDatabaseEnabled()) {
+    return getPushSubscriptionsForUserSql(userId);
+  }
   if (!userId) return [];
-  const all = await listAll();
+  const all = await listAllSheets();
   return all.filter((item) => item.userId === userId);
 }
 
 export async function removePushSubscriptionByEndpoint(
   endpoint: string,
 ): Promise<boolean> {
-  const all = await listAll();
+  if (isSqlDatabaseEnabled()) {
+    return removePushSubscriptionByEndpointSql(endpoint);
+  }
+  const all = await listAllSheets();
   const match = all.find((item) => item.endpoint === endpoint);
   if (!match) return false;
 

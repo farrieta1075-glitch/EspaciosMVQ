@@ -1,8 +1,9 @@
 import "server-only";
 import { formatDateISO, formatTimeDisplay, parseReservationDateTime } from "@/lib/date-utils";
-import { createNotification } from "@/lib/sheets/notifications";
-import { getSheetRows } from "@/lib/sheets/repository";
-import { SHEET_TABS } from "@/lib/sheets/tabs";
+import {
+  createNotification,
+  getEventReminderReservationIds,
+} from "@/lib/sheets/notifications";
 import { getActiveReservations } from "@/lib/sheets/reservations";
 import { getAllSpaces } from "@/lib/sheets/spaces";
 
@@ -40,18 +41,12 @@ export async function runEventReminderJob(now = new Date()): Promise<{
   skipped: number;
 }> {
   const targetDate = tomorrowDateIso(now);
-  const [reservations, spaces, notificationRows] = await Promise.all([
+  const [reservations, spaces, reminderSent] = await Promise.all([
     getActiveReservations(),
     getAllSpaces(),
-    getSheetRows(SHEET_TABS.NOTIFICACIONES).then(({ rows }) => rows),
+    getEventReminderReservationIds(),
   ]);
   const spaceMap = new Map(spaces.map((space) => [space.id, space.name]));
-  const reminderSent = new Set<string>();
-  for (const row of notificationRows) {
-    if (row.type === "EVENT_REMINDER" && row.reservationId) {
-      reminderSent.add(row.reservationId);
-    }
-  }
 
   let created = 0;
   let skipped = 0;

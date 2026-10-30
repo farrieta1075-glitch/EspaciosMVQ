@@ -1,0 +1,154 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlserver"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                    String  @id @db.NVarChar(64)
+  email                 String? @db.NVarChar(320)
+  username              String? @db.NVarChar(128)
+  passwordHash          String? @db.NVarChar(256)
+  role                  String  @db.NVarChar(32)
+  areaId                String? @db.NVarChar(64)
+  active                Boolean @default(true)
+  receiveApprovalEmails Boolean @default(true)
+  areaScopeIds          String  @default("[]") @db.NVarChar(Max)
+
+  @@map("Users")
+}
+
+model Area {
+  id           String  @id @db.NVarChar(64)
+  name         String  @db.NVarChar(256)
+  code         String  @default("") @db.NVarChar(64)
+  parentId     String? @db.NVarChar(64)
+  colorHex     String  @default("") @db.NVarChar(16)
+  eventPresets String  @default("[]") @db.NVarChar(Max)
+
+  @@map("Areas")
+}
+
+model FloorMap {
+  id              String @id @db.NVarChar(64)
+  name            String @db.NVarChar(256)
+  backgroundType  String @default("") @db.NVarChar(32)
+  backgroundUrl   String @default("") @db.NVarChar(2048)
+  width           Int    @default(0)
+  height          Int    @default(0)
+
+  @@map("Maps")
+}
+
+model Space {
+  id           String  @id @db.NVarChar(64)
+  name         String  @db.NVarChar(256)
+  floor        String  @default("") @db.NVarChar(64)
+  capacity     Int     @default(0)
+  geometryJson String  @default("{}") @db.NVarChar(Max)
+  mapId        String  @db.NVarChar(64)
+  active       Boolean @default(true)
+  minCapacity  Int     @default(0)
+
+  @@index([mapId])
+  @@map("Spaces")
+}
+
+model Resource {
+  id       String  @id @db.NVarChar(64)
+  name     String  @db.NVarChar(256)
+  type     String  @default("") @db.NVarChar(64)
+  totalQty Int     @default(0)
+  imageUrl String  @default("") @db.NVarChar(2048)
+  scope    String  @default("") @db.NVarChar(64)
+  active   Boolean @default(true)
+
+  @@map("Resources")
+}
+
+model ResourceSpace {
+  resourceId String @db.NVarChar(64)
+  spaceId    String @db.NVarChar(64)
+
+  @@id([resourceId, spaceId])
+  @@map("ResourceSpaces")
+}
+
+model Reservation {
+  id                          String  @id @db.NVarChar(64)
+  eventName                   String  @db.NVarChar(512)
+  spaceIds                    String  @default("[]") @db.NVarChar(Max)
+  areaId                      String  @db.NVarChar(64)
+  userId                      String  @db.NVarChar(64)
+  startAt                     String  @db.NVarChar(64)
+  endAt                       String  @db.NVarChar(64)
+  recurrenceRule              String  @default("") @db.NVarChar(Max)
+  status                      String  @db.NVarChar(32)
+  eventDescription            String  @default("") @db.NVarChar(Max)
+  pendingAction               String  @default("") @db.NVarChar(32)
+  pendingPayload              String  @default("") @db.NVarChar(Max)
+  approvalToken               String  @default("") @db.NVarChar(128)
+  estimatedAttendees          Int     @default(0)
+  attendeeJustificationCode   String  @default("") @db.NVarChar(64)
+  attendeeJustificationNote   String  @default("") @db.NVarChar(Max)
+  actualAttendees             Int?
+  attendanceComment           String  @default("") @db.NVarChar(Max)
+  sendEventReminder           Boolean @default(false)
+
+  @@index([areaId])
+  @@index([userId])
+  @@index([status])
+  @@map("Reservations")
+}
+
+model ReservationResource {
+  reservationId String @db.NVarChar(64)
+  resourceId    String @db.NVarChar(64)
+  quantity      Int    @default(1)
+
+  @@id([reservationId, resourceId])
+  @@map("ReservationResources")
+}
+
+model EventHistory {
+  eventName  String @db.NVarChar(512)
+  areaId     String @db.NVarChar(64)
+  count      Int    @default(0)
+  lastUsedAt String @default("") @db.NVarChar(64)
+
+  @@id([eventName, areaId])
+  @@map("EventHistory")
+}
+
+model Notification {
+  id            String   @id @db.NVarChar(64)
+  userId        String   @db.NVarChar(64)
+  areaId        String   @default("") @db.NVarChar(64)
+  reservationId String   @default("") @db.NVarChar(64)
+  type          String   @db.NVarChar(64)
+  message       String   @db.NVarChar(Max)
+  read          Boolean  @default(false)
+  createdAt     DateTime
+
+  @@index([userId, createdAt])
+  @@index([reservationId, type])
+  @@map("Notifications")
+}
+
+model PushSubscription {
+  id        String   @id @db.NVarChar(64)
+  userId    String   @db.NVarChar(64)
+  deviceId  String   @db.NVarChar(128)
+  endpoint  String   @unique @db.NVarChar(2048)
+  p256dh    String   @db.NVarChar(512)
+  auth      String   @db.NVarChar(256)
+  userAgent String   @default("") @db.NVarChar(512)
+  updatedAt DateTime
+
+  @@index([userId])
+  @@index([deviceId])
+  @@map("PushSubscriptions")
+}

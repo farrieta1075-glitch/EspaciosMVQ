@@ -13,9 +13,14 @@
     "test:email": "node --env-file=.env.local scripts/test-email.mjs",
     "list:admin-emails": "node --env-file=.env.local scripts/list-admin-emails.mjs",
     "migrate:uploads-to-blob": "node --env-file=.env.local scripts/migrate-uploads-to-blob.mjs",
-    "generate:vapid": "node scripts/generate-vapid-keys.mjs"
+    "generate:vapid": "node scripts/generate-vapid-keys.mjs",
+    "postinstall": "prisma generate",
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate deploy"
   },
   "dependencies": {
+    "@prisma/client": "^6.19.2",
     "@radix-ui/react-dialog": "^1.1.14",
     "@radix-ui/react-dropdown-menu": "^2.1.15",
     "@radix-ui/react-label": "^2.1.7",
@@ -57,6 +62,7 @@
     "@types/web-push": "^3.6.4",
     "eslint": "^9.33.0",
     "eslint-config-next": "^15.4.6",
+    "prisma": "^6.19.2",
     "tailwindcss": "^4.1.11",
     "typescript": "^5.9.2"
   }
