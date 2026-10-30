@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import type { Area } from "@/types/area";
+import { buildAreaHierarchy } from "@/lib/area-scope";
 
 export interface AreaColorStyle {
   hex: string;
@@ -82,6 +83,62 @@ function resolveAreaHex(
   return FALLBACK_HEX[hashAreaId(area.id)] ?? FALLBACK_HEX[0];
 }
 
+function mixHexWithWhite(hex: string, whiteMix: number): string {
+  const amount = Math.min(1, Math.max(0, whiteMix));
+  const normalized = hex.replace("#", "");
+  if (normalized.length !== 6) return hex;
+  const r = Number.parseInt(normalized.slice(0, 2), 16);
+  const g = Number.parseInt(normalized.slice(2, 4), 16);
+  const b = Number.parseInt(normalized.slice(4, 6), 16);
+  const mix = (channel: number) =>
+    Math.round(channel + (255 - channel) * amount);
+  const toHex = (value: number) => value.toString(16).padStart(2, "0");
+  return `#${toHex(mix(r))}${toHex(mix(g))}${toHex(mix(b))}`;
+}
+
+function resolveAreaHexWithHierarchy(area: Area, allAreas: Area[]): string {
+  if (area.colorHex?.trim() && /^#[0-9A-Fa-f]{6}$/.test(area.colorHex.trim())) {
+    return area.colorHex.trim();
+  }
+
+  const { areasById, childrenByParent } = buildAreaHierarchy(allAreas);
+  const chain: Area[] = [area];
+  let current: Area | undefined = area;
+  while (current?.parentId && areasById.has(current.parentId)) {
+    const parent: Area = areasById.get(current.parentId)!;
+    chain.unshift(parent);
+    current = parent;
+  }
+
+  const root = chain[0] ?? area;
+  const baseHex = resolveAreaHex(root);
+
+  if (!area.parentId || chain.length <= 1) {
+    return baseHex;
+  }
+
+  const depth = chain.length - 1;
+  const parent = areasById.get(area.parentId);
+  const siblings = parent
+    ? (childrenByParent.get(parent.id) ?? [area])
+    : [area];
+  const siblingIndex = Math.max(
+    0,
+    siblings.findIndex((item) => item.id === area.id),
+  );
+  const siblingCount = Math.max(siblings.length, 1);
+  const siblingSpread =
+    siblingCount > 1 ? (siblingIndex + 1) / siblingCount : 0.5;
+  const depthStep = 0.14;
+  const siblingStep = 0.1;
+  const lighten = Math.min(
+    0.72,
+    depth * depthStep + siblingSpread * siblingStep * depth,
+  );
+
+  return mixHexWithWhite(baseHex, lighten);
+}
+
 function styleFromHex(hex: string): AreaColorStyle {
   return {
     hex,
@@ -93,7 +150,8 @@ function styleFromHex(hex: string): AreaColorStyle {
 }
 
 export function getAreaColor(
-  area: Pick<Area, "id" | "name" | "code" | "colorHex"> | null | undefined,
+  area: Pick<Area, "id" | "name" | "code" | "colorHex" | "parentId"> | null | undefined,
+  allAreas?: Area[],
 ): AreaColorStyle {
   if (!area) {
     return {
@@ -104,17 +162,23 @@ export function getAreaColor(
       ring: "ring-muted-foreground/30",
     };
   }
-  return styleFromHex(resolveAreaHex(area));
+  const fullArea = allAreas?.find((item) => item.id === area.id);
+  const hex =
+    fullArea && allAreas
+      ? resolveAreaHexWithHierarchy(fullArea, allAreas)
+      : resolveAreaHex(area);
+  return styleFromHex(hex);
 }
 
 export function getAreaHex(
-  area: Pick<Area, "id" | "name" | "code" | "colorHex"> | null | undefined,
+  area: Pick<Area, "id" | "name" | "code" | "colorHex" | "parentId"> | null | undefined,
+  allAreas?: Area[],
 ): string {
-  return getAreaColor(area).hex;
+  return getAreaColor(area, allAreas).hex;
 }
 
 export function buildAreaColorMap(areas: Area[]): Map<string, AreaColorStyle> {
-  return new Map(areas.map((area) => [area.id, getAreaColor(area)]));
+  return new Map(areas.map((area) => [area.id, getAreaColor(area, areas)]));
 }
 
 export function areaCardStyle(color: AreaColorStyle): CSSProperties {

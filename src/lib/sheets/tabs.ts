@@ -9,6 +9,7 @@ export const SHEET_TABS = {
   RESERVA_RECURSOS: "ReservaRecursos",
   EVENTO_HISTORICO: "EventoHistorico",
   NOTIFICACIONES: "Notificaciones",
+  PUSH_SUBSCRIPTIONS: "PushSubscriptions",
 } as const;
 
 export type SheetTab = (typeof SHEET_TABS)[keyof typeof SHEET_TABS];
@@ -80,5 +81,15 @@ export const SHEET_HEADERS: Record<SheetTab, string[]> = {
     "message",
     "read",
     "createdAt",
+  ],
+  PushSubscriptions: [
+    "id",
+    "userId",
+    "deviceId",
+    "endpoint",
+    "p256dh",
+    "auth",
+    "userAgent",
+    "updatedAt",
   ],
 };

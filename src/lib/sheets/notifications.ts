@@ -114,6 +114,20 @@ export async function createNotification(input: {
   };
 
   await appendSheetRow(SHEET_TABS.NOTIFICACIONES, notificationToRow(notification));
+
+  void import("@/lib/push/send-web-push")
+    .then(({ sendWebPushToUser }) =>
+      sendWebPushToUser(input.userId, {
+        title: "MVQro Espacios",
+        body: input.message,
+        url: "/reservas",
+        tag: notification.id,
+      }),
+    )
+    .catch((error) => {
+      console.warn("[notifications] Web push no enviado:", error);
+    });
+
   return notification;
 }
 

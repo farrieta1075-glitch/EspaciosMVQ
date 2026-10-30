@@ -15,6 +15,7 @@ import {
 import { getAllSpaces } from "@/lib/sheets/spaces";
 import { getReservationById } from "@/lib/sheets/reservations";
 import { parsePendingPayload } from "@/types/reservation";
+import { getApprovalResolution } from "@/lib/approval-resolution";
 import { reservationNeedsAdminAction } from "@/types/reservation";
 
 const bodySchema = z.object({
@@ -40,7 +41,22 @@ export async function POST(
 
   const approve = body.data.action === "approve";
 
+  const resolution = getApprovalResolution(reservation);
+
   if (body.data.token) {
+    if (
+      !reservation.approvalToken ||
+      reservation.approvalToken !== body.data.token
+    ) {
+      if (resolution.handled && resolution.message) {
+        return NextResponse.json({ error: resolution.message }, { status: 409 });
+      }
+      return NextResponse.json(
+        { error: "Enlace inválido o expirado" },
+        { status: 403 },
+      );
+    }
+
     const detail = await decideReservationByToken({
       id,
       token: body.data.token,
@@ -56,15 +72,28 @@ export async function POST(
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
-  const detail = approve
-    ? await approveReservation(id)
-    : await rejectReservation(id);
-
-  if (!detail) {
-    return NextResponse.json({ error: "No se pudo procesar la solicitud" }, { status: 400 });
+  if (resolution.handled && resolution.message) {
+    return NextResponse.json({ error: resolution.message }, { status: 409 });
   }
 
-  return NextResponse.json(detail);
+  try {
+    const detail = approve
+      ? await approveReservation(id)
+      : await rejectReservation(id);
+
+    if (!detail) {
+      return NextResponse.json(
+        { error: "No se pudo procesar la solicitud" },
+        { status: 400 },
+      );
+    }
+
+    return NextResponse.json(detail);
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "No se pudo procesar la solicitud.";
+    return NextResponse.json({ error: message }, { status: 409 });
+  }
 }
 
 export async function GET(
@@ -79,8 +108,41 @@ export async function GET(
     return NextResponse.json({ error: "Reserva no encontrada" }, { status: 404 });
   }
 
+  const resolution = getApprovalResolution(reservation);
+
   if (token) {
     if (!reservation.approvalToken || reservation.approvalToken !== token) {
+      if (resolution.handled && resolution.message) {
+        const detail = await getReservationDetail(id);
+        if (!detail) {
+          return NextResponse.json(
+            { error: "Reserva no encontrada" },
+            { status: 404 },
+          );
+        }
+        const payload = parsePendingPayload(reservation.pendingPayload);
+        const spaces = await getAllSpaces();
+        const pendingSpaceNames = payload
+          ? payload.spaceIds.map(
+              (spaceId) =>
+                spaces.find((space) => space.id === spaceId)?.name ?? spaceId,
+            )
+          : undefined;
+        const changeSummary: ApprovalChangeSummary = buildApprovalChangeSummary({
+          reservation,
+          spaceNames: detail.spaceNames,
+          pendingSpaceNames,
+          resources: detail.resources,
+          areaName: detail.areaName,
+        });
+        return NextResponse.json({
+          ...detail,
+          changeSummary,
+          canRespond: false,
+          resolutionMessage: resolution.message,
+          resolutionOutcome: resolution.outcome,
+        });
+      }
       return NextResponse.json({ error: "Enlace inválido o expirado" }, { status: 403 });
     }
   } else {
@@ -117,5 +179,7 @@ export async function GET(
     changeSummary,
     canRespond: reservationNeedsAdminAction(reservation),
     tokenAccepted: Boolean(token),
+    resolutionMessage: resolution.handled ? resolution.message : null,
+    resolutionOutcome: resolution.handled ? resolution.outcome : null,
   });
 }

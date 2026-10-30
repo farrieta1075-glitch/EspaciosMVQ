@@ -175,7 +175,7 @@ export function AdminAreasClient({ initialAreas }: AdminAreasClientProps) {
   }
 
   function renderSubareaRow(area: Area) {
-    const hex = area.colorHex || getAreaHex(area);
+    const hex = getAreaHex(area, areas);
     const presetCount = area.eventPresets?.length ?? 0;
 
     return (
@@ -229,7 +229,7 @@ export function AdminAreasClient({ initialAreas }: AdminAreasClientProps) {
   function renderRootArea(area: Area) {
     const children = childrenByParent.get(area.id) ?? [];
     const expanded = expandedIds[area.id] ?? false;
-    const hex = area.colorHex || getAreaHex(area);
+    const hex = getAreaHex(area, areas);
     const isRoot = !area.parentId;
 
     return (
@@ -392,11 +392,19 @@ export function AdminAreasClient({ initialAreas }: AdminAreasClientProps) {
                 <Input
                   id="areaColor"
                   value={form.colorHex}
-                  placeholder="#4A235A"
+                  placeholder={
+                    form.parentId ? "Heredado del área padre" : "#4A235A"
+                  }
                   onChange={(e) =>
                     setForm({ ...form, colorHex: e.target.value })
                   }
                 />
+                {form.parentId ? (
+                  <p className="text-xs text-muted-foreground">
+                    Las subáreas usan el color del padre en tonos más claros. Deja
+                    vacío para heredar o escribe un código para personalizar.
+                  </p>
+                ) : null}
               </div>
             </div>
             <div className="space-y-2">

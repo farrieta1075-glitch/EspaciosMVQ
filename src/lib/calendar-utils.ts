@@ -39,7 +39,9 @@ export function getReservationAreaColor(
       name: reservation.areaName ?? "",
       code: "",
       colorHex: "",
+      parentId: null,
     },
+    areas,
   );
 }
 

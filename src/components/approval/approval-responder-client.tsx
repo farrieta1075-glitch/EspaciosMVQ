@@ -6,12 +6,13 @@ import { useSearchParams } from "next/navigation";
 import { CheckCircle2, Loader2, XCircle } from "lucide-react";
 import type { ApprovalChangeSummary } from "@/lib/approval-change-summary";
 import type { ReservationDetail } from "@/types/reservation";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
 type PreviewResponse = ReservationDetail & {
   changeSummary: ApprovalChangeSummary;
   canRespond: boolean;
+  resolutionMessage?: string | null;
+  resolutionOutcome?: "approved" | "rejected" | "handled" | null;
 };
 
 function formatRange(startAt: string, endAt: string) {
@@ -276,7 +277,17 @@ export function ApprovalResponderClient() {
       )}
 
       {!outcome && !preview.canRespond && !message && (
-        <Badge variant="secondary">Esta solicitud ya fue procesada.</Badge>
+        <div className="rounded-lg border border-border bg-muted/30 p-4 text-sm">
+          <p className="font-medium">
+            {preview.resolutionOutcome === "rejected"
+              ? "Solicitud rechazada"
+              : "Solicitud ya autorizada"}
+          </p>
+          <p className="mt-1 text-muted-foreground">
+            {preview.resolutionMessage ??
+              "Otro administrador ya atendió esta solicitud. No puedes volver a autorizarla o rechazarla."}
+          </p>
+        </div>
       )}
 
       <div className="pt-2">

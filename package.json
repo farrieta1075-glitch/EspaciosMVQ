@@ -12,7 +12,8 @@
     "seed": "node scripts/seed-sheets.mjs",
     "test:email": "node --env-file=.env.local scripts/test-email.mjs",
     "list:admin-emails": "node --env-file=.env.local scripts/list-admin-emails.mjs",
-    "migrate:uploads-to-blob": "node --env-file=.env.local scripts/migrate-uploads-to-blob.mjs"
+    "migrate:uploads-to-blob": "node --env-file=.env.local scripts/migrate-uploads-to-blob.mjs",
+    "generate:vapid": "node scripts/generate-vapid-keys.mjs"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.14",
@@ -40,6 +41,7 @@
     "server-only": "^0.0.1",
     "tailwind-merge": "^3.3.1",
     "uuid": "^14.0.2",
+    "web-push": "^3.6.7",
     "zod": "^3.25.76"
   },
   "devDependencies": {
@@ -52,6 +54,7 @@
     "@types/react": "^19.1.9",
     "@types/react-dom": "^19.1.7",
     "@types/uuid": "^10.0.0",
+    "@types/web-push": "^3.6.4",
     "eslint": "^9.33.0",
     "eslint-config-next": "^15.4.6",
     "tailwindcss": "^4.1.11",

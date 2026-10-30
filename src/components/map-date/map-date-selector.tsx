@@ -176,13 +176,16 @@ export function MapDateSelector({
     ) => {
       const highlightArea =
         areas.find((area) => area.id === highlightAreaId) ?? null;
-      const viewerHex = getAreaHex(highlightArea);
+      const viewerHex = getAreaHex(highlightArea, areas);
 
       if (isSelected) {
         const occupantId = spaceOccupantAreaIds.get(spaceId);
         const highlightHex =
           availabilityStatus === "occupied" && occupantId
-            ? getAreaHex(areas.find((area) => area.id === occupantId) ?? null)
+            ? getAreaHex(
+                areas.find((area) => area.id === occupantId) ?? null,
+                areas,
+              )
             : viewerHex;
         return {
           fill: hexToRgba(highlightHex, 0.78),
@@ -196,6 +199,7 @@ export function MapDateSelector({
           areas.find(
             (area) => area.id === spaceOccupantAreaIds.get(spaceId),
           ) ?? null,
+          areas,
         );
         return {
           fill: hexToRgba(hex, 0.55),

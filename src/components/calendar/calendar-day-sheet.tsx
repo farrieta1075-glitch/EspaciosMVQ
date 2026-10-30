@@ -140,7 +140,7 @@ export function CalendarDaySheet({
   }, [mapSpaces, occupancyBySpace]);
 
   const viewerArea = areas.find((area) => area.id === viewerAreaId) ?? null;
-  const viewerHex = getAreaHex(viewerArea);
+  const viewerHex = getAreaHex(viewerArea, areas);
 
   const selectedReservation = selectedSpaceId
     ? findReservationForSpace(dayEvents, selectedSpaceId)
@@ -220,6 +220,7 @@ export function CalendarDaySheet({
                   const highlightHex = reservation
                     ? getAreaHex(
                         areas.find((a) => a.id === reservation.areaId) ?? null,
+                        areas,
                       )
                     : viewerHex;
                   return {
@@ -231,6 +232,7 @@ export function CalendarDaySheet({
                 if (reservation) {
                   const hex = getAreaHex(
                     areas.find((a) => a.id === reservation.areaId) ?? null,
+                    areas,
                   );
                   const own = isOwnAreaReservation(reservation, viewerAreaId);
                   return {
@@ -251,7 +253,7 @@ export function CalendarDaySheet({
           {showAreaLegend && areasOnDay.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {areasOnDay.map((area) => {
-                const color = getAreaColor(area);
+                const color = getAreaColor(area, areas);
                 return (
                   <span
                     key={area.id}

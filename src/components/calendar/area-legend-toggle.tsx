@@ -33,7 +33,7 @@ export function AreaLegendToggle({
       {show && areas.length > 0 && (
         <div className="flex flex-wrap justify-end gap-2">
           {areas.map((area) => {
-            const color = getAreaColor(area);
+            const color = getAreaColor(area, areas);
             return (
               <span
                 key={area.id}

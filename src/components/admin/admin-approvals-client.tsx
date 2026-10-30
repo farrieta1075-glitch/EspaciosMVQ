@@ -72,7 +72,7 @@ export function AdminApprovalsClient({
       ) : (
         reservations.map((reservation) => {
           const area = areas.find((item) => item.id === reservation.areaId);
-          const color = getAreaColor(area ?? null);
+          const color = getAreaColor(area ?? null, areas);
           const statusLabel = reservationStatusLabel(reservation);
 
           return (

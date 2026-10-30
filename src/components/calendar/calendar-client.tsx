@@ -11,12 +11,14 @@ import { AreaLegendToggle } from "@/components/calendar/area-legend-toggle";
 import { CalendarDaySheet } from "@/components/calendar/calendar-day-sheet";
 import { MonthView } from "@/components/calendar/month-view";
 import { WeekView } from "@/components/calendar/week-view";
+import { WeekDayEventList } from "@/components/calendar/week-day-event-list";
 import { Button } from "@/components/ui/button";
 import {
   addMonths,
   addWeeks,
   formatDateISO,
   getWeekDays,
+  isSameDay,
   isSameMonth,
 } from "@/lib/date-utils";
 import { canSelectCalendarDay } from "@/lib/calendar-date-selection";
@@ -149,6 +151,13 @@ export function CalendarClient({
     return set;
   }, [activeReservations]);
 
+  const weekFocusDay = React.useMemo(() => {
+    const focus = sheetDate ?? anchorDate;
+    if (viewMode !== "week") return focus;
+    const days = getWeekDays(anchorDate);
+    return days.some((day) => isSameDay(day, focus)) ? focus : anchorDate;
+  }, [anchorDate, sheetDate, viewMode]);
+
   const areasInView = React.useMemo(() => {
     const visible = reservationsInVisiblePeriod(
       activeReservations,
@@ -178,6 +187,7 @@ export function CalendarClient({
 
   function handleSelectDate(date: Date) {
     if (!isDateSelectable(date)) return;
+    setSheetDate(date);
     if (pickMode && returnTo) {
       setPickedReservationDate(formatDateISO(date));
       router.push(returnTo);
@@ -219,7 +229,7 @@ export function CalendarClient({
       {viewMode === "week" ? (
         <WeekView
           anchorDate={anchorDate}
-          selectedDate={sheetDate ?? anchorDate}
+          selectedDate={weekFocusDay}
           reservations={activeReservations}
           areas={areas}
           onSelectDate={handleSelectDate}
@@ -277,6 +287,14 @@ export function CalendarClient({
           <ChevronRight className="h-4 w-4" />
         </Button>
       </div>
+
+      {viewMode === "week" && !pickMode && (
+        <WeekDayEventList
+          day={weekFocusDay}
+          reservations={activeReservations}
+          areas={areas}
+        />
+      )}
 
       {canReserve && !pickMode && (
         <Button asChild className="h-11 w-full text-base">

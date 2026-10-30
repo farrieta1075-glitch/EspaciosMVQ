@@ -4,6 +4,7 @@ import { renderApprovalActionResultPage } from "@/lib/email/approval-action-html
 import { approvalResponderUrl } from "@/lib/email/approval-email-content";
 import { decideReservationByToken } from "@/lib/reservation-service";
 import { getReservationById } from "@/lib/sheets/reservations";
+import { getApprovalResolution } from "@/lib/approval-resolution";
 import { reservationNeedsAdminAction } from "@/types/reservation";
 
 function htmlResponse(html: string, status = 200) {
@@ -51,6 +52,19 @@ export async function GET(
   }
 
   if (!reservation.approvalToken || reservation.approvalToken !== token) {
+    const resolution = getApprovalResolution(reservation);
+    if (resolution.handled && resolution.message) {
+      return htmlResponse(
+        renderApprovalActionResultPage({
+          ok: true,
+          approved: resolution.outcome === "approved",
+          title: "Solicitud ya atendida",
+          message: resolution.message,
+          eventName: reservation.eventName,
+          detailUrl: approvalResponderUrl(reservation),
+        }),
+      );
+    }
     return htmlResponse(
       renderApprovalActionResultPage({
         ok: false,

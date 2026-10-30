@@ -181,14 +181,9 @@ export function EventForm({
             <Label>Eventos sugeridos por área</Label>
             <div className="space-y-3">
               {eventPresetGroups.map((group) => {
-                const hex =
-                  group.colorHex ||
-                  getAreaHex({
-                    id: group.id,
-                    name: group.label,
-                    code: "",
-                    colorHex: "",
-                  });
+                const areaForColor =
+                  areas.find((item) => item.id === group.id) ?? null;
+                const hex = getAreaHex(areaForColor, areas);
                 return (
                   <div key={group.id} className="space-y-1.5">
                     <p className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
