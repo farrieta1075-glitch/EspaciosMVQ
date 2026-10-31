@@ -100,6 +100,13 @@ export function ReservationFlow({
   const [eventPresetGroups, setEventPresetGroups] = React.useState<
     EventPresetGroup[]
   >([]);
+  const [eventPresetAreaOptions, setEventPresetAreaOptions] = React.useState<
+    { id: string; label: string; depth: number }[]
+  >([]);
+  const [presetsByAreaId, setPresetsByAreaId] = React.useState<
+    Record<string, string[]>
+  >({});
+  const [presetSourceAreaId, setPresetSourceAreaId] = React.useState("");
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [resourcesOpen, setResourcesOpen] = React.useState(false);
@@ -126,8 +133,16 @@ export function ReservationFlow({
       .then((response) => (response.ok ? response.json() : null))
       .then((data) => {
         if (data?.groups) setEventPresetGroups(data.groups);
+        if (data?.areaOptions) setEventPresetAreaOptions(data.areaOptions);
+        if (data?.presetsByAreaId) setPresetsByAreaId(data.presetsByAreaId);
       });
   }, [userAreaScopeIds, isAdmin]);
+
+  React.useEffect(() => {
+    if (areaId && presetsByAreaId[areaId]?.length) {
+      setPresetSourceAreaId(areaId);
+    }
+  }, [areaId, presetsByAreaId]);
 
   const activeHighlightAreaId = isAdmin
     ? areaId
@@ -448,6 +463,10 @@ export function ReservationFlow({
               selectedSpaceIds={selection?.selectedSpaceIds ?? []}
               spaces={spaces}
               eventPresetGroups={eventPresetGroups}
+              eventPresetAreaOptions={eventPresetAreaOptions}
+              presetsByAreaId={presetsByAreaId}
+              presetSourceAreaId={presetSourceAreaId}
+              onPresetSourceAreaIdChange={setPresetSourceAreaId}
             />
           </div>
         </SheetContent>

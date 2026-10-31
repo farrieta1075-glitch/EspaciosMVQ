@@ -8,8 +8,9 @@ import {
   getSheetRows,
   updateSheetRowById,
 } from "@/lib/sheets/repository";
+import { isCatalogOnSql } from "@/lib/db/config";
 import { SHEET_TABS } from "@/lib/sheets/tabs";
-import type { BackgroundType, FloorMap } from "@/types/space";
+import type { BackgroundType, FloorMap, MapFloorId } from "@/types/space";
 
 const mapRowSchema = z.object({
   id: z.string().min(1),
@@ -28,10 +29,21 @@ function floorMapToRow(map: FloorMap): string[] {
     map.backgroundUrl,
     String(map.width),
     String(map.height),
+    map.secondaryBackgroundType ?? "",
+    map.secondaryBackgroundUrl ?? "",
+    String(map.secondaryWidth ?? 0),
+    String(map.secondaryHeight ?? 0),
+    (map.primaryFloor ?? "1") as MapFloorId,
+    map.floor1Label ?? "Planta baja",
+    map.floor2Label ?? "Piso 2",
   ];
 }
 
 export async function getAllMaps(): Promise<FloorMap[]> {
+  if (isCatalogOnSql()) {
+    const catalog = await import("@/lib/db/catalog/maps");
+    return catalog.getAllMaps();
+  }
   const { rows } = await getSheetRows(SHEET_TABS.MAPAS);
   const maps: FloorMap[] = [];
 
@@ -52,6 +64,14 @@ export async function getAllMaps(): Promise<FloorMap[]> {
       backgroundUrl: parsed.data.backgroundUrl,
       width: parsed.data.width,
       height: parsed.data.height,
+      secondaryBackgroundType: (row.secondaryBackgroundType ||
+        undefined) as BackgroundType | undefined,
+      secondaryBackgroundUrl: row.secondaryBackgroundUrl || undefined,
+      secondaryWidth: row.secondaryWidth ? Number(row.secondaryWidth) : undefined,
+      secondaryHeight: row.secondaryHeight ? Number(row.secondaryHeight) : undefined,
+      primaryFloor: row.primaryFloor === "2" ? "2" : "1",
+      floor1Label: row.floor1Label || undefined,
+      floor2Label: row.floor2Label || undefined,
     });
   }
 
@@ -59,6 +79,10 @@ export async function getAllMaps(): Promise<FloorMap[]> {
 }
 
 export async function getMapById(id: string): Promise<FloorMap | null> {
+  if (isCatalogOnSql()) {
+    const catalog = await import("@/lib/db/catalog/maps");
+    return catalog.getMapById(id);
+  }
   const maps = await getAllMaps();
   return maps.find((map) => map.id === id) ?? null;
 }
@@ -66,6 +90,10 @@ export async function getMapById(id: string): Promise<FloorMap | null> {
 export async function createMap(
   input: Omit<FloorMap, "id"> & { id?: string },
 ): Promise<FloorMap> {
+  if (isCatalogOnSql()) {
+    const catalog = await import("@/lib/db/catalog/maps");
+    return catalog.createMap(input);
+  }
   const map: FloorMap = {
     id: input.id ?? "",
     name: input.name,
@@ -88,6 +116,10 @@ export async function updateMap(
   id: string,
   input: Partial<Omit<FloorMap, "id">>,
 ): Promise<FloorMap | null> {
+  if (isCatalogOnSql()) {
+    const catalog = await import("@/lib/db/catalog/maps");
+    return catalog.updateMap(id, input);
+  }
   const existing = await getMapById(id);
   if (!existing) return null;
 
@@ -101,6 +133,10 @@ export async function updateMap(
 }
 
 export async function deleteMap(id: string): Promise<boolean> {
+  if (isCatalogOnSql()) {
+    const catalog = await import("@/lib/db/catalog/maps");
+    return catalog.deleteMap(id);
+  }
   const rowIndex = await findRowIndexById(SHEET_TABS.MAPAS, id);
   if (!rowIndex) return false;
 

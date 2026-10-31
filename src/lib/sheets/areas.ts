@@ -9,6 +9,7 @@ import {
   updateSheetRowById,
 } from "@/lib/sheets/repository";
 import { parseEventPresets, serializeEventPresets } from "@/lib/area-scope";
+import { isCatalogOnSql } from "@/lib/db/config";
 import { SHEET_TABS } from "@/lib/sheets/tabs";
 import type { Area } from "@/types/area";
 
@@ -44,6 +45,10 @@ function areaToRow(area: Area): string[] {
 }
 
 export async function getAllAreas(): Promise<Area[]> {
+  if (isCatalogOnSql()) {
+    const catalog = await import("@/lib/db/catalog/areas");
+    return catalog.getAllAreas();
+  }
   const { rows } = await getSheetRowsCanonical(SHEET_TABS.AREAS);
   const areas: Area[] = [];
 
@@ -64,6 +69,10 @@ export async function getAllAreas(): Promise<Area[]> {
 }
 
 export async function getAreaById(id: string): Promise<Area | null> {
+  if (isCatalogOnSql()) {
+    const catalog = await import("@/lib/db/catalog/areas");
+    return catalog.getAreaById(id);
+  }
   return (await getAllAreas()).find((area) => area.id === id) ?? null;
 }
 
@@ -74,6 +83,10 @@ export async function createArea(input: {
   colorHex?: string;
   eventPresets?: string[];
 }): Promise<Area> {
+  if (isCatalogOnSql()) {
+    const catalog = await import("@/lib/db/catalog/areas");
+    return catalog.createArea(input);
+  }
   const { createId } = await import("@/lib/id");
   const name = input.name.trim();
   if (!name) throw new Error("El nombre del área es obligatorio.");
@@ -119,6 +132,10 @@ export async function updateArea(
     eventPresets: string[];
   }>,
 ): Promise<Area | null> {
+  if (isCatalogOnSql()) {
+    const catalog = await import("@/lib/db/catalog/areas");
+    return catalog.updateArea(id, input);
+  }
   const existing = await getAreaById(id);
   if (!existing) return null;
 
@@ -153,6 +170,10 @@ export async function updateArea(
 }
 
 export async function deleteArea(id: string): Promise<void> {
+  if (isCatalogOnSql()) {
+    const catalog = await import("@/lib/db/catalog/areas");
+    return catalog.deleteArea(id);
+  }
   const areas = await getAllAreas();
   const hasChildren = areas.some((area) => area.parentId === id);
   if (hasChildren) {

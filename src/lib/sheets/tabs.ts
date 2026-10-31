@@ -38,7 +38,21 @@ export const SHEET_HEADERS: Record<SheetTab, string[]> = {
     /** Al final para no desalinear filas existentes (antes de minCapacity). */
     "minCapacity",
   ],
-  Mapas: ["id", "name", "backgroundType", "backgroundUrl", "width", "height"],
+  Mapas: [
+    "id",
+    "name",
+    "backgroundType",
+    "backgroundUrl",
+    "width",
+    "height",
+    "secondaryBackgroundType",
+    "secondaryBackgroundUrl",
+    "secondaryWidth",
+    "secondaryHeight",
+    "primaryFloor",
+    "floor1Label",
+    "floor2Label",
+  ],
   Recursos: [
     "id",
     "name",

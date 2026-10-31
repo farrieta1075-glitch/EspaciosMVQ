@@ -1,4 +1,5 @@
 import "server-only";
+import { isCatalogOnSql } from "@/lib/db/config";
 import {
   appendSheetRow,
   deleteSheetRowByIndex,
@@ -13,6 +14,10 @@ export interface ResourceSpaceLink {
 }
 
 export async function getResourceSpaceLinks(): Promise<ResourceSpaceLink[]> {
+  if (isCatalogOnSql()) {
+    const catalog = await import("@/lib/db/catalog/resource-spaces");
+    return catalog.getResourceSpaceLinks();
+  }
   const { rows } = await getSheetRows(SHEET_TABS.RECURSO_ESPACIO);
   return rows
     .filter((row) => row.resourceId && row.spaceId)
@@ -33,6 +38,10 @@ export async function setResourceSpaceLinks(
   resourceId: string,
   spaceIds: string[],
 ): Promise<void> {
+  if (isCatalogOnSql()) {
+    const catalog = await import("@/lib/db/catalog/resource-spaces");
+    return catalog.setResourceSpaceLinks(resourceId, spaceIds);
+  }
   const { rows } = await getSheetRows(SHEET_TABS.RECURSO_ESPACIO);
   const { sheetId } = await getSheetMeta(SHEET_TABS.RECURSO_ESPACIO);
 

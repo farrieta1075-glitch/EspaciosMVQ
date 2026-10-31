@@ -6,6 +6,7 @@ import {
   getSheetRowsCanonical,
   updateSheetRowById,
 } from "@/lib/sheets/repository";
+import { isCatalogOnSql } from "@/lib/db/config";
 import { SHEET_TABS } from "@/lib/sheets/tabs";
 import type { AppUser, UserRole } from "@/types/user";
 
@@ -89,6 +90,10 @@ function userToRow(user: AppUser): string[] {
 }
 
 export async function getAllUserRecords(): Promise<AppUser[]> {
+  if (isCatalogOnSql()) {
+    const catalog = await import("@/lib/db/catalog/users");
+    return catalog.getAllUserRecords();
+  }
   const { rows } = await getSheetRowsCanonical(SHEET_TABS.USUARIOS);
   const users: AppUser[] = [];
 
@@ -113,6 +118,10 @@ export async function getActiveUsers(): Promise<AppUser[]> {
 }
 
 export async function getUserById(id: string): Promise<AppUser | null> {
+  if (isCatalogOnSql()) {
+    const catalog = await import("@/lib/db/catalog/users");
+    return catalog.getUserById(id);
+  }
   return (await getAllUserRecords()).find((user) => user.id === id) ?? null;
 }
 
@@ -159,6 +168,10 @@ export async function createUser(input: {
   active?: boolean;
   receiveApprovalEmails?: boolean;
 }): Promise<AppUser> {
+  if (isCatalogOnSql()) {
+    const catalog = await import("@/lib/db/catalog/users");
+    return catalog.createUser(input);
+  }
   await assertUniqueCredentials(input);
 
   const { createId } = await import("@/lib/id");
@@ -192,6 +205,10 @@ export async function updateUser(
     receiveApprovalEmails: boolean;
   }>,
 ): Promise<AppUser | null> {
+  if (isCatalogOnSql()) {
+    const catalog = await import("@/lib/db/catalog/users");
+    return catalog.updateUser(id, input);
+  }
   const existing = await getUserById(id);
   if (!existing) return null;
 
@@ -237,11 +254,19 @@ export async function updateUser(
 }
 
 export async function deactivateUser(id: string): Promise<boolean> {
+  if (isCatalogOnSql()) {
+    const catalog = await import("@/lib/db/catalog/users");
+    return catalog.deactivateUser(id);
+  }
   const updated = await updateUser(id, { active: false });
   return updated !== null;
 }
 
 export async function countActiveAdmins(excludeId?: string): Promise<number> {
+  if (isCatalogOnSql()) {
+    const catalog = await import("@/lib/db/catalog/users");
+    return catalog.countActiveAdmins(excludeId);
+  }
   const users = await getActiveUsers();
   return users.filter(
     (user) => user.role === "ADMIN" && user.id !== excludeId,

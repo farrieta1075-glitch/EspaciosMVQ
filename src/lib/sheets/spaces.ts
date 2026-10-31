@@ -9,6 +9,7 @@ import {
   updateSheetRowById,
   type SheetRow,
 } from "@/lib/sheets/repository";
+import { isCatalogOnSql } from "@/lib/db/config";
 import { SHEET_HEADERS, SHEET_TABS } from "@/lib/sheets/tabs";
 import type { Space, SpaceGeometry } from "@/types/space";
 
@@ -66,6 +67,10 @@ function remapLegacyMisalignedSpaceRow(row: SheetRow): SheetRow {
 }
 
 export async function getAllSpaces(): Promise<Space[]> {
+  if (isCatalogOnSql()) {
+    const catalog = await import("@/lib/db/catalog/spaces");
+    return catalog.getAllSpaces();
+  }
   const { rows } = await getSheetRowsCanonical(SHEET_TABS.ESPACIOS);
   const spaces: Space[] = [];
 
@@ -97,10 +102,18 @@ export async function getAllSpaces(): Promise<Space[]> {
 }
 
 export async function getSpacesByMapId(mapId: string): Promise<Space[]> {
+  if (isCatalogOnSql()) {
+    const catalog = await import("@/lib/db/catalog/spaces");
+    return catalog.getSpacesByMapId(mapId);
+  }
   return (await getAllSpaces()).filter((space) => space.mapId === mapId);
 }
 
 export async function getSpaceById(id: string): Promise<Space | null> {
+  if (isCatalogOnSql()) {
+    const catalog = await import("@/lib/db/catalog/spaces");
+    return catalog.getSpaceById(id);
+  }
   const spaces = await getAllSpaces();
   return spaces.find((space) => space.id === id) ?? null;
 }
@@ -108,6 +121,10 @@ export async function getSpaceById(id: string): Promise<Space | null> {
 export async function createSpace(
   input: Omit<Space, "id"> & { id?: string },
 ): Promise<Space> {
+  if (isCatalogOnSql()) {
+    const catalog = await import("@/lib/db/catalog/spaces");
+    return catalog.createSpace(input);
+  }
   const space: Space = {
     id: input.id ?? "",
     name: input.name,
@@ -132,6 +149,10 @@ export async function updateSpace(
   id: string,
   input: Partial<Omit<Space, "id">>,
 ): Promise<Space | null> {
+  if (isCatalogOnSql()) {
+    const catalog = await import("@/lib/db/catalog/spaces");
+    return catalog.updateSpace(id, input);
+  }
   const existing = await getSpaceById(id);
   if (!existing) return null;
 
@@ -150,6 +171,10 @@ export async function updateSpace(
 }
 
 export async function deleteSpace(id: string): Promise<boolean> {
+  if (isCatalogOnSql()) {
+    const catalog = await import("@/lib/db/catalog/spaces");
+    return catalog.deleteSpace(id);
+  }
   const rowIndex = await findRowIndexById(SHEET_TABS.ESPACIOS, id);
   if (!rowIndex) return false;
 

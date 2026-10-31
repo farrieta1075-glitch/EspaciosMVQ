@@ -11,6 +11,7 @@ export async function POST(request: Request) {
   const file = formData.get("file");
   const mapId = formData.get("mapId");
   const backgroundType = formData.get("backgroundType");
+  const floorTarget = formData.get("floorTarget")?.toString().trim() === "2" ? "2" : "1";
 
   if (!(file instanceof File) || typeof mapId !== "string") {
     return NextResponse.json({ error: "Archivo o mapId inválido" }, { status: 400 });
@@ -26,7 +27,7 @@ export async function POST(request: Request) {
       ? "pdf"
       : file.name.split(".").pop()?.toLowerCase() ?? "png";
 
-  const filename = `${mapId}.${ext}`;
+  const filename = floorTarget === "2" ? `${mapId}-floor2.${ext}` : `${mapId}.${ext}`;
   const buffer = Buffer.from(await file.arrayBuffer());
 
   let backgroundUrl: string;
@@ -49,10 +50,18 @@ export async function POST(request: Request) {
         ? "image"
         : "blank";
 
-  const updated = await updateMap(mapId, {
-    backgroundUrl,
-    backgroundType: type,
-  });
+  const updated = await updateMap(
+    mapId,
+    floorTarget === "2"
+      ? {
+          secondaryBackgroundUrl: backgroundUrl,
+          secondaryBackgroundType: type,
+        }
+      : {
+          backgroundUrl,
+          backgroundType: type,
+        },
+  );
 
   return NextResponse.json(updated);
 }

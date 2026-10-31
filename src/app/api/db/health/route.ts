@@ -48,16 +48,31 @@ export async function GET() {
   try {
     const prisma = getPrisma();
     await prisma.$queryRaw`SELECT 1 AS ok`;
-    const [pushCount, notificationCount] = await Promise.all([
+    const [
+      pushCount,
+      notificationCount,
+      userCount,
+      areaCount,
+      spaceCount,
+      mapCount,
+      resourceCount,
+      resourceSpaceCount,
+    ] = await Promise.all([
       prisma.pushSubscription.count(),
       prisma.notification.count(),
+      prisma.user.count(),
+      prisma.area.count(),
+      prisma.space.count(),
+      prisma.floorMap.count(),
+      prisma.resource.count(),
+      prisma.resourceSpace.count(),
     ]);
 
     return NextResponse.json({
       ok: true,
       mode: "sql",
       message:
-        "SQL conectado. Solo notificaciones y suscripciones push usan Azure; usuarios y reservas siguen en Sheets hasta migración.",
+        "SQL conectado. Catálogo (usuarios, áreas, espacios, mapas, recursos), push y notificaciones en Azure. Reservas e historial siguen en Google Sheets.",
       env: {
         hasDirectDatabaseUrl,
         hasAzureParts,
@@ -65,6 +80,12 @@ export async function GET() {
       },
       stores,
       sqlRowCounts: {
+        users: userCount,
+        areas: areaCount,
+        spaces: spaceCount,
+        maps: mapCount,
+        resources: resourceCount,
+        resourceSpaces: resourceSpaceCount,
         pushSubscriptions: pushCount,
         notifications: notificationCount,
       },

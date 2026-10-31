@@ -62,6 +62,10 @@ interface EventFormProps {
   selectedSpaceIds?: string[];
   spaces?: Space[];
   eventPresetGroups?: EventPresetGroup[];
+  eventPresetAreaOptions?: { id: string; label: string; depth: number }[];
+  presetsByAreaId?: Record<string, string[]>;
+  presetSourceAreaId?: string;
+  onPresetSourceAreaIdChange?: (areaId: string) => void;
 }
 
 export function EventForm({
@@ -96,7 +100,35 @@ export function EventForm({
   selectedSpaceIds = [],
   spaces = [],
   eventPresetGroups = [],
+  eventPresetAreaOptions = [],
+  presetsByAreaId = {},
+  presetSourceAreaId,
+  onPresetSourceAreaIdChange,
 }: EventFormProps) {
+  const [internalPresetAreaId, setInternalPresetAreaId] = React.useState("");
+  const activePresetAreaId =
+    presetSourceAreaId ?? internalPresetAreaId ?? areaId ?? eventPresetAreaOptions[0]?.id ?? "";
+  const presetEvents =
+    presetsByAreaId[activePresetAreaId] ??
+    eventPresetGroups.find((group) => group.id === activePresetAreaId)?.events ??
+    [];
+
+  React.useEffect(() => {
+    if (presetSourceAreaId !== undefined) return;
+    if (areaId && presetsByAreaId[areaId]?.length) {
+      setInternalPresetAreaId(areaId);
+    } else if (eventPresetAreaOptions[0]?.id) {
+      setInternalPresetAreaId(eventPresetAreaOptions[0].id);
+    }
+  }, [areaId, eventPresetAreaOptions, presetSourceAreaId, presetsByAreaId]);
+
+  function setPresetAreaId(next: string) {
+    onPresetSourceAreaIdChange?.(next);
+    if (presetSourceAreaId === undefined) {
+      setInternalPresetAreaId(next);
+    }
+  }
+
   const [suggestions, setSuggestions] = React.useState<
     { eventName: string; count: number }[]
   >([]);
@@ -176,48 +208,59 @@ export function EventForm({
 
   const fields = (
         <div className="space-y-4">
-        {eventPresetGroups.length > 0 && (
+        {(eventPresetAreaOptions.length > 0 || eventPresetGroups.length > 0) &&
+          presetEvents.length > 0 && (
           <div className="space-y-2">
-            <Label>Eventos sugeridos por área</Label>
-            <div className="space-y-3">
-              {eventPresetGroups.map((group) => {
+            <Label>Eventos sugeridos</Label>
+            {eventPresetAreaOptions.length > 1 && (
+              <div className="space-y-1">
+                <Label htmlFor="presetArea" className="text-xs text-muted-foreground">
+                  Área o subárea
+                </Label>
+                <Select
+                  id="presetArea"
+                  value={activePresetAreaId}
+                  disabled={disabled}
+                  onChange={(event) => setPresetAreaId(event.target.value)}
+                >
+                  {eventPresetAreaOptions.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.label}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            )}
+            <div className="flex flex-wrap gap-1.5">
+              {presetEvents.map((preset) => {
                 const areaForColor =
-                  areas.find((item) => item.id === group.id) ?? null;
+                  areas.find((item) => item.id === activePresetAreaId) ?? null;
                 const hex = getAreaHex(areaForColor, areas);
                 return (
-                  <div key={group.id} className="space-y-1.5">
-                    <p className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                      <span
-                        className="h-2.5 w-2.5 rounded-full ring-1 ring-border"
-                        style={{ backgroundColor: hex }}
-                      />
-                      {group.parentLabel
-                        ? `${group.parentLabel} · ${group.label}`
-                        : group.label}
-                    </p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {group.events.map((preset) => (
-                        <Button
-                          key={`${group.id}-${preset}`}
-                          type="button"
-                          size="sm"
-                          variant={
-                            eventName.trim() === preset ? "default" : "outline"
-                          }
-                          className="h-7 text-xs"
-                          disabled={disabled}
-                          onClick={() => onEventNameChange(preset)}
-                        >
-                          {preset}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
+                  <Button
+                    key={`${activePresetAreaId}-${preset}`}
+                    type="button"
+                    size="sm"
+                    variant={
+                      eventName.trim() === preset ? "default" : "outline"
+                    }
+                    className="h-7 gap-1.5 text-xs"
+                    disabled={disabled}
+                    onClick={() => onEventNameChange(preset)}
+                  >
+                    <span
+                      className="h-2 w-2 rounded-full ring-1 ring-border"
+                      style={{ backgroundColor: hex }}
+                      aria-hidden
+                    />
+                    {preset}
+                  </Button>
                 );
               })}
             </div>
             <p className="text-xs text-muted-foreground">
-              También puedes escribir otro nombre manualmente abajo.
+              Incluye eventos del área seleccionada y de sus subáreas. También
+              puedes escribir otro nombre abajo.
             </p>
           </div>
         )}

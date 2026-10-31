@@ -28,7 +28,10 @@ import {
   shouldRetryMutationRequest,
   sleep,
 } from "@/lib/read-json-response";
-import { EventForm } from "@/components/reservation/event-form";
+import {
+  EventForm,
+  type EventPresetGroup,
+} from "@/components/reservation/event-form";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
@@ -136,6 +139,32 @@ export function ReservationEditFlow({
   const [restoredSelection, setRestoredSelection] = React.useState<
     InitialMapSelection | undefined
   >(undefined);
+  const [eventPresetGroups, setEventPresetGroups] = React.useState<
+    EventPresetGroup[]
+  >([]);
+  const [eventPresetAreaOptions, setEventPresetAreaOptions] = React.useState<
+    { id: string; label: string; depth: number }[]
+  >([]);
+  const [presetsByAreaId, setPresetsByAreaId] = React.useState<
+    Record<string, string[]>
+  >({});
+  const [presetSourceAreaId, setPresetSourceAreaId] = React.useState("");
+
+  React.useEffect(() => {
+    void fetch("/api/areas/event-presets")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        if (data?.groups) setEventPresetGroups(data.groups);
+        if (data?.areaOptions) setEventPresetAreaOptions(data.areaOptions);
+        if (data?.presetsByAreaId) setPresetsByAreaId(data.presetsByAreaId);
+      });
+  }, []);
+
+  React.useEffect(() => {
+    if (areaId && presetsByAreaId[areaId]?.length) {
+      setPresetSourceAreaId(areaId);
+    }
+  }, [areaId, presetsByAreaId]);
 
   React.useEffect(() => {
     const draft = loadReservationDraft();
@@ -426,6 +455,11 @@ export function ReservationEditFlow({
               onAttendeeJustificationNoteChange={setAttendeeJustificationNote}
               selectedSpaceIds={activeSelection.selectedSpaceIds}
               spaces={spaces}
+              eventPresetGroups={eventPresetGroups}
+              eventPresetAreaOptions={eventPresetAreaOptions}
+              presetsByAreaId={presetsByAreaId}
+              presetSourceAreaId={presetSourceAreaId}
+              onPresetSourceAreaIdChange={setPresetSourceAreaId}
             />
           </div>
         </SheetContent>

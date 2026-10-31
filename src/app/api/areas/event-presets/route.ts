@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth/index";
 import { isAdmin } from "@/lib/auth/permissions";
 import {
+  buildEventPresetAreaOptions,
+  buildPresetsByAreaId,
   collectEventPresetGroups,
   resolveUserAreaScopeIds,
 } from "@/lib/area-scope";
@@ -28,6 +30,14 @@ export async function GET(request: Request) {
     scopeIds = user ? resolveUserAreaScopeIds(user) : [];
   }
 
+  const areaOptions = buildEventPresetAreaOptions(areas, scopeIds);
+  const presetsByAreaId = buildPresetsByAreaId(areas, scopeIds);
   const groups = collectEventPresetGroups(areas, scopeIds);
-  return NextResponse.json({ scopeIds, groups });
+
+  return NextResponse.json({
+    scopeIds,
+    areaOptions,
+    presetsByAreaId,
+    groups,
+  });
 }

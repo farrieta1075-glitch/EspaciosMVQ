@@ -33,12 +33,19 @@ model Area {
 }
 
 model FloorMap {
-  id              String @id @db.NVarChar(64)
-  name            String @db.NVarChar(256)
-  backgroundType  String @default("") @db.NVarChar(32)
-  backgroundUrl   String @default("") @db.NVarChar(2048)
-  width           Int    @default(0)
-  height          Int    @default(0)
+  id                     String @id @db.NVarChar(64)
+  name                   String @db.NVarChar(256)
+  backgroundType         String @default("blank") @db.NVarChar(32)
+  backgroundUrl          String @default("") @db.NVarChar(2048)
+  width                  Int    @default(0)
+  height                 Int    @default(0)
+  secondaryBackgroundType String @default("") @db.NVarChar(32)
+  secondaryBackgroundUrl  String @default("") @db.NVarChar(2048)
+  secondaryWidth          Int    @default(0)
+  secondaryHeight         Int    @default(0)
+  primaryFloor            String @default("1") @db.NVarChar(8)
+  floor1Label             String @default("Planta baja") @db.NVarChar(128)
+  floor2Label             String @default("Piso 2") @db.NVarChar(128)
 
   @@map("Maps")
 }

@@ -1,6 +1,8 @@
 "use client";
 
+import * as React from "react";
 import dynamic from "next/dynamic";
+import { MapFloorSettings } from "@/components/admin/map-floor-settings";
 import type { FloorMap, Space } from "@/types/space";
 
 const SpaceMapEditor = dynamic(
@@ -24,5 +26,11 @@ interface MapEditorClientProps {
 }
 
 export function MapEditorClient({ map, initialSpaces }: MapEditorClientProps) {
-  return <SpaceMapEditor map={map} initialSpaces={initialSpaces} />;
+  const [currentMap, setCurrentMap] = React.useState(map);
+  return (
+    <div className="space-y-4">
+      <MapFloorSettings map={currentMap} onUpdated={setCurrentMap} />
+      <SpaceMapEditor map={currentMap} initialSpaces={initialSpaces} />
+    </div>
+  );
 }

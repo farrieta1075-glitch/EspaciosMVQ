@@ -46,17 +46,22 @@ export function isSqlDatabaseEnabled(): boolean {
   return Boolean(resolveDatabaseUrl());
 }
 
+export function isCatalogOnSql(): boolean {
+  return isSqlDatabaseEnabled();
+}
+
 export const SQL_BACKED_FEATURES = [
   "pushSubscriptions",
   "notifications",
-] as const;
-
-export const SHEETS_BACKED_FEATURES = [
   "users",
   "areas",
   "spaces",
   "maps",
   "resources",
+  "resourceSpaces",
+] as const;
+
+export const SHEETS_BACKED_FEATURES = [
   "reservations",
   "reservationResources",
   "eventHistory",

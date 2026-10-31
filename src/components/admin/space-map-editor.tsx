@@ -15,7 +15,13 @@ import {
   Trash2,
 } from "lucide-react";
 import { Stage, Layer, Rect, Line, Image as KonvaImage, Text } from "react-konva";
-import type { FloorMap, Space, SpaceGeometry } from "@/types/space";
+import { MapFloorSwitcher } from "@/components/map-date/map-floor-switcher";
+import {
+  getMapFloorDisplayOrder,
+  getMapFloorLayer,
+  spaceBelongsToFloor,
+} from "@/lib/map-floors";
+import type { FloorMap, MapFloorId, Space, SpaceGeometry } from "@/types/space";
 import { loadImage } from "@/lib/load-image";
 import { resolveAssetUrl } from "@/lib/storage/resolve-asset-url";
 import { Button } from "@/components/ui/button";
@@ -60,13 +66,47 @@ export function SpaceMapEditor({ map, initialSpaces }: SpaceMapEditorProps) {
   const [saving, setSaving] = React.useState(false);
   const [message, setMessage] = React.useState<string | null>(null);
 
+  const floorOrder = React.useMemo(() => getMapFloorDisplayOrder(map), [map]);
+  const [activeFloor, setActiveFloor] = React.useState<MapFloorId>(
+    floorOrder[0] ?? "1",
+  );
+  React.useEffect(() => {
+    setActiveFloor(floorOrder[0] ?? "1");
+  }, [map.id, floorOrder]);
+
+  const activeLayer = React.useMemo(
+    () => getMapFloorLayer(map, activeFloor),
+    [map, activeFloor],
+  );
+  const floorLabels = React.useMemo(
+    () =>
+      Object.fromEntries(
+        floorOrder.map((id) => [id, getMapFloorLayer(map, id).label]),
+      ) as Record<MapFloorId, string>,
+    [floorOrder, map],
+  );
+
+  const spacesOnFloor = React.useMemo(
+    () => spaces.filter((space) => spaceBelongsToFloor(space.floor, activeFloor)),
+    [spaces, activeFloor],
+  );
+
+  React.useEffect(() => {
+    if (
+      selectedSpaceId &&
+      !spacesOnFloor.some((space) => space.id === selectedSpaceId)
+    ) {
+      setSelectedSpaceId(spacesOnFloor[0]?.id ?? "");
+    }
+  }, [activeFloor, selectedSpaceId, spacesOnFloor]);
+
   const [draftRect, setDraftRect] = React.useState<number[] | null>(null);
   const [draftPolygon, setDraftPolygon] = React.useState<number[]>([]);
   const isDrawingRectRef = React.useRef(false);
   const rectStartRef = React.useRef<{ x: number; y: number } | null>(null);
 
-  const mapWidth = map.width;
-  const mapHeight = map.height;
+  const mapWidth = activeLayer.width;
+  const mapHeight = activeLayer.height;
   const displayScale = Math.min(containerWidth / mapWidth, 1);
 
   React.useEffect(() => {
@@ -83,13 +123,13 @@ export function SpaceMapEditor({ map, initialSpaces }: SpaceMapEditorProps) {
     async function loadBackground() {
       setLoadingBg(true);
       try {
-        if (map.backgroundType === "blank" || !map.backgroundUrl) {
+        if (activeLayer.backgroundType === "blank" || !activeLayer.backgroundUrl) {
           setBackgroundImage(null);
           return;
         }
 
-        const assetUrl = resolveAssetUrl(map.backgroundUrl);
-        if (map.backgroundType === "pdf") {
+        const assetUrl = resolveAssetUrl(activeLayer.backgroundUrl);
+        if (activeLayer.backgroundType === "pdf") {
           const { renderPdfFirstPage } = await import("@/lib/pdf-render");
           const rendered = await renderPdfFirstPage(assetUrl);
           const img = await loadImage(rendered.dataUrl);
@@ -107,7 +147,11 @@ export function SpaceMapEditor({ map, initialSpaces }: SpaceMapEditorProps) {
     }
 
     loadBackground();
-  }, [map.backgroundType, map.backgroundUrl]);
+  }, [
+    activeLayer.backgroundType,
+    activeLayer.backgroundUrl,
+    activeFloor,
+  ]);
 
   function getPointerPosition(): { x: number; y: number } | null {
     const stage = stageRef.current;
@@ -123,6 +167,7 @@ export function SpaceMapEditor({ map, initialSpaces }: SpaceMapEditorProps) {
         space.id === spaceId
           ? {
               ...space,
+              floor: activeFloor,
               geometry: {
                 ...geometry,
                 color: geometry.color ?? getSpaceColor(index),
@@ -257,7 +302,10 @@ export function SpaceMapEditor({ map, initialSpaces }: SpaceMapEditorProps) {
           fetch(`/api/admin/espacios/${space.id}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ geometry: space.geometry }),
+            body: JSON.stringify({
+              geometry: space.geometry,
+              floor: space.floor?.trim() || "1",
+            }),
           }),
         ),
       );
@@ -275,7 +323,7 @@ export function SpaceMapEditor({ map, initialSpaces }: SpaceMapEditorProps) {
     }
   }
 
-  const canDraw = Boolean(selectedSpaceId) && spaces.length > 0;
+  const canDraw = Boolean(selectedSpaceId) && spacesOnFloor.length > 0;
 
   return (
     <div className="space-y-4">
@@ -291,6 +339,13 @@ export function SpaceMapEditor({ map, initialSpaces }: SpaceMapEditorProps) {
           <p className="text-sm text-muted-foreground">
             Delimita espacios con rectángulos o polígonos sobre el plano.
           </p>
+          <MapFloorSwitcher
+            className="mt-2"
+            floors={floorOrder}
+            labels={floorLabels}
+            activeFloor={activeFloor}
+            onChange={setActiveFloor}
+          />
         </div>
         <Button onClick={handleSave} disabled={saving} className="gap-2">
           {saving ? (
@@ -320,12 +375,12 @@ export function SpaceMapEditor({ map, initialSpaces }: SpaceMapEditorProps) {
               id="spaceSelect"
               value={selectedSpaceId}
               onChange={(e) => setSelectedSpaceId(e.target.value)}
-              disabled={spaces.length === 0}
+              disabled={spacesOnFloor.length === 0}
             >
-              {spaces.length === 0 ? (
-                <option value="">Sin espacios</option>
+              {spacesOnFloor.length === 0 ? (
+                <option value="">Sin espacios en esta planta</option>
               ) : (
-                spaces.map((space) => (
+                spacesOnFloor.map((space) => (
                   <option key={space.id} value={space.id}>
                     {space.name}
                   </option>
@@ -393,10 +448,12 @@ export function SpaceMapEditor({ map, initialSpaces }: SpaceMapEditorProps) {
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Espacios en este mapa
             </p>
-            {spaces.length === 0 ? (
-              <p className="text-xs text-muted-foreground">No hay espacios en este mapa.</p>
+            {spacesOnFloor.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                No hay espacios en esta planta. Asigna el piso al crear o editar el espacio.
+              </p>
             ) : (
-              spaces.map((space, index) => (
+              spacesOnFloor.map((space, index) => (
                 <button
                   key={space.id}
                   type="button"
@@ -490,7 +547,7 @@ export function SpaceMapEditor({ map, initialSpaces }: SpaceMapEditorProps) {
                     listening={tool !== "select"}
                   />
 
-                  {spaces.map((space, index) => {
+                  {spacesOnFloor.map((space, index) => {
                     if (!space.geometry) return null;
                     const color = space.geometry.color ?? getSpaceColor(index);
                     const opacity = selectedSpaceId === space.id ? 0.45 : 0.3;

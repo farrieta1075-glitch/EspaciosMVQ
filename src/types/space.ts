@@ -19,6 +19,9 @@ export interface Space {
 
 export type BackgroundType = "blank" | "image" | "pdf";
 
+/** "1" = planta principal (backgroundUrl); "2" = segundo piso (secondary*). */
+export type MapFloorId = "1" | "2";
+
 export interface FloorMap {
   id: string;
   name: string;
@@ -26,4 +29,12 @@ export interface FloorMap {
   backgroundUrl: string;
   width: number;
   height: number;
+  secondaryBackgroundType?: BackgroundType;
+  secondaryBackgroundUrl?: string;
+  secondaryWidth?: number;
+  secondaryHeight?: number;
+  /** Planta que se muestra primero al abrir el mapa. */
+  primaryFloor?: MapFloorId;
+  floor1Label?: string;
+  floor2Label?: string;
 }

@@ -5,7 +5,14 @@ import type Konva from "konva";
 import type { KonvaEventObject } from "konva/lib/Node";
 import { Loader2 } from "lucide-react";
 import { Stage, Layer, Rect, Line, Image as KonvaImage, Text } from "react-konva";
-import type { FloorMap, Space } from "@/types/space";
+import { MapFloorSwitcher } from "@/components/map-date/map-floor-switcher";
+import {
+  getMapFloorDisplayOrder,
+  getMapFloorLayer,
+  mapHasSecondFloor,
+  spaceBelongsToFloor,
+} from "@/lib/map-floors";
+import type { FloorMap, MapFloorId, Space } from "@/types/space";
 import type { SpaceAvailabilityStatus } from "@/types/reservation";
 import {
   MAP_AVAILABLE_HEX,
@@ -67,8 +74,27 @@ export function SpaceMapViewer({
   const [loadingBg, setLoadingBg] = React.useState(true);
   const [containerWidth, setContainerWidth] = React.useState<number | null>(null);
 
-  const mapWidth = map.width;
-  const mapHeight = map.height;
+  const floorOrder = React.useMemo(() => getMapFloorDisplayOrder(map), [map]);
+  const [activeFloor, setActiveFloor] = React.useState<MapFloorId>(
+    floorOrder[0] ?? "1",
+  );
+  React.useEffect(() => {
+    setActiveFloor(floorOrder[0] ?? "1");
+  }, [map.id, floorOrder]);
+
+  const layer = React.useMemo(
+    () => getMapFloorLayer(map, activeFloor),
+    [map, activeFloor],
+  );
+  const mapWidth = layer.width;
+  const mapHeight = layer.height;
+  const floorLabels = React.useMemo(
+    () => ({
+      "1": getMapFloorLayer(map, "1").label,
+      "2": getMapFloorLayer(map, "2").label,
+    }),
+    [map],
+  );
   const measuredWidth = containerWidth ?? 0;
   const displayScale =
     measuredWidth > 0
@@ -98,7 +124,10 @@ export function SpaceMapViewer({
     async function loadBackground() {
       setLoadingBg(true);
       try {
-        const image = await getCachedMapBackground(map);
+        const image = await getCachedMapBackground({
+          backgroundType: layer.backgroundType,
+          backgroundUrl: layer.backgroundUrl,
+        });
         if (!cancelled) setBackgroundImage(image);
       } finally {
         if (!cancelled) setLoadingBg(false);
@@ -108,7 +137,7 @@ export function SpaceMapViewer({
     return () => {
       cancelled = true;
     };
-  }, [map.backgroundType, map.backgroundUrl, map.id]);
+  }, [layer.backgroundType, layer.backgroundUrl, activeFloor, map.id]);
 
   function resolvePaintStyle(
     spaceId: string,
@@ -145,13 +174,27 @@ export function SpaceMapViewer({
     onSpaceToggle(spaceId);
   }
 
-  const drawableSpaces = spaces.filter((space) => space.geometry && space.active);
+  const drawableSpaces = spaces.filter(
+    (space) =>
+      space.geometry &&
+      space.active &&
+      spaceBelongsToFloor(space.floor, activeFloor),
+  );
 
   return (
     <div
       ref={containerRef}
       className="w-full min-w-0 max-w-full overflow-hidden rounded-xl border border-border bg-muted/20 p-1 sm:p-2"
     >
+      {mapHasSecondFloor(map) && (
+        <MapFloorSwitcher
+          floors={floorOrder}
+          labels={floorLabels}
+          activeFloor={activeFloor}
+          onChange={setActiveFloor}
+          className="mb-2"
+        />
+      )}
       {(showDefaultLegend || headerExtra) && (
         <div className="mb-2 space-y-2">
           {showDefaultLegend && (
@@ -186,7 +229,9 @@ export function SpaceMapViewer({
         </div>
       ) : drawableSpaces.length === 0 ? (
         <div className="flex h-64 items-center justify-center px-4 text-center text-sm text-muted-foreground">
-          Este mapa no tiene espacios delimitados. Configúralos en Administración → Espacios.
+          {spaces.some((space) => space.geometry && space.active)
+            ? `No hay espacios en ${layer.label}. Cambia de planta con las flechas.`
+            : "Este mapa no tiene espacios delimitados. Configúralos en Administración → Espacios."}
         </div>
       ) : (
         <div

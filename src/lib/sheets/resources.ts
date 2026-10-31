@@ -8,6 +8,7 @@ import {
   getSheetRows,
   updateSheetRowById,
 } from "@/lib/sheets/repository";
+import { isCatalogOnSql } from "@/lib/db/config";
 import { getResourceSpaceLinks, setResourceSpaceLinks } from "@/lib/sheets/resource-spaces";
 import { SHEET_TABS } from "@/lib/sheets/tabs";
 import type { Resource, ResourceScope, ResourceType } from "@/types/resource";
@@ -73,6 +74,10 @@ async function buildResourcesWithRestrictions(): Promise<Resource[]> {
 }
 
 export async function getAllResources(): Promise<Resource[]> {
+  if (isCatalogOnSql()) {
+    const catalog = await import("@/lib/db/catalog/resources");
+    return catalog.getAllResources();
+  }
   return buildResourcesWithRestrictions();
 }
 
@@ -91,6 +96,10 @@ export async function createResource(
     restrictedSpaceIds?: string[];
   },
 ): Promise<Resource> {
+  if (isCatalogOnSql()) {
+    const catalog = await import("@/lib/db/catalog/resources");
+    return catalog.createResource(input);
+  }
   const resource: Omit<Resource, "restrictedSpaceIds"> = {
     id: input.id ?? "",
     name: input.name,
@@ -122,6 +131,10 @@ export async function updateResource(
   id: string,
   input: Partial<Omit<Resource, "id">>,
 ): Promise<Resource | null> {
+  if (isCatalogOnSql()) {
+    const catalog = await import("@/lib/db/catalog/resources");
+    return catalog.updateResource(id, input);
+  }
   const existing = await getResourceById(id);
   if (!existing) return null;
 
@@ -151,6 +164,10 @@ export async function updateResource(
 }
 
 export async function deleteResource(id: string): Promise<boolean> {
+  if (isCatalogOnSql()) {
+    const catalog = await import("@/lib/db/catalog/resources");
+    return catalog.deleteResource(id);
+  }
   const rowIndex = await findRowIndexById(SHEET_TABS.RECURSOS, id);
   if (!rowIndex) return false;
 

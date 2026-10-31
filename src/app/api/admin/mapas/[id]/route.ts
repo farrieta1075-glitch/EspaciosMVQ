@@ -9,6 +9,13 @@ const updateMapSchema = z.object({
   backgroundUrl: z.string().optional(),
   width: z.coerce.number().optional(),
   height: z.coerce.number().optional(),
+  secondaryBackgroundType: z.enum(["blank", "image", "pdf"]).optional(),
+  secondaryBackgroundUrl: z.string().optional(),
+  secondaryWidth: z.coerce.number().optional(),
+  secondaryHeight: z.coerce.number().optional(),
+  primaryFloor: z.enum(["1", "2"]).optional(),
+  floor1Label: z.string().optional(),
+  floor2Label: z.string().optional(),
 });
 
 export async function GET(
