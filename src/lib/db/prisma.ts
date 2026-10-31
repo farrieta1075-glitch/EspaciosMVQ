@@ -1,11 +1,13 @@
 import "server-only";
 import { PrismaClient } from "@prisma/client";
+import { ensureDatabaseUrlEnv } from "@/lib/db/config";
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
 export function getPrisma(): PrismaClient {
+  ensureDatabaseUrlEnv();
   if (!globalForPrisma.prisma) {
     globalForPrisma.prisma = new PrismaClient({
       log:
