@@ -4,6 +4,7 @@ import {
   getSheetRows,
   updateSheetRowByIndex,
 } from "@/lib/sheets/repository";
+import { isAppDataOnSql } from "@/lib/db/config";
 import { SHEET_TABS } from "@/lib/sheets/tabs";
 import type { EventSuggestion } from "@/types/reservation";
 import { getAllReservations } from "@/lib/sheets/reservations";
@@ -16,7 +17,7 @@ interface HistoryRow {
   lastUsedAt: string;
 }
 
-async function getHistoryRows(): Promise<HistoryRow[]> {
+async function getHistoryRowsFromSheets(): Promise<HistoryRow[]> {
   const { rows } = await getSheetRows(SHEET_TABS.EVENTO_HISTORICO);
   return rows.map((row, index) => ({
     rowIndex: index + 2,
@@ -27,14 +28,36 @@ async function getHistoryRows(): Promise<HistoryRow[]> {
   }));
 }
 
+export async function getEventHistoryRows(): Promise<
+  { eventName: string; areaId: string; count: number; lastUsedAt: string }[]
+> {
+  if (isAppDataOnSql()) {
+    const sql = await import("@/lib/db/event-history");
+    return sql.getEventHistoryRowsSql();
+  }
+  const rows = await getHistoryRowsFromSheets();
+  return rows.map(({ eventName, areaId, count, lastUsedAt }) => ({
+    eventName,
+    areaId,
+    count,
+    lastUsedAt,
+  }));
+}
+
 export async function recordEventUsage(
   eventName: string,
   areaId: string,
 ): Promise<void> {
+  if (isAppDataOnSql()) {
+    const sql = await import("@/lib/db/event-history");
+    await sql.recordEventUsageSql(eventName, areaId);
+    return;
+  }
+
   const normalized = eventName.trim();
   if (!normalized) return;
 
-  const rows = await getHistoryRows();
+  const rows = await getHistoryRowsFromSheets();
   const existing = rows.find(
     (row) =>
       row.eventName.toLowerCase() === normalized.toLowerCase() &&
@@ -70,8 +93,13 @@ export async function getEventSuggestions(
   areaId?: string | null,
   limit = 8,
 ): Promise<EventSuggestion[]> {
+  if (isAppDataOnSql()) {
+    const sql = await import("@/lib/db/event-history");
+    return sql.getEventSuggestionsSql(query, areaId, limit);
+  }
+
   const q = query.trim().toLowerCase();
-  const historyRows = await getHistoryRows();
+  const historyRows = await getHistoryRowsFromSheets();
   const reservationNames = (await getAllReservations()).map((r) => r.eventName);
 
   const uniqueNames = new Map<string, EventSuggestion>();
@@ -112,7 +140,12 @@ export async function getEventSuggestions(
 }
 
 export async function getAllEventNames(): Promise<string[]> {
-  const history = await getHistoryRows();
+  if (isAppDataOnSql()) {
+    const sql = await import("@/lib/db/event-history");
+    return sql.getAllEventNamesSql();
+  }
+
+  const history = await getHistoryRowsFromSheets();
   const reservations = await getAllReservations();
   const names = new Set<string>();
   for (const row of history) {

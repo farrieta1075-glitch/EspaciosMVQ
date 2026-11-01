@@ -4,8 +4,7 @@ import { getAllUserRecords } from "@/lib/sheets/users";
 import { getAllReservations, getAllReservationResources } from "@/lib/sheets/reservations";
 import { getAllResources } from "@/lib/sheets/resources";
 import { getAllSpaces } from "@/lib/sheets/spaces";
-import { getSheetRows } from "@/lib/sheets/repository";
-import { SHEET_TABS } from "@/lib/sheets/tabs";
+import { getEventHistoryRows } from "@/lib/sheets/event-history";
 
 export interface DashboardStats {
   summary: {
@@ -78,7 +77,7 @@ export async function getDashboardStats(options?: {
     getAllResources(),
     getAllUserRecords(),
     getAllAreas(),
-    getSheetRows(SHEET_TABS.EVENTO_HISTORICO).then(({ rows }) => rows),
+    getEventHistoryRows(),
   ]);
 
   const filtered = reservations.filter((reservation) =>

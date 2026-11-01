@@ -50,6 +50,11 @@ export function isCatalogOnSql(): boolean {
   return isSqlDatabaseEnabled();
 }
 
+/** Datos operativos en Azure cuando hay DATABASE_URL (sin fallback a Sheets). */
+export function isAppDataOnSql(): boolean {
+  return isSqlDatabaseEnabled();
+}
+
 export const SQL_BACKED_FEATURES = [
   "pushSubscriptions",
   "notifications",
@@ -59,8 +64,12 @@ export const SQL_BACKED_FEATURES = [
   "maps",
   "resources",
   "resourceSpaces",
+  "reservations",
+  "reservationResources",
+  "eventHistory",
 ] as const;
 
+/** Solo aplica si no hay SQL; con Azure activo la app no usa Sheets para datos. */
 export const SHEETS_BACKED_FEATURES = [
   "reservations",
   "reservationResources",

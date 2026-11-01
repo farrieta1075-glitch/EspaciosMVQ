@@ -1,5 +1,10 @@
 import "server-only";
 import { z } from "zod";
+import { isAppDataOnSql } from "@/lib/db/config";
+import {
+  parseSpaceIds as parseSpaceIdsSql,
+  serializeSpaceIds as serializeSpaceIdsSql,
+} from "@/lib/db/reservations";
 import {
   appendSheetRow,
   deleteSheetRowByIndex,
@@ -58,24 +63,8 @@ const reservationRowSchema = z.object({
     .transform((value) => value.trim().toLowerCase() !== "false"),
 });
 
-export function parseSpaceIds(raw: string): string[] {
-  if (!raw.trim()) return [];
-  if (raw.startsWith("[")) {
-    try {
-      return JSON.parse(raw) as string[];
-    } catch {
-      return [];
-    }
-  }
-  return raw
-    .split(",")
-    .map((id) => id.trim())
-    .filter(Boolean);
-}
-
-export function serializeSpaceIds(spaceIds: string[]): string {
-  return JSON.stringify(spaceIds);
-}
+export const parseSpaceIds = parseSpaceIdsSql;
+export const serializeSpaceIds = serializeSpaceIdsSql;
 
 type ParsedReservationRow = z.infer<typeof reservationRowSchema>;
 
@@ -134,6 +123,10 @@ function isReservationDataRow(row: Record<string, string>): boolean {
 }
 
 export async function getAllReservations(): Promise<Reservation[]> {
+  if (isAppDataOnSql()) {
+    const sql = await import("@/lib/db/reservations");
+    return sql.getAllReservationsSql();
+  }
   const { rows } = await getSheetRowsCanonical(SHEET_TABS.RESERVAS);
   const reservations: Reservation[] = [];
 
@@ -175,9 +168,44 @@ export async function getReservationsNeedingApproval(): Promise<Reservation[]> {
   );
 }
 
+export async function insertReservation(
+  reservation: Reservation,
+): Promise<void> {
+  if (isAppDataOnSql()) {
+    const sql = await import("@/lib/db/reservations");
+    await sql.insertReservationSql(reservation);
+    return;
+  }
+  await appendSheetRow(
+    SHEET_TABS.RESERVAS,
+    reservationToRow(reservation),
+  );
+}
+
+export async function insertReservationResource(
+  reservationId: string,
+  resourceId: string,
+  quantity: number,
+): Promise<void> {
+  if (isAppDataOnSql()) {
+    const sql = await import("@/lib/db/reservations");
+    await sql.insertReservationResourceSql(reservationId, resourceId, quantity);
+    return;
+  }
+  await appendSheetRow(SHEET_TABS.RESERVA_RECURSOS, [
+    reservationId,
+    resourceId,
+    String(quantity),
+  ]);
+}
+
 export async function updateReservationRecord(
   reservation: Reservation,
 ): Promise<boolean> {
+  if (isAppDataOnSql()) {
+    const sql = await import("@/lib/db/reservations");
+    return sql.updateReservationSql(reservation);
+  }
   return updateSheetRowById(
     SHEET_TABS.RESERVAS,
     reservation.id,
@@ -186,6 +214,10 @@ export async function updateReservationRecord(
 }
 
 export async function getAllReservationResources(): Promise<ReservationResource[]> {
+  if (isAppDataOnSql()) {
+    const sql = await import("@/lib/db/reservations");
+    return sql.getAllReservationResourcesSql();
+  }
   const { rows } = await getSheetRowsCanonical(SHEET_TABS.RESERVA_RECURSOS);
   return rows
     .filter((row) => row.reservationId && row.resourceId)
@@ -208,6 +240,11 @@ export async function replaceReservationResources(
   reservationId: string,
   resources: { resourceId: string; quantity: number }[],
 ): Promise<void> {
+  if (isAppDataOnSql()) {
+    const sql = await import("@/lib/db/reservations");
+    await sql.replaceReservationResourcesSql(reservationId, resources);
+    return;
+  }
   const { rows } = await getSheetRowsCanonical(SHEET_TABS.RESERVA_RECURSOS);
   const { sheetId } = await getSheetMeta(SHEET_TABS.RESERVA_RECURSOS);
 

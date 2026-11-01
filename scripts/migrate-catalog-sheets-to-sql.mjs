@@ -1,6 +1,7 @@
 /**
  * Migra Usuarios, Areas, Espacios, Mapas, Recursos y RecursoEspacio → Azure SQL.
- * NO migra Reservas, ReservaRecursos, EventoHistorico ni Notificaciones.
+ * NO migra datos de Reservas, ReservaRecursos, EventoHistorico ni Notificaciones
+ * (esas tablas en Azure empiezan vacías; la app ya lee/escribe ahí con DATABASE_URL).
  *
  * Uso: node --env-file=.env.local scripts/migrate-catalog-sheets-to-sql.mjs
  */

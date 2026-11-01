@@ -23,9 +23,11 @@ export async function GET() {
         resolved ? "azure_sql" : "google_sheets",
       ]),
     ),
-    googleSheets: Object.fromEntries(
-      SHEETS_BACKED_FEATURES.map((key) => [key, "google_sheets"]),
-    ),
+    googleSheets: resolved
+      ? {}
+      : Object.fromEntries(
+          SHEETS_BACKED_FEATURES.map((key) => [key, "google_sheets"]),
+        ),
   };
 
   if (!isSqlDatabaseEnabled()) {
@@ -57,6 +59,9 @@ export async function GET() {
       mapCount,
       resourceCount,
       resourceSpaceCount,
+      reservationCount,
+      reservationResourceCount,
+      eventHistoryCount,
     ] = await Promise.all([
       prisma.pushSubscription.count(),
       prisma.notification.count(),
@@ -66,13 +71,16 @@ export async function GET() {
       prisma.floorMap.count(),
       prisma.resource.count(),
       prisma.resourceSpace.count(),
+      prisma.reservation.count(),
+      prisma.reservationResource.count(),
+      prisma.eventHistory.count(),
     ]);
 
     return NextResponse.json({
       ok: true,
       mode: "sql",
       message:
-        "SQL conectado. Catálogo (usuarios, áreas, espacios, mapas, recursos), push y notificaciones en Azure. Reservas e historial siguen en Google Sheets.",
+        "SQL conectado. Toda la aplicación lee y escribe en Azure SQL (reservas e historial empiezan vacíos si no migraste filas desde Sheets).",
       env: {
         hasDirectDatabaseUrl,
         hasAzureParts,
@@ -88,6 +96,9 @@ export async function GET() {
         resourceSpaces: resourceSpaceCount,
         pushSubscriptions: pushCount,
         notifications: notificationCount,
+        reservations: reservationCount,
+        reservationResources: reservationResourceCount,
+        eventHistory: eventHistoryCount,
       },
     });
   } catch (error) {

@@ -13,7 +13,6 @@ import {
 } from "@/lib/sheets/notifications";
 import { userHasAreaScope } from "@/lib/area-scope";
 import { getAllUserRecords } from "@/lib/sheets/users";
-import { appendSheetRow } from "@/lib/sheets/repository";
 import {
   formatDateISO,
   formatTimeHHmm,
@@ -26,14 +25,15 @@ import {
   getAllReservationResources,
   getReservationById,
   getReservationsNeedingApproval,
-  reservationToRow,
+  insertReservation,
+  insertReservationResource,
   replaceReservationResources,
   updateReservationRecord,
   reservationsOverlap,
 } from "@/lib/sheets/reservations";
 import { getAllResources } from "@/lib/sheets/resources";
 import { getAllAreas } from "@/lib/sheets/areas";
-import { SHEET_TABS } from "@/lib/sheets/tabs";
+import { isAppDataOnSql } from "@/lib/db/config";
 import type {
   CreateReservationInput,
   PendingUpdatePayload,
@@ -277,19 +277,14 @@ export async function createReservation(
       sendEventReminder: input.sendEventReminder !== false,
     };
 
-    await appendSheetRow(
-      SHEET_TABS.RESERVAS,
-      reservationToRow({ ...reservation, spaceIds: input.spaceIds }),
-    );
+    await insertReservation({ ...reservation, spaceIds: input.spaceIds });
 
-    let persisted = await getReservationById(id);
-    if (!persisted) {
-      await new Promise((resolve) => setTimeout(resolve, 400));
-      persisted = await getReservationById(id);
-    }
+    const persisted = await getReservationById(id);
     if (!persisted) {
       throw new Error(
-        "La reserva se escribió en la hoja pero no se pudo leer. Revisa que la pestaña Reservas tenga las columnas estimatedAttendees, attendeeJustificationCode, attendeeJustificationNote, actualAttendees y attendanceComment al final (después de approvalToken).",
+        isAppDataOnSql()
+          ? "No se pudo guardar la reserva en la base de datos."
+          : "La reserva se escribió en la hoja pero no se pudo leer. Revisa que la pestaña Reservas tenga las columnas estimatedAttendees, attendeeJustificationCode, attendeeJustificationNote, actualAttendees y attendanceComment al final (después de approvalToken).",
       );
     }
 
@@ -297,11 +292,11 @@ export async function createReservation(
 
     for (const resource of input.resources) {
       if (resource.quantity <= 0) continue;
-      await appendSheetRow(SHEET_TABS.RESERVA_RECURSOS, [
+      await insertReservationResource(
         id,
         resource.resourceId,
-        String(resource.quantity),
-      ]);
+        resource.quantity,
+      );
     }
 
     if (!input.createdByAdmin) {
