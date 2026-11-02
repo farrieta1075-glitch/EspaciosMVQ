@@ -28,6 +28,7 @@ import { defaultRecurrenceUntil } from "@/lib/recurrence-default-until";
 import {
   RECURRENCE_TYPE_LABELS,
   listRecurrenceDates,
+  ordinalLabelEs,
 } from "@/lib/recurrence";
 import { ATTENDEE_JUSTIFICATION_OPTIONS } from "@/lib/attendee-justification";
 import { reservationNeedsAttendeeJustification } from "@/lib/capacity-validation";
@@ -248,7 +249,13 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
   const [appliedPresetName, setAppliedPresetName] = React.useState<
     string | null
   >(null);
+  const [useEventNameCombobox, setUseEventNameCombobox] = React.useState(false);
+  const [manualEventNameOption, setManualEventNameOption] = React.useState<
+    string | null
+  >(null);
   const [showExceptionPicker, setShowExceptionPicker] = React.useState(false);
+
+  const MANUAL_EVENT_NAME_PREFIX = "__custom__:";
 
   const presetFormHandlers = React.useMemo(
     () => ({
@@ -340,6 +347,15 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
   const eventDetailsDone = confirmed.scheduleCollapsed;
 
   function canConfirmRecurrenceStep(): boolean {
+    if (recurrence.type === "MONTHLY_RELATIVE") {
+      if (
+        needsFourthVsLastPrompt(reservationDate) &&
+        !relativeDisambiguation
+      ) {
+        return false;
+      }
+      if (!recurrence.monthlyRelative) return false;
+    }
     return (
       recurrence.type === "NONE" ||
       (recurrence.type === "CUSTOM" &&
@@ -370,6 +386,15 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
   function applyAreaChange(id: string) {
     if (isAdmin) onAreaIdChange(id);
     else onReservationAreaIdChange(id);
+    const newPresets = presetsForAreaId(id);
+    if (
+      !appliedPresetName &&
+      eventName.trim().length >= 3 &&
+      newPresets.length > 0
+    ) {
+      setManualEventNameOption(eventName.trim());
+      setUseEventNameCombobox(true);
+    }
     setConfirmed((c) => ({ ...c, area: true }));
     setEditingSection(null);
     setPendingAreaId(null);
@@ -409,6 +434,8 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
   function confirmPresetMismatchAreaChange() {
     clearEventPresetFormFields(presetFormHandlers);
     setAppliedPresetName(null);
+    setUseEventNameCombobox(false);
+    setManualEventNameOption(null);
     setShowExceptionPicker(false);
     setConfirmed((c) => ({
       ...c,
@@ -422,11 +449,112 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
     setPresetMismatchDialogOpen(false);
   }
 
-  function handlePresetSelect(value: string) {
-    if (value === "__manual__") {
+  function handleEventNameComboboxChange(value: string) {
+    if (value.startsWith(MANUAL_EVENT_NAME_PREFIX)) {
+      const manualName = value.slice(MANUAL_EVENT_NAME_PREFIX.length);
       setAppliedPresetName(null);
+      onEventNameChange(manualName);
+      setManualEventNameOption(manualName);
       return;
     }
+    handlePresetSelect(value);
+  }
+
+  function eventNameComboboxValue(): string {
+    if (
+      appliedPresetName &&
+      presets.some((p) => p.name === appliedPresetName)
+    ) {
+      return appliedPresetName;
+    }
+    const trimmed = eventName.trim();
+    if (
+      manualEventNameOption &&
+      trimmed === manualEventNameOption &&
+      !presets.some((p) => p.name === manualEventNameOption)
+    ) {
+      return `${MANUAL_EVENT_NAME_PREFIX}${manualEventNameOption}`;
+    }
+    if (presets.some((p) => p.name === trimmed)) {
+      return trimmed;
+    }
+    if (trimmed.length >= 3) {
+      return `${MANUAL_EVENT_NAME_PREFIX}${trimmed}`;
+    }
+    return "";
+  }
+
+  function renderEventNameField(inputId: string) {
+    const showCombobox = useEventNameCombobox && presets.length > 0;
+    if (showCombobox) {
+      const manualLabel =
+        manualEventNameOption &&
+        !presets.some((p) => p.name === manualEventNameOption)
+          ? manualEventNameOption
+          : null;
+      return (
+        <Select
+          id={inputId}
+          value={eventNameComboboxValue()}
+          onChange={(e) => handleEventNameComboboxChange(e.target.value)}
+        >
+          <option value="" disabled>
+            Selecciona o conserva tu evento
+          </option>
+          {manualLabel ? (
+            <option value={`${MANUAL_EVENT_NAME_PREFIX}${manualLabel}`}>
+              {manualLabel}
+            </option>
+          ) : null}
+          {presets.map((p) => (
+            <option key={p.name} value={p.name}>
+              {p.name}
+            </option>
+          ))}
+        </Select>
+      );
+    }
+
+    return (
+      <>
+        <Input
+          id={inputId}
+          value={eventName}
+          onChange={(e) => {
+            setAppliedPresetName(null);
+            onEventNameChange(e.target.value);
+          }}
+          list="wiz-event-presets"
+        />
+        <datalist id="wiz-event-presets">
+          {presets.map((p) => (
+            <option key={p.name} value={p.name} />
+          ))}
+        </datalist>
+        {presets.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {presets.map((p) => (
+              <Button
+                key={p.name}
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs"
+                onClick={() => {
+                  handlePresetSelect(p.name);
+                  setEditingSection(null);
+                }}
+              >
+                {p.name}
+              </Button>
+            ))}
+          </div>
+        )}
+      </>
+    );
+  }
+
+  function handlePresetSelect(value: string) {
     const preset = presets.find((p) => p.name === value);
     if (!preset) return;
     applyAreaEventPresetToForm(preset, reservationDate, presetFormHandlers);
@@ -459,11 +587,11 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
   }
 
   React.useEffect(() => {
-    if (confirmed.date && recurrence.type === "MONTHLY_RELATIVE") {
+    if (recurrence.type === "MONTHLY_RELATIVE") {
       applyMonthlyRelativeFromDate(reservationDate);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [confirmed.date, reservationDate, recurrence.type, relativeDisambiguation]);
+  }, [reservationDate, recurrence.type, relativeDisambiguation]);
 
   const activeHighlightAreaId = activeAreaId;
 
@@ -493,15 +621,29 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
 
   function handleRecurrenceTypeChange(type: RecurrenceType) {
     setShowExceptionPicker(false);
+    if (type === "MONTHLY_RELATIVE") {
+      setRelativeDisambiguation(null);
+    }
+    const until =
+      type === "NONE" || type === "CUSTOM"
+        ? recurrence.until
+        : defaultRecurrenceUntil(reservationDate, type);
+
+    let monthlyRelative = recurrence.monthlyRelative;
+    if (type === "MONTHLY_RELATIVE") {
+      const inferred = inferMonthlyRelativeFromDate(reservationDate);
+      monthlyRelative = { weekday: inferred.weekday, ordinal: inferred.ordinal };
+    } else {
+      monthlyRelative = undefined;
+    }
+
     onRecurrenceChange({
       ...recurrence,
       type,
+      until,
       exceptDates: type === "NONE" ? [] : recurrence.exceptDates ?? [],
       customDates: type === "CUSTOM" ? recurrence.customDates ?? [] : [],
-      until:
-        type === "NONE" || type === "CUSTOM"
-          ? recurrence.until
-          : defaultRecurrenceUntil(reservationDate, type),
+      monthlyRelative,
     });
   }
 
@@ -526,6 +668,17 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
             )}
           </Select>
         </div>
+
+        {recurrence.type === "MONTHLY_RELATIVE" &&
+          recurrence.monthlyRelative && (
+            <p className="text-xs text-muted-foreground">
+              Se repite el{" "}
+              {ordinalLabelEs(recurrence.monthlyRelative.ordinal)}{" "}
+              {weekdayNameEs(recurrence.monthlyRelative.weekday)} de cada mes
+              (según la fecha elegida), hasta completar las ocurrencias
+              indicadas en «Repetir hasta».
+            </p>
+          )}
 
         {recurrence.type !== "NONE" && recurrence.type !== "CUSTOM" && (
           <>
@@ -776,29 +929,6 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
       {/* Datos del evento — acumulativo o panel colapsado */}
       {areaResolved && !eventDetailsDone && (
         <section className="space-y-3 rounded-lg border border-border p-3">
-          {presets.length > 0 && (
-            <div className="space-y-1">
-              <Label htmlFor="wiz-preset-source">Origen de datos del evento</Label>
-              <Select
-                id="wiz-preset-source"
-                value={
-                  appliedPresetName &&
-                  presets.some((p) => p.name === appliedPresetName)
-                    ? appliedPresetName
-                    : "__manual__"
-                }
-                onChange={(e) => handlePresetSelect(e.target.value)}
-              >
-                <option value="__manual__">Datos capturados manualmente</option>
-                {presets.map((p) => (
-                  <option key={p.name} value={p.name}>
-                    Precargado: {p.name}
-                  </option>
-                ))}
-              </Select>
-            </div>
-          )}
-
           {confirmed.eventName && editingSection !== "eventName" && (
             <SummaryLine
               label="Evento"
@@ -810,39 +940,7 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
           {(!confirmed.eventName || editingSection === "eventName") && (
             <div className="space-y-2">
               <Label htmlFor="wiz-eventName">Nombre del evento</Label>
-              <Input
-                id="wiz-eventName"
-                value={eventName}
-                onChange={(e) => {
-                  setAppliedPresetName(null);
-                  onEventNameChange(e.target.value);
-                }}
-                list="wiz-event-presets"
-              />
-              <datalist id="wiz-event-presets">
-                {presets.map((p) => (
-                  <option key={p.name} value={p.name} />
-                ))}
-              </datalist>
-              {presets.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {presets.map((p) => (
-                    <Button
-                      key={p.name}
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      className="h-7 text-xs"
-                      onClick={() => {
-                        handlePresetSelect(p.name);
-                        setEditingSection(null);
-                      }}
-                    >
-                      {p.name}
-                    </Button>
-                  ))}
-                </div>
-              )}
+              {renderEventNameField("wiz-eventName")}
               <ContinueButton
                 visible={eventName.trim().length >= 3}
                 onClick={() => {
@@ -942,30 +1040,6 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
 
       {areaResolved && eventDetailsDone && (
         <section className="space-y-1 rounded-lg border border-border p-3">
-          {presets.length > 0 && eventDetailsExpanded && (
-            <div className="space-y-1 pt-1">
-              <Label htmlFor="wiz-preset-source-collapsed">
-                Origen de datos del evento
-              </Label>
-              <Select
-                id="wiz-preset-source-collapsed"
-                value={
-                  appliedPresetName &&
-                  presets.some((p) => p.name === appliedPresetName)
-                    ? appliedPresetName
-                    : "__manual__"
-                }
-                onChange={(e) => handlePresetSelect(e.target.value)}
-              >
-                <option value="__manual__">Datos capturados manualmente</option>
-                {presets.map((p) => (
-                  <option key={p.name} value={p.name}>
-                    Precargado: {p.name}
-                  </option>
-                ))}
-              </Select>
-            </div>
-          )}
           <button
             type="button"
             className="flex w-full items-center justify-between rounded-md px-1 py-2 text-left text-sm font-medium hover:bg-muted/60"
@@ -982,11 +1056,7 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
             <div className="space-y-3 border-t border-border pt-3">
               <div className="space-y-2">
                 <Label htmlFor="wiz-eventName-exp">Nombre del evento</Label>
-                <Input
-                  id="wiz-eventName-exp"
-                  value={eventName}
-                  onChange={(e) => onEventNameChange(e.target.value)}
-                />
+                {renderEventNameField("wiz-eventName-exp")}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="wiz-eventDesc-exp">Descripción</Label>
@@ -1078,7 +1148,8 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
         </section>
       )}
 
-      {confirmed.date &&
+      {eventDetailsDone &&
+        !confirmed.date &&
         needsFourthVsLastPrompt(reservationDate) &&
         recurrence.type === "MONTHLY_RELATIVE" &&
         !relativeDisambiguation && (

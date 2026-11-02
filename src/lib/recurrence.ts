@@ -1,6 +1,7 @@
 import { formatDateISO } from "@/lib/date-utils";
 import {
   dateForMonthlyRelativeInMonth,
+  inferMonthlyRelativeFromDate,
   type MonthlyRelativeOrdinal,
 } from "@/lib/monthly-relative-recurrence";
 import type { RecurrenceConfig, RecurrenceType } from "@/types/reservation";
@@ -62,13 +63,15 @@ export function listRecurrenceDates(
     return dates;
   }
 
-  if (recurrenceType === "MONTHLY_RELATIVE" && config?.monthlyRelative) {
+  if (recurrenceType === "MONTHLY_RELATIVE") {
+    const monthlyRelative =
+      config?.monthlyRelative ?? inferMonthlyRelativeFromDate(date);
     const cursor = new Date(`${date}T12:00:00`);
     while (cursor <= untilDate && dates.length < MAX_OCCURRENCES) {
       const iso = dateForMonthlyRelativeInMonth(
         cursor.getFullYear(),
         cursor.getMonth(),
-        config.monthlyRelative,
+        monthlyRelative,
       );
       if (iso) {
         const isoDate = new Date(`${iso}T12:00:00`);
