@@ -18,6 +18,8 @@ import {
   type ReservationWizardConfirmed,
 } from "@/lib/reservation-draft-storage";
 import { formatDateISO } from "@/lib/date-utils";
+import { inferMonthlyRelativeFromDate } from "@/lib/monthly-relative-recurrence";
+import { defaultRecurrenceUntil } from "@/lib/recurrence-default-until";
 import {
   readJsonResponse,
   shouldRetryMutationRequest,
@@ -112,6 +114,8 @@ export function ReservationFlow({
   >(undefined);
   const [restoredWizardConfirmed, setRestoredWizardConfirmed] =
     React.useState<ReservationWizardConfirmed | null>(null);
+  const [calendarDateChangeConfirm, setCalendarDateChangeConfirm] =
+    React.useState<{ anchorDate: string; newDate: string } | null>(null);
 
   React.useEffect(() => {
     const scopeQuery = userAreaScopeIds.join(",");
@@ -157,10 +161,23 @@ export function ReservationFlow({
       setRestoredWizardConfirmed(draft.wizardConfirmed);
     }
 
+    const anchorDate =
+      draft.calendarAnchorDate ??
+      draft.selection?.date ??
+      picked ??
+      formatDateISO(new Date());
+
+    if (picked) {
+      setCalendarDateChangeConfirm({ anchorDate, newDate: picked });
+    }
+
     if (draft.selection) {
-      setSelection(draft.selection);
+      setSelection({
+        ...draft.selection,
+        date: picked ? anchorDate : draft.selection.date,
+      });
       setRestoredSelection({
-        date: picked ?? draft.selection.date,
+        date: picked ? anchorDate : draft.selection.date,
         startTime: draft.selection.startTime,
         endTime: draft.selection.endTime,
         mapId: draft.selection.mapId,
@@ -173,7 +190,7 @@ export function ReservationFlow({
         ),
       });
     } else if (picked) {
-      setRestoredSelection({ date: picked });
+      setRestoredSelection({ date: anchorDate });
     }
 
     clearReservationDraft();
@@ -337,6 +354,11 @@ export function ReservationFlow({
       reservationAreaId,
       selection,
       wizardConfirmed: ctx.wizardConfirmed,
+      calendarAnchorDate:
+        selection?.date ??
+        restoredSelection?.date ??
+        initialDate ??
+        formatDateISO(new Date()),
     });
     const date =
       selection?.date ??
@@ -344,6 +366,57 @@ export function ReservationFlow({
       initialDate ??
       formatDateISO(new Date());
     router.push(buildCalendarPickUrl("/reserva", date));
+  }
+
+  function handleCalendarDateChangeConfirm(options: {
+    newDate: string;
+    keepRecurrence: boolean;
+    keepExceptions: boolean;
+  }) {
+    const { newDate, keepRecurrence, keepExceptions } = options;
+    setCalendarDateChangeConfirm(null);
+
+    setRecurrence((current) => {
+      if (!keepRecurrence) {
+        return {
+          type: "NONE",
+          until: "",
+          exceptDates: [],
+          customDates: [],
+        };
+      }
+      let next = { ...current };
+      if (!keepExceptions) {
+        next = { ...next, exceptDates: [] };
+      }
+      if (next.type === "MONTHLY_RELATIVE") {
+        const inferred = inferMonthlyRelativeFromDate(newDate);
+        next = {
+          ...next,
+          monthlyRelative: {
+            weekday: inferred.weekday,
+            ordinal: inferred.ordinal,
+          },
+          until:
+            next.until?.trim() && next.until >= newDate
+              ? next.until
+              : defaultRecurrenceUntil(newDate, "MONTHLY_RELATIVE"),
+        };
+      }
+      return next;
+    });
+
+    setSelection((current) =>
+      current ? { ...current, date: newDate } : current,
+    );
+    setRestoredSelection((current) =>
+      current ? { ...current, date: newDate } : { date: newDate },
+    );
+    setMapSelectorKey((value) => value + 1);
+  }
+
+  function handleCalendarDateChangeCancel() {
+    setCalendarDateChangeConfirm(null);
   }
 
   return (
@@ -400,6 +473,9 @@ export function ReservationFlow({
         onEventDetailsConfirmed={(name) =>
           setPageTitle(`Nueva Reserva (${name.trim()})`)
         }
+        calendarDateChangeConfirm={calendarDateChangeConfirm}
+        onCalendarDateChangeConfirm={handleCalendarDateChangeConfirm}
+        onCalendarDateChangeCancel={handleCalendarDateChangeCancel}
       />
 
       {similarPrompt && (

@@ -31,6 +31,8 @@ export interface ReservationDraft {
   reservationAreaId?: string;
   selection: MapDateSelection | null;
   wizardConfirmed?: ReservationWizardConfirmed;
+  /** Fecha mostrada al abrir el calendario (para confirmar al volver). */
+  calendarAnchorDate?: string;
 }
 
 export function saveReservationDraft(draft: ReservationDraft): void {

@@ -134,6 +134,13 @@ interface ReservationCreateWizardProps {
   eventPresetGroups: EventPresetGroup[];
   presetsByAreaId: Record<string, AreaEventPreset[]>;
   onEventDetailsConfirmed?: (eventName: string) => void;
+  calendarDateChangeConfirm?: { anchorDate: string; newDate: string } | null;
+  onCalendarDateChangeConfirm?: (options: {
+    newDate: string;
+    keepRecurrence: boolean;
+    keepExceptions: boolean;
+  }) => void;
+  onCalendarDateChangeCancel?: () => void;
   presetSourceAreaId: string;
   onPresetSourceAreaIdChange: (id: string) => void;
   onSelectionChange: (selection: MapDateSelection) => void;
@@ -210,6 +217,9 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
     reservationAreaId,
     onReservationAreaIdChange,
     onEventDetailsConfirmed,
+    calendarDateChangeConfirm,
+    onCalendarDateChangeConfirm,
+    onCalendarDateChangeCancel,
   } = props;
 
   const selectableIds = isAdmin
@@ -254,8 +264,16 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
     string | null
   >(null);
   const [showExceptionPicker, setShowExceptionPicker] = React.useState(false);
+  const [confirmKeepRecurrence, setConfirmKeepRecurrence] = React.useState(true);
+  const [confirmKeepExceptions, setConfirmKeepExceptions] = React.useState(true);
 
   const MANUAL_EVENT_NAME_PREFIX = "__custom__:";
+
+  React.useEffect(() => {
+    if (!calendarDateChangeConfirm) return;
+    setConfirmKeepRecurrence(recurrence.type !== "NONE");
+    setConfirmKeepExceptions((recurrence.exceptDates?.length ?? 0) > 0);
+  }, [calendarDateChangeConfirm, recurrence.type, recurrence.exceptDates]);
 
   const presetFormHandlers = React.useMemo(
     () => ({
@@ -872,6 +890,114 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
       </Dialog>
 
       <Dialog
+        open={Boolean(calendarDateChangeConfirm)}
+        onOpenChange={(open) => {
+          if (!open) onCalendarDateChangeCancel?.();
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmar cambio de fecha</DialogTitle>
+            <DialogDescription>
+              Revisa la nueva fecha y confirma si mantienes la recurrencia y las
+              excepciones configuradas.
+            </DialogDescription>
+          </DialogHeader>
+          {calendarDateChangeConfirm ? (
+            <div className="space-y-3 text-sm">
+              <p>
+                <span className="text-muted-foreground">Nueva fecha: </span>
+                <span className="font-medium">
+                  {formatDateDisplay(
+                    new Date(
+                      `${calendarDateChangeConfirm.newDate}T12:00:00`,
+                    ),
+                  )}
+                </span>
+              </p>
+              {calendarDateChangeConfirm.anchorDate !==
+                calendarDateChangeConfirm.newDate && (
+                <p className="text-xs text-muted-foreground">
+                  Anterior:{" "}
+                  {formatDateDisplay(
+                    new Date(
+                      `${calendarDateChangeConfirm.anchorDate}T12:00:00`,
+                    ),
+                  )}
+                </p>
+              )}
+              {recurrence.type === "NONE" ? (
+                <p className="rounded-md bg-muted/50 px-2 py-1.5 text-muted-foreground">
+                  Recurrencia: sin recurrencia. Confirma que esta fecha es la
+                  correcta.
+                </p>
+              ) : (
+                <label className="flex items-start gap-2">
+                  <input
+                    type="checkbox"
+                    checked={confirmKeepRecurrence}
+                    onChange={(e) => {
+                      setConfirmKeepRecurrence(e.target.checked);
+                      if (!e.target.checked) setConfirmKeepExceptions(false);
+                    }}
+                    className="mt-0.5 rounded border-border"
+                  />
+                  <span>
+                    Mantener recurrencia:{" "}
+                    <strong>{RECURRENCE_TYPE_LABELS[recurrence.type]}</strong>
+                    {recurrence.until
+                      ? ` (hasta ${formatDateDisplay(new Date(`${recurrence.until}T12:00:00`))})`
+                      : ""}
+                  </span>
+                </label>
+              )}
+              {(recurrence.exceptDates?.length ?? 0) > 0 && (
+                <label className="flex items-start gap-2">
+                  <input
+                    type="checkbox"
+                    checked={confirmKeepExceptions && confirmKeepRecurrence}
+                    disabled={!confirmKeepRecurrence}
+                    onChange={(e) =>
+                      setConfirmKeepExceptions(e.target.checked)
+                    }
+                    className="mt-0.5 rounded border-border"
+                  />
+                  <span>
+                    Mantener {recurrence.exceptDates?.length ?? 0}{" "}
+                    excepción(es) de días sin reserva
+                  </span>
+                </label>
+              )}
+            </div>
+          ) : null}
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onCalendarDateChangeCancel?.()}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                if (!calendarDateChangeConfirm) return;
+                onCalendarDateChangeConfirm?.({
+                  newDate: calendarDateChangeConfirm.newDate,
+                  keepRecurrence:
+                    recurrence.type === "NONE" ? false : confirmKeepRecurrence,
+                  keepExceptions:
+                    confirmKeepRecurrence && confirmKeepExceptions,
+                });
+              }}
+            >
+              Confirmar fecha
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
         open={presetMismatchDialogOpen}
         onOpenChange={setPresetMismatchDialogOpen}
       >
@@ -1039,30 +1165,34 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
       )}
 
       {areaResolved && eventDetailsDone && (
-        <section className="space-y-1 rounded-lg border border-border p-3">
+        <section className="rounded-lg border border-border px-2 py-0.5">
           <button
             type="button"
-            className="flex w-full items-center justify-between rounded-md px-1 py-2 text-left text-sm font-medium hover:bg-muted/60"
+            className="flex w-full items-center justify-between rounded-md py-1 text-left text-sm font-medium hover:bg-muted/60"
             onClick={() => setEventDetailsExpanded((v) => !v)}
           >
             Datos del evento
             {eventDetailsExpanded ? (
-              <ChevronUp className="h-4 w-4" />
+              <ChevronUp className="h-3.5 w-3.5 shrink-0" />
             ) : (
-              <ChevronDown className="h-4 w-4" />
+              <ChevronDown className="h-3.5 w-3.5 shrink-0" />
             )}
           </button>
           {eventDetailsExpanded && (
-            <div className="space-y-3 border-t border-border pt-3">
-              <div className="space-y-2">
-                <Label htmlFor="wiz-eventName-exp">Nombre del evento</Label>
+            <div className="space-y-2 border-t border-border pb-1 pt-2">
+              <div className="space-y-1">
+                <Label htmlFor="wiz-eventName-exp" className="text-xs">
+                  Nombre del evento
+                </Label>
                 {renderEventNameField("wiz-eventName-exp")}
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="wiz-eventDesc-exp">Descripción</Label>
+              <div className="space-y-1">
+                <Label htmlFor="wiz-eventDesc-exp" className="text-xs">
+                  Descripción
+                </Label>
                 <textarea
                   id="wiz-eventDesc-exp"
-                  className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  className="flex min-h-[56px] w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm"
                   value={eventDescription}
                   onChange={(e) => {
                   setAppliedPresetName(null);
@@ -1070,12 +1200,15 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
                 }}
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="wiz-attendees-exp">Asistentes estimados</Label>
+              <div className="space-y-1">
+                <Label htmlFor="wiz-attendees-exp" className="text-xs">
+                  Asistentes estimados
+                </Label>
                 <Input
                   id="wiz-attendees-exp"
                   type="number"
                   min={1}
+                  className="h-9"
                   value={estimatedAttendees}
                   onChange={(e) => {
                     setAppliedPresetName(null);
