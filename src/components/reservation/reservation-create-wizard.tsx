@@ -238,7 +238,7 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
     }),
   );
   const [editingSection, setEditingSection] = React.useState<
-    null | "area" | "eventName" | "eventDescription" | "attendees" | "recurrence"
+    null | "area" | "eventName" | "eventDescription" | "attendees"
   >(null);
   const [eventDetailsExpanded, setEventDetailsExpanded] = React.useState(false);
   const [pendingAreaId, setPendingAreaId] = React.useState<string | null>(null);
@@ -337,7 +337,16 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
     );
 
   const areaResolved = confirmed.area && Boolean(activeAreaId);
-  const eventDetailsDone = confirmed.recurrence && confirmed.scheduleCollapsed;
+  const eventDetailsDone = confirmed.scheduleCollapsed;
+
+  function canConfirmRecurrenceStep(): boolean {
+    return (
+      recurrence.type === "NONE" ||
+      (recurrence.type === "CUSTOM" &&
+        (recurrence.customDates?.length ?? 0) > 0) ||
+      (recurrence.type !== "CUSTOM" && Boolean(recurrence.until))
+    );
+  }
 
   React.useEffect(() => {
     if (eventDetailsDone && eventName.trim()) {
@@ -426,15 +435,11 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
     const attendeesOk = Boolean(
       preset.estimatedAttendees && preset.estimatedAttendees > 0,
     );
-    const recurrenceOk = Boolean(
-      preset.recurrence?.type && preset.recurrence.type !== "NONE",
-    );
     setConfirmed((c) => ({
       ...c,
       eventName: preset.name.trim().length >= 3,
       eventDescription: descOk,
       attendees: descOk && attendeesOk,
-      recurrence: descOk && attendeesOk && recurrenceOk,
       scheduleCollapsed: false,
     }));
   }
@@ -500,15 +505,13 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
     });
   }
 
-  function renderRecurrenceBlock(inExpandedPanel: boolean) {
+  function renderRecurrenceBlock() {
     return (
       <div className="space-y-3">
         <div className="space-y-1">
-          <Label htmlFor={inExpandedPanel ? "wiz-recurrence-exp" : "wiz-recurrence"}>
-            Recurrencia
-          </Label>
+          <Label htmlFor="wiz-recurrence">Recurrencia</Label>
           <Select
-            id={inExpandedPanel ? "wiz-recurrence-exp" : "wiz-recurrence"}
+            id="wiz-recurrence"
             value={recurrence.type}
             onChange={(e) =>
               handleRecurrenceTypeChange(e.target.value as RecurrenceType)
@@ -603,17 +606,6 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
                 )}
               </div>
             )}
-            <label className="flex items-start gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={sendEventReminder}
-                onChange={(e) => onSendEventReminderChange(e.target.checked)}
-                className="mt-0.5 rounded border-border"
-              />
-              <span>
-                Enviar recordatorio de reserva (notificación in-app 1 día antes)
-              </span>
-            </label>
           </>
         )}
 
@@ -667,30 +659,25 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
                 </li>
               ))}
             </ul>
-            <label className="flex items-start gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={sendEventReminder}
-                onChange={(e) => onSendEventReminderChange(e.target.checked)}
-                className="mt-0.5 rounded border-border"
-              />
-              <span>Enviar recordatorio de reserva (1 día antes)</span>
-            </label>
           </div>
         )}
-
-        {recurrence.type === "NONE" && (
-          <label className="flex items-start gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={sendEventReminder}
-              onChange={(e) => onSendEventReminderChange(e.target.checked)}
-              className="mt-0.5 rounded border-border"
-            />
-            <span>Enviar recordatorio de reserva (1 día antes)</span>
-          </label>
-        )}
       </div>
+    );
+  }
+
+  function renderEventReminderField() {
+    return (
+      <label className="flex items-start gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={sendEventReminder}
+          onChange={(e) => onSendEventReminderChange(e.target.checked)}
+          className="mt-0.5 rounded border-border"
+        />
+        <span>
+          Enviar recordatorio de reserva (notificación in-app 1 día antes)
+        </span>
+      </label>
     );
   }
 
@@ -938,50 +925,23 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
               </div>
             )}
 
-          {confirmed.attendees &&
-            confirmed.recurrence &&
-            editingSection !== "recurrence" && (
-              <SummaryLine
-                label="Recurrencia"
-                value={RECURRENCE_TYPE_LABELS[recurrence.type]}
-                onClick={() => setEditingSection("recurrence")}
+          {confirmed.attendees && !confirmed.scheduleCollapsed && (
+            <div className="space-y-2">
+              {renderEventReminderField()}
+              <ContinueButton
+                visible
+                onClick={() => {
+                  setConfirmed((c) => ({ ...c, scheduleCollapsed: true }));
+                  setEditingSection(null);
+                }}
               />
-            )}
-
-          {confirmed.attendees &&
-            (!confirmed.recurrence || editingSection === "recurrence") && (
-              <div className="space-y-2">
-                {renderRecurrenceBlock(false)}
-                <ContinueButton
-                  visible={
-                    recurrence.type === "NONE" ||
-                    (recurrence.type === "CUSTOM" &&
-                      (recurrence.customDates?.length ?? 0) > 0) ||
-                    (recurrence.type !== "CUSTOM" && Boolean(recurrence.until))
-                  }
-                  onClick={() => {
-                    setConfirmed((c) => ({
-                      ...c,
-                      recurrence: true,
-                      scheduleCollapsed: true,
-                    }));
-                    setEditingSection(null);
-                  }}
-                />
-              </div>
-            )}
+            </div>
+          )}
         </section>
       )}
 
       {areaResolved && eventDetailsDone && (
         <section className="space-y-1 rounded-lg border border-border p-3">
-          <SummaryLine
-            label="Área"
-            value={areaLabel}
-            onClick={
-              showAreaPicker ? () => setEditingSection("area") : undefined
-            }
-          />
           {presets.length > 0 && eventDetailsExpanded && (
             <div className="space-y-1 pt-1">
               <Label htmlFor="wiz-preset-source-collapsed">
@@ -1053,32 +1013,34 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
                   }}
                 />
               </div>
-              {renderRecurrenceBlock(true)}
+              {renderEventReminderField()}
             </div>
           )}
         </section>
       )}
 
       {eventDetailsDone && !confirmed.date && (
-        <section className="space-y-2">
-          <Label>Fecha</Label>
-          <button
-            type="button"
-            className="w-full rounded-md border border-dashed border-border px-3 py-2 text-left hover:bg-muted/50"
-            onClick={() =>
-              onReservationDatePick({ wizardConfirmed: confirmed })
-            }
-          >
-            <p className="text-base font-semibold text-primary underline-offset-2">
-              {formatDateDisplay(new Date(`${reservationDate}T12:00:00`))}
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Toca la fecha para abrir el calendario y elegir otro día.
-            </p>
-          </button>
-          <Button
-            type="button"
-            size="sm"
+        <section className="space-y-3">
+          <div className="space-y-2">
+            <Label>Fecha</Label>
+            <button
+              type="button"
+              className="w-full rounded-md border border-dashed border-border px-3 py-2 text-left hover:bg-muted/50"
+              onClick={() =>
+                onReservationDatePick({ wizardConfirmed: confirmed })
+              }
+            >
+              <p className="text-base font-semibold text-primary underline-offset-2">
+                {formatDateDisplay(new Date(`${reservationDate}T12:00:00`))}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Toca la fecha para abrir el calendario y elegir otro día.
+              </p>
+            </button>
+          </div>
+          {renderRecurrenceBlock()}
+          <ContinueButton
+            visible={canConfirmRecurrenceStep()}
             onClick={() => {
               onSelectionChange({
                 date: reservationDate,
@@ -1092,11 +1054,9 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
                 selectedSpaceIds: selection?.selectedSpaceIds ?? [],
                 selectedResources: selection?.selectedResources ?? [],
               });
-              setConfirmed((c) => ({ ...c, date: true }));
+              setConfirmed((c) => ({ ...c, date: true, recurrence: true }));
             }}
-          >
-            Continuar »
-          </Button>
+          />
         </section>
       )}
 
