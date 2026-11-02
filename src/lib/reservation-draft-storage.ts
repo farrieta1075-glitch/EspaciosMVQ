@@ -3,6 +3,17 @@ import type { MapDateSelection, RecurrenceType } from "@/types/reservation";
 const DRAFT_KEY = "mvqro_reservation_draft";
 const PICK_DATE_KEY = "mvqro_reservation_pick_date";
 
+export type ReservationWizardConfirmed = {
+  area: boolean;
+  eventName: boolean;
+  eventDescription: boolean;
+  attendees: boolean;
+  recurrence: boolean;
+  scheduleCollapsed: boolean;
+  date: boolean;
+  time: boolean;
+};
+
 export interface ReservationDraft {
   kind: "create" | "edit";
   editReservationId?: string;
@@ -14,9 +25,12 @@ export interface ReservationDraft {
   recurrenceType: RecurrenceType;
   recurrenceUntil: string;
   recurrenceExceptDates: string[];
+  recurrenceCustomDates?: string[];
   sendEventReminder: boolean;
   areaId: string;
+  reservationAreaId?: string;
   selection: MapDateSelection | null;
+  wizardConfirmed?: ReservationWizardConfirmed;
 }
 
 export function saveReservationDraft(draft: ReservationDraft): void {

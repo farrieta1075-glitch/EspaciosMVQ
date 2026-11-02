@@ -15,6 +15,7 @@ import {
   consumePickedReservationDate,
   loadReservationDraft,
   saveReservationDraft,
+  type ReservationWizardConfirmed,
 } from "@/lib/reservation-draft-storage";
 import { formatDateISO } from "@/lib/date-utils";
 import {
@@ -108,6 +109,8 @@ export function ReservationFlow({
   const [restoredSelection, setRestoredSelection] = React.useState<
     InitialMapSelection | undefined
   >(undefined);
+  const [restoredWizardConfirmed, setRestoredWizardConfirmed] =
+    React.useState<ReservationWizardConfirmed | null>(null);
 
   React.useEffect(() => {
     const scopeQuery = userAreaScopeIds.join(",");
@@ -142,10 +145,16 @@ export function ReservationFlow({
       type: draft.recurrenceType,
       until: draft.recurrenceUntil,
       exceptDates: draft.recurrenceExceptDates ?? [],
-      customDates: [],
+      customDates: draft.recurrenceCustomDates ?? [],
     });
     setSendEventReminder(draft.sendEventReminder ?? true);
     setAreaId(draft.areaId);
+    if (draft.reservationAreaId) {
+      setReservationAreaId(draft.reservationAreaId);
+    }
+    if (draft.wizardConfirmed) {
+      setRestoredWizardConfirmed(draft.wizardConfirmed);
+    }
 
     if (draft.selection) {
       setSelection(draft.selection);
@@ -308,7 +317,9 @@ export function ReservationFlow({
   const resourceCount =
     selection?.selectedResources.filter((item) => item.quantity > 0).length ?? 0;
 
-  function handleReservationDatePick() {
+  function handleReservationDatePick(ctx: {
+    wizardConfirmed: ReservationWizardConfirmed;
+  }) {
     saveReservationDraft({
       kind: "create",
       eventName,
@@ -319,9 +330,12 @@ export function ReservationFlow({
       recurrenceType: recurrence.type,
       recurrenceUntil: recurrence.until,
       recurrenceExceptDates: recurrence.exceptDates ?? [],
+      recurrenceCustomDates: recurrence.customDates ?? [],
       sendEventReminder,
       areaId,
+      reservationAreaId,
       selection,
+      wizardConfirmed: ctx.wizardConfirmed,
     });
     const date =
       selection?.date ??
@@ -345,6 +359,7 @@ export function ReservationFlow({
         initialSpaceId={initialSpaceId}
         mapSelectorKey={mapSelectorKey}
         restoredSelection={restoredSelection}
+        initialWizardConfirmed={restoredWizardConfirmed}
         eventPresetGroups={eventPresetGroups}
         presetsByAreaId={presetsByAreaId}
         presetSourceAreaId={presetSourceAreaId}

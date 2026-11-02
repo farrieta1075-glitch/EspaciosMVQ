@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Loader2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Loader2 } from "lucide-react";
 import type { Area } from "@/types/area";
 import type { FloorMap, Space } from "@/types/space";
 import type {
@@ -24,6 +24,7 @@ import {
   needsFourthVsLastPrompt,
   weekdayNameEs,
 } from "@/lib/monthly-relative-recurrence";
+import { defaultRecurrenceUntil } from "@/lib/recurrence-default-until";
 import {
   RECURRENCE_TYPE_LABELS,
   listRecurrenceDates,
@@ -32,11 +33,32 @@ import { ATTENDEE_JUSTIFICATION_OPTIONS } from "@/lib/attendee-justification";
 import { reservationNeedsAttendeeJustification } from "@/lib/capacity-validation";
 import { formatDateDisplay, formatDateISO } from "@/lib/date-utils";
 import { addMinutesToTimeHHmm } from "@/lib/date-utils";
+import type { ReservationWizardConfirmed } from "@/lib/reservation-draft-storage";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import type { EventPresetGroup } from "@/components/reservation/event-form";
+import { cn } from "@/lib/utils";
+
+const DEFAULT_CONFIRMED: ReservationWizardConfirmed = {
+  area: false,
+  eventName: false,
+  eventDescription: false,
+  attendees: false,
+  recurrence: false,
+  scheduleCollapsed: false,
+  date: false,
+  time: false,
+};
 
 function ContinueButton({
   visible,
@@ -55,6 +77,49 @@ function ContinueButton({
   );
 }
 
+function SummaryLine({
+  label,
+  value,
+  onClick,
+  className,
+}: {
+  label: string;
+  value: string;
+  onClick?: () => void;
+  className?: string;
+}) {
+  const body = (
+    <>
+      <span className="text-muted-foreground">{label}: </span>
+      <span className="font-medium text-foreground">{value}</span>
+    </>
+  );
+  if (!onClick) {
+    return <p className={cn("text-sm", className)}>{body}</p>;
+  }
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "w-full rounded-md px-1 py-0.5 text-left text-sm hover:bg-muted/60",
+        className,
+      )}
+    >
+      {body}
+    </button>
+  );
+}
+
+function eventNameUsesPreset(
+  name: string,
+  presetsByAreaId: Record<string, string[]>,
+): boolean {
+  const trimmed = name.trim();
+  if (!trimmed) return false;
+  return Object.values(presetsByAreaId).some((list) => list.includes(trimmed));
+}
+
 interface ReservationCreateWizardProps {
   maps: FloorMap[];
   spaces: Space[];
@@ -67,12 +132,15 @@ interface ReservationCreateWizardProps {
   initialSpaceId?: string;
   mapSelectorKey: number;
   restoredSelection?: InitialMapSelection;
+  initialWizardConfirmed?: ReservationWizardConfirmed | null;
   eventPresetGroups: EventPresetGroup[];
   presetsByAreaId: Record<string, string[]>;
   presetSourceAreaId: string;
   onPresetSourceAreaIdChange: (id: string) => void;
   onSelectionChange: (selection: MapDateSelection) => void;
-  onReservationDatePick: () => void;
+  onReservationDatePick: (ctx: {
+    wizardConfirmed: ReservationWizardConfirmed;
+  }) => void;
   resourcesOpen: boolean;
   onResourcesOpenChange: (open: boolean) => void;
   resourceCount: number;
@@ -80,7 +148,6 @@ interface ReservationCreateWizardProps {
   onSubmit: () => void;
   canSubmit: boolean;
   loading: boolean;
-  // controlled event fields from parent for draft/submit
   eventName: string;
   onEventNameChange: (v: string) => void;
   eventDescription: string;
@@ -114,6 +181,7 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
     initialSpaceId,
     mapSelectorKey,
     restoredSelection,
+    initialWizardConfirmed,
     presetsByAreaId,
     onSelectionChange,
     onReservationDatePick,
@@ -162,22 +230,26 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
     ? areaId
     : reservationAreaId || flatSelectable[0] || userAreaId || "";
 
-  const [confirmed, setConfirmed] = React.useState({
-    area: !showAreaPicker,
-    eventName: false,
-    eventDescription: false,
-    attendees: false,
-    recurrence: false,
-    reminder: false,
-    scheduleCollapsed: false,
-    date: false,
-    time: false,
-  });
-
-  const [customDateDraft, setCustomDateDraft] = React.useState("");
-  const [relativeDisambiguation, setRelativeDisambiguation] = React.useState<
-    "FOURTH" | "LAST" | null
+  const restoreApplied = React.useRef(false);
+  const [confirmed, setConfirmed] = React.useState<ReservationWizardConfirmed>(
+    () => ({
+      ...DEFAULT_CONFIRMED,
+      area: !showAreaPicker,
+      ...(initialWizardConfirmed ?? {}),
+    }),
+  );
+  const [editingSection, setEditingSection] = React.useState<
+    null | "area" | "eventName" | "eventDescription" | "attendees" | "recurrence"
   >(null);
+  const [eventDetailsExpanded, setEventDetailsExpanded] = React.useState(false);
+  const [pendingAreaId, setPendingAreaId] = React.useState<string | null>(null);
+  const [areaChangeDialogOpen, setAreaChangeDialogOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    if (restoreApplied.current || !initialWizardConfirmed) return;
+    restoreApplied.current = true;
+    setConfirmed((c) => ({ ...c, ...initialWizardConfirmed }));
+  }, [initialWizardConfirmed]);
 
   React.useEffect(() => {
     if (!showAreaPicker && flatSelectable[0]) {
@@ -202,6 +274,11 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
     initialDate ??
     formatDateISO(new Date());
 
+  const [customDateDraft, setCustomDateDraft] = React.useState("");
+  const [relativeDisambiguation, setRelativeDisambiguation] = React.useState<
+    "FOURTH" | "LAST" | null
+  >(null);
+
   const [draftStart, setDraftStart] = React.useState(
     selection?.startTime ?? restoredSelection?.startTime ?? "08:00",
   );
@@ -225,11 +302,41 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
     );
 
   const areaResolved = confirmed.area && Boolean(activeAreaId);
-  const eventDetailsDone = confirmed.reminder;
+  const eventDetailsDone = confirmed.recurrence && confirmed.scheduleCollapsed;
 
-  function confirmArea() {
-    if (!activeAreaId) return;
+  const activeAreaRecord =
+    areas.find((a) => a.id === activeAreaId) ??
+    ({
+      id: activeAreaId,
+      name: activeAreaId,
+      code: "",
+      parentId: null,
+      colorHex: "",
+      eventPresets: [],
+    } satisfies Area);
+
+  const areaLabel = getAreaLabel(activeAreaRecord, areas);
+
+  function applyAreaChange(id: string) {
+    if (isAdmin) onAreaIdChange(id);
+    else onReservationAreaIdChange(id);
     setConfirmed((c) => ({ ...c, area: true }));
+    setEditingSection(null);
+    setPendingAreaId(null);
+    setAreaChangeDialogOpen(false);
+  }
+
+  function requestAreaChange(id: string) {
+    if (!id) return;
+    if (
+      id !== activeAreaId &&
+      eventNameUsesPreset(eventName, presetsByAreaId)
+    ) {
+      setPendingAreaId(id);
+      setAreaChangeDialogOpen(true);
+      return;
+    }
+    applyAreaChange(id);
   }
 
   function applyMonthlyRelativeFromDate(dateIso: string) {
@@ -267,10 +374,246 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
         ? recurrence.customDates ?? []
         : [];
 
+  const plannedDatesForExceptions =
+    recurrence.type !== "NONE" && recurrence.type !== "CUSTOM"
+      ? listRecurrenceDates(
+          reservationDate,
+          recurrence.type,
+          recurrence.until,
+          recurrence,
+        )
+      : [];
+
+  const exceptSet = new Set(recurrence.exceptDates ?? []);
+
+  function handleRecurrenceTypeChange(type: RecurrenceType) {
+    onRecurrenceChange({
+      ...recurrence,
+      type,
+      customDates: type === "CUSTOM" ? recurrence.customDates ?? [] : [],
+      until:
+        type === "NONE" || type === "CUSTOM"
+          ? recurrence.until
+          : defaultRecurrenceUntil(reservationDate, type),
+    });
+  }
+
+  function renderRecurrenceBlock(inExpandedPanel: boolean) {
+    return (
+      <div className="space-y-3">
+        <div className="space-y-1">
+          <Label htmlFor={inExpandedPanel ? "wiz-recurrence-exp" : "wiz-recurrence"}>
+            Recurrencia
+          </Label>
+          <Select
+            id={inExpandedPanel ? "wiz-recurrence-exp" : "wiz-recurrence"}
+            value={recurrence.type}
+            onChange={(e) =>
+              handleRecurrenceTypeChange(e.target.value as RecurrenceType)
+            }
+          >
+            {(Object.keys(RECURRENCE_TYPE_LABELS) as RecurrenceType[]).map(
+              (key) => (
+                <option key={key} value={key}>
+                  {RECURRENCE_TYPE_LABELS[key]}
+                </option>
+              ),
+            )}
+          </Select>
+        </div>
+
+        {recurrence.type !== "NONE" && recurrence.type !== "CUSTOM" && (
+          <>
+            <div className="space-y-1">
+              <Label htmlFor="wiz-until">Repetir hasta</Label>
+              <Input
+                id="wiz-until"
+                type="date"
+                value={recurrence.until}
+                onChange={(e) =>
+                  onRecurrenceChange({
+                    ...recurrence,
+                    until: e.target.value,
+                  })
+                }
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Por defecto equivale a 10 eventos (10 días, 10 semanas, 20
+                semanas en quincenal, etc.). Puedes ajustar la fecha.
+              </p>
+            </div>
+            {plannedDatesForExceptions.length > 0 && (
+              <div className="space-y-2 rounded-lg border border-border p-3">
+                <p className="text-xs text-muted-foreground">
+                  Marca los días que no deben generarse (excepciones).
+                </p>
+                <ul className="max-h-44 space-y-1 overflow-y-auto rounded-md border border-border p-2">
+                  {plannedDatesForExceptions.map((isoDate) => {
+                    const isException = exceptSet.has(isoDate);
+                    const [y, m, d] = isoDate.split("-").map(Number);
+                    const label = formatDateDisplay(new Date(y, m - 1, d));
+                    return (
+                      <li key={isoDate}>
+                        <label className="flex cursor-pointer items-center gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            checked={isException}
+                            onChange={(event) => {
+                              const next = new Set(recurrence.exceptDates ?? []);
+                              if (event.target.checked) next.add(isoDate);
+                              else next.delete(isoDate);
+                              onRecurrenceChange({
+                                ...recurrence,
+                                exceptDates: [...next],
+                              });
+                            }}
+                            className="rounded border-border"
+                          />
+                          <span
+                            className={cn(
+                              isException && "text-muted-foreground line-through",
+                            )}
+                          >
+                            {label}
+                            {isException ? " (excepción)" : ""}
+                          </span>
+                        </label>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={sendEventReminder}
+                onChange={(e) => onSendEventReminderChange(e.target.checked)}
+                className="mt-0.5 rounded border-border"
+              />
+              <span>
+                Enviar recordatorio de reserva (notificación in-app 1 día antes)
+              </span>
+            </label>
+          </>
+        )}
+
+        {recurrence.type === "CUSTOM" && (
+          <div className="space-y-2">
+            <Label>Fechas personalizadas</Label>
+            <div className="flex gap-2">
+              <Input
+                type="date"
+                value={customDateDraft}
+                onChange={(e) => setCustomDateDraft(e.target.value)}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  if (!customDateDraft) return;
+                  const set = new Set([
+                    ...(recurrence.customDates ?? []),
+                    customDateDraft,
+                  ]);
+                  onRecurrenceChange({
+                    ...recurrence,
+                    customDates: [...set].sort(),
+                  });
+                  setCustomDateDraft("");
+                }}
+              >
+                Añadir
+              </Button>
+            </div>
+            <ul className="space-y-1 text-sm">
+              {(recurrence.customDates ?? []).map((d) => (
+                <li key={d} className="flex items-center justify-between gap-2">
+                  {formatDateDisplay(new Date(`${d}T12:00:00`))}
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() =>
+                      onRecurrenceChange({
+                        ...recurrence,
+                        customDates: (recurrence.customDates ?? []).filter(
+                          (x) => x !== d,
+                        ),
+                      })
+                    }
+                  >
+                    Quitar
+                  </Button>
+                </li>
+              ))}
+            </ul>
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={sendEventReminder}
+                onChange={(e) => onSendEventReminderChange(e.target.checked)}
+                className="mt-0.5 rounded border-border"
+              />
+              <span>Enviar recordatorio de reserva (1 día antes)</span>
+            </label>
+          </div>
+        )}
+
+        {recurrence.type === "NONE" && (
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={sendEventReminder}
+              onChange={(e) => onSendEventReminderChange(e.target.checked)}
+              className="mt-0.5 rounded border-border"
+            />
+            <span>Enviar recordatorio de reserva (1 día antes)</span>
+          </label>
+        )}
+      </div>
+    );
+  }
+
+  const showAreaEditor =
+    showAreaPicker && (!confirmed.area || editingSection === "area");
+
   return (
     <div className="flex flex-col gap-3 pb-2">
-      {/* Área / subárea */}
-      {showAreaPicker && !confirmed.area && (
+      <Dialog open={areaChangeDialogOpen} onOpenChange={setAreaChangeDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>¿Cambiar área?</DialogTitle>
+            <DialogDescription>
+              El nombre del evento coincide con un evento precargado. Si cambias
+              de área, revisa que el nombre siga siendo el adecuado.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setPendingAreaId(null);
+                setAreaChangeDialogOpen(false);
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                if (pendingAreaId) applyAreaChange(pendingAreaId);
+              }}
+            >
+              Cambiar área
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Área */}
+      {showAreaEditor && (
         <section className="space-y-2">
           <Label className="text-sm font-medium">Área o subárea de la reserva</Label>
           <ReservationAreaTreePicker
@@ -278,52 +621,33 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
             isAdmin={isAdmin}
             selectableAreaIds={selectableIds}
             value={activeAreaId}
-            onChange={(id) => {
-              if (isAdmin) onAreaIdChange(id);
-              else onReservationAreaIdChange(id);
-            }}
-          />
-          <ContinueButton
-            visible={Boolean(activeAreaId)}
-            onClick={confirmArea}
+            onChange={requestAreaChange}
           />
         </section>
       )}
 
-      {areaResolved && showAreaPicker && confirmed.area && (
-        <p className="text-sm text-muted-foreground">
-          Área:{" "}
-          <span className="font-medium text-foreground">
-            {getAreaLabel(
-              areas.find((a) => a.id === activeAreaId) ?? {
-                id: activeAreaId,
-                name: activeAreaId,
-                code: "",
-                parentId: null,
-                colorHex: "",
-                eventPresets: [],
-              },
-              areas,
-            )}
-          </span>
-        </p>
+      {areaResolved && !showAreaEditor && (
+        <SummaryLine
+          label="Área"
+          value={areaLabel}
+          onClick={
+            showAreaPicker ? () => setEditingSection("area") : undefined
+          }
+        />
       )}
 
-      {!showAreaPicker && areaResolved && (
-        <p className="text-sm">
-          Área:{" "}
-          <span className="font-medium">
-            {getAreaLabel(
-              areas.find((a) => a.id === activeAreaId)!,
-              areas,
-            )}
-          </span>
-        </p>
-      )}
-
+      {/* Datos del evento — acumulativo o panel colapsado */}
       {areaResolved && !eventDetailsDone && (
-        <section className="space-y-4 rounded-lg border border-border p-3">
-          {!confirmed.eventName && (
+        <section className="space-y-3 rounded-lg border border-border p-3">
+          {confirmed.eventName && editingSection !== "eventName" && (
+            <SummaryLine
+              label="Evento"
+              value={eventName.trim()}
+              onClick={() => setEditingSection("eventName")}
+            />
+          )}
+
+          {(!confirmed.eventName || editingSection === "eventName") && (
             <div className="space-y-2">
               <Label htmlFor="wiz-eventName">Nombre del evento</Label>
               <Input
@@ -349,6 +673,7 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
                       onClick={() => {
                         onEventNameChange(name);
                         setConfirmed((c) => ({ ...c, eventName: true }));
+                        setEditingSection(null);
                       }}
                     >
                       {name}
@@ -358,241 +683,205 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
               )}
               <ContinueButton
                 visible={eventName.trim().length >= 3}
-                onClick={() =>
-                  setConfirmed((c) => ({ ...c, eventName: true }))
-                }
-              />
-            </div>
-          )}
-
-          {confirmed.eventName && !confirmed.eventDescription && (
-            <div className="space-y-2">
-              <Label htmlFor="wiz-eventDesc">Descripción del evento</Label>
-              <textarea
-                id="wiz-eventDesc"
-                className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                value={eventDescription}
-                onChange={(e) => onEventDescriptionChange(e.target.value)}
-              />
-              <ContinueButton
-                visible={eventDescription.trim().length >= 3}
-                onClick={() =>
-                  setConfirmed((c) => ({ ...c, eventDescription: true }))
-                }
-              />
-            </div>
-          )}
-
-          {confirmed.eventDescription && !confirmed.attendees && (
-            <div className="space-y-2">
-              <Label htmlFor="wiz-attendees">Asistentes estimados</Label>
-              <Input
-                id="wiz-attendees"
-                type="number"
-                min={1}
-                value={estimatedAttendees}
-                onChange={(e) => onEstimatedAttendeesChange(e.target.value)}
-              />
-              <ContinueButton
-                visible={estimatedNumber > 0}
-                onClick={() => setConfirmed((c) => ({ ...c, attendees: true }))}
-              />
-            </div>
-          )}
-
-          {confirmed.attendees && !confirmed.recurrence && (
-            <div className="space-y-3">
-              <div className="space-y-1">
-                <Label htmlFor="wiz-recurrence">Recurrencia</Label>
-                <Select
-                  id="wiz-recurrence"
-                  value={recurrence.type}
-                  onChange={(e) => {
-                    const type = e.target.value as RecurrenceType;
-                    onRecurrenceChange({
-                      ...recurrence,
-                      type,
-                      customDates: type === "CUSTOM" ? recurrence.customDates ?? [] : [],
-                    });
-                  }}
-                >
-                  {(Object.keys(RECURRENCE_TYPE_LABELS) as RecurrenceType[]).map(
-                    (key) => (
-                      <option key={key} value={key}>
-                        {RECURRENCE_TYPE_LABELS[key]}
-                      </option>
-                    ),
-                  )}
-                </Select>
-              </div>
-
-              {recurrence.type !== "NONE" &&
-                recurrence.type !== "CUSTOM" && (
-                  <>
-                    <div className="space-y-1">
-                      <Label htmlFor="wiz-until">Repetir hasta</Label>
-                      <Input
-                        id="wiz-until"
-                        type="date"
-                        value={recurrence.until}
-                        onChange={(e) =>
-                          onRecurrenceChange({
-                            ...recurrence,
-                            until: e.target.value,
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="wiz-except">Excepciones (fechas ISO, coma)</Label>
-                      <Input
-                        id="wiz-except"
-                        placeholder="2026-12-25, 2027-01-01"
-                        value={(recurrence.exceptDates ?? []).join(", ")}
-                        onChange={(e) =>
-                          onRecurrenceChange({
-                            ...recurrence,
-                            exceptDates: e.target.value
-                              .split(",")
-                              .map((s) => s.trim())
-                              .filter(Boolean),
-                          })
-                        }
-                      />
-                    </div>
-                  </>
-                )}
-
-              {recurrence.type === "CUSTOM" && (
-                <div className="space-y-2">
-                  <Label>Fechas personalizadas</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      type="date"
-                      value={customDateDraft}
-                      onChange={(e) => setCustomDateDraft(e.target.value)}
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => {
-                        if (!customDateDraft) return;
-                        const set = new Set([
-                          ...(recurrence.customDates ?? []),
-                          customDateDraft,
-                        ]);
-                        onRecurrenceChange({
-                          ...recurrence,
-                          customDates: [...set].sort(),
-                        });
-                        setCustomDateDraft("");
-                      }}
-                    >
-                      Añadir
-                    </Button>
-                  </div>
-                  <ul className="space-y-1 text-sm">
-                    {(recurrence.customDates ?? []).map((d) => (
-                      <li key={d} className="flex items-center justify-between gap-2">
-                        {formatDateDisplay(new Date(`${d}T12:00:00`))}
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          onClick={() =>
-                            onRecurrenceChange({
-                              ...recurrence,
-                              customDates: (recurrence.customDates ?? []).filter(
-                                (x) => x !== d,
-                              ),
-                            })
-                          }
-                        >
-                          Quitar
-                        </Button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              <ContinueButton
-                visible={
-                  recurrence.type === "NONE" ||
-                  (recurrence.type === "CUSTOM" &&
-                    (recurrence.customDates?.length ?? 0) > 0) ||
-                  (recurrence.type !== "CUSTOM" && Boolean(recurrence.until))
-                }
-                onClick={() =>
-                  setConfirmed((c) => ({ ...c, recurrence: true }))
-                }
-              />
-            </div>
-          )}
-
-          {confirmed.recurrence && !confirmed.reminder && (
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={sendEventReminder}
-                  onChange={(e) => onSendEventReminderChange(e.target.checked)}
-                />
-                Enviar recordatorio (un día antes)
-              </label>
-              <ContinueButton
-                visible
                 onClick={() => {
-                  setConfirmed((c) => ({
-                    ...c,
-                    reminder: true,
-                    scheduleCollapsed: true,
-                  }));
+                  setConfirmed((c) => ({ ...c, eventName: true }));
+                  setEditingSection(null);
                 }}
               />
+            </div>
+          )}
+
+          {confirmed.eventName &&
+            confirmed.eventDescription &&
+            editingSection !== "eventDescription" && (
+              <SummaryLine
+                label="Descripción"
+                value={
+                  eventDescription.trim().length > 48
+                    ? `${eventDescription.trim().slice(0, 48)}…`
+                    : eventDescription.trim()
+                }
+                onClick={() => setEditingSection("eventDescription")}
+              />
+            )}
+
+          {confirmed.eventName &&
+            (!confirmed.eventDescription ||
+              editingSection === "eventDescription") && (
+              <div className="space-y-2">
+                <Label htmlFor="wiz-eventDesc">Descripción del evento</Label>
+                <textarea
+                  id="wiz-eventDesc"
+                  className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={eventDescription}
+                  onChange={(e) => onEventDescriptionChange(e.target.value)}
+                />
+                <ContinueButton
+                  visible={eventDescription.trim().length >= 3}
+                  onClick={() => {
+                    setConfirmed((c) => ({ ...c, eventDescription: true }));
+                    setEditingSection(null);
+                  }}
+                />
+              </div>
+            )}
+
+          {confirmed.eventDescription &&
+            confirmed.attendees &&
+            editingSection !== "attendees" && (
+              <SummaryLine
+                label="Asistentes"
+                value={estimatedAttendees}
+                onClick={() => setEditingSection("attendees")}
+              />
+            )}
+
+          {confirmed.eventDescription &&
+            (!confirmed.attendees || editingSection === "attendees") && (
+              <div className="space-y-2">
+                <Label htmlFor="wiz-attendees">Asistentes estimados</Label>
+                <Input
+                  id="wiz-attendees"
+                  type="number"
+                  min={1}
+                  value={estimatedAttendees}
+                  onChange={(e) => onEstimatedAttendeesChange(e.target.value)}
+                />
+                <ContinueButton
+                  visible={estimatedNumber > 0}
+                  onClick={() => {
+                    setConfirmed((c) => ({ ...c, attendees: true }));
+                    setEditingSection(null);
+                  }}
+                />
+              </div>
+            )}
+
+          {confirmed.attendees &&
+            confirmed.recurrence &&
+            editingSection !== "recurrence" && (
+              <SummaryLine
+                label="Recurrencia"
+                value={RECURRENCE_TYPE_LABELS[recurrence.type]}
+                onClick={() => setEditingSection("recurrence")}
+              />
+            )}
+
+          {confirmed.attendees &&
+            (!confirmed.recurrence || editingSection === "recurrence") && (
+              <div className="space-y-2">
+                {renderRecurrenceBlock(false)}
+                <ContinueButton
+                  visible={
+                    recurrence.type === "NONE" ||
+                    (recurrence.type === "CUSTOM" &&
+                      (recurrence.customDates?.length ?? 0) > 0) ||
+                    (recurrence.type !== "CUSTOM" && Boolean(recurrence.until))
+                  }
+                  onClick={() => {
+                    setConfirmed((c) => ({
+                      ...c,
+                      recurrence: true,
+                      scheduleCollapsed: true,
+                    }));
+                    setEditingSection(null);
+                  }}
+                />
+              </div>
+            )}
+        </section>
+      )}
+
+      {areaResolved && eventDetailsDone && (
+        <section className="space-y-1 rounded-lg border border-border p-3">
+          <SummaryLine label="Área" value={areaLabel} />
+          <SummaryLine label="Evento" value={eventName.trim()} />
+          <button
+            type="button"
+            className="flex w-full items-center justify-between rounded-md px-1 py-2 text-left text-sm font-medium hover:bg-muted/60"
+            onClick={() => setEventDetailsExpanded((v) => !v)}
+          >
+            Datos del evento
+            {eventDetailsExpanded ? (
+              <ChevronUp className="h-4 w-4" />
+            ) : (
+              <ChevronDown className="h-4 w-4" />
+            )}
+          </button>
+          {eventDetailsExpanded && (
+            <div className="space-y-3 border-t border-border pt-3">
+              <div className="space-y-2">
+                <Label htmlFor="wiz-eventName-exp">Nombre del evento</Label>
+                <Input
+                  id="wiz-eventName-exp"
+                  value={eventName}
+                  onChange={(e) => onEventNameChange(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="wiz-eventDesc-exp">Descripción</Label>
+                <textarea
+                  id="wiz-eventDesc-exp"
+                  className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={eventDescription}
+                  onChange={(e) => onEventDescriptionChange(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="wiz-attendees-exp">Asistentes estimados</Label>
+                <Input
+                  id="wiz-attendees-exp"
+                  type="number"
+                  min={1}
+                  value={estimatedAttendees}
+                  onChange={(e) => onEstimatedAttendeesChange(e.target.value)}
+                />
+              </div>
+              {renderRecurrenceBlock(true)}
             </div>
           )}
         </section>
       )}
 
-      {eventDetailsDone && (
-        <p className="rounded-md bg-muted/40 px-3 py-2 text-sm font-medium">
-          {eventName.trim()}
-        </p>
-      )}
-
       {eventDetailsDone && !confirmed.date && (
         <section className="space-y-2">
           <Label>Fecha</Label>
-          <p className="text-base font-semibold">
-            {formatDateDisplay(new Date(`${reservationDate}T12:00:00`))}
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="outline" size="sm" onClick={onReservationDatePick}>
-              Cambiar (calendario)
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              onClick={() => {
-                onSelectionChange({
-                  date: reservationDate,
-                  startTime,
-                  endTime,
-                  mapId:
-                    selection?.mapId ??
-                    restoredSelection?.mapId ??
-                    maps[0]?.id ??
-                    "",
-                  selectedSpaceIds: selection?.selectedSpaceIds ?? [],
-                  selectedResources: selection?.selectedResources ?? [],
-                });
-                setConfirmed((c) => ({ ...c, date: true }));
-              }}
-            >
-              Continuar »
-            </Button>
-          </div>
+          <button
+            type="button"
+            className="w-full rounded-md border border-dashed border-border px-3 py-2 text-left hover:bg-muted/50"
+            onClick={() =>
+              onReservationDatePick({ wizardConfirmed: confirmed })
+            }
+          >
+            <p className="text-base font-semibold text-primary underline-offset-2">
+              {formatDateDisplay(new Date(`${reservationDate}T12:00:00`))}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Toca la fecha para abrir el calendario y elegir otro día. Al
+              volver, continuarás aquí mismo.
+            </p>
+          </button>
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => {
+              onSelectionChange({
+                date: reservationDate,
+                startTime,
+                endTime,
+                mapId:
+                  selection?.mapId ??
+                  restoredSelection?.mapId ??
+                  maps[0]?.id ??
+                  "",
+                selectedSpaceIds: selection?.selectedSpaceIds ?? [],
+                selectedResources: selection?.selectedResources ?? [],
+              });
+              setConfirmed((c) => ({ ...c, date: true }));
+            }}
+          >
+            Continuar »
+          </Button>
         </section>
       )}
 
