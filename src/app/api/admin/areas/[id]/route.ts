@@ -3,13 +3,14 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAdminSession, unauthorizedResponse } from "@/lib/auth/api";
 import { deleteArea, getAreaById, updateArea } from "@/lib/sheets/areas";
+import { areaEventPresetsInputSchema } from "@/lib/validators/area-event-preset-schema";
 
 const updateAreaSchema = z.object({
   name: z.string().min(1).optional(),
   code: z.string().optional(),
   parentId: z.string().optional().nullable(),
   colorHex: z.string().optional(),
-  eventPresets: z.array(z.string()).optional(),
+  eventPresets: areaEventPresetsInputSchema.optional(),
 });
 
 export async function GET(

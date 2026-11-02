@@ -146,7 +146,7 @@ export function ReservationEditFlow({
     { id: string; label: string; depth: number }[]
   >([]);
   const [presetsByAreaId, setPresetsByAreaId] = React.useState<
-    Record<string, string[]>
+    Record<string, import("@/types/area-event-preset").AreaEventPreset[]>
   >({});
   const [presetSourceAreaId, setPresetSourceAreaId] = React.useState("");
 

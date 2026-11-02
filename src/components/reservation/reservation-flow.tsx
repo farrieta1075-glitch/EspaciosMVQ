@@ -91,8 +91,9 @@ export function ReservationFlow({
     EventPresetGroup[]
   >([]);
   const [presetsByAreaId, setPresetsByAreaId] = React.useState<
-    Record<string, string[]>
+    Record<string, import("@/types/area-event-preset").AreaEventPreset[]>
   >({});
+  const [pageTitle, setPageTitle] = React.useState("Nueva reserva");
   const [presetSourceAreaId, setPresetSourceAreaId] = React.useState("");
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -347,6 +348,11 @@ export function ReservationFlow({
 
   return (
     <div className="flex flex-col gap-2 pb-2">
+      <header>
+        <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
+          {pageTitle}
+        </h1>
+      </header>
       <ReservationCreateWizard
         maps={maps}
         spaces={spaces}
@@ -391,6 +397,9 @@ export function ReservationFlow({
         onAreaIdChange={setAreaId}
         reservationAreaId={reservationAreaId}
         onReservationAreaIdChange={setReservationAreaId}
+        onEventDetailsConfirmed={(name) =>
+          setPageTitle(`Nueva Reserva (${name.trim()})`)
+        }
       />
 
       {similarPrompt && (

@@ -47,6 +47,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import type { EventPresetGroup } from "@/components/reservation/event-form";
+import type { AreaEventPreset } from "@/types/area-event-preset";
+import {
+  applyAreaEventPresetToForm,
+  clearEventPresetFormFields,
+  eventNameMatchesAnyPreset,
+} from "@/lib/event-preset-utils";
 import { cn } from "@/lib/utils";
 
 const DEFAULT_CONFIRMED: ReservationWizardConfirmed = {
@@ -111,15 +117,6 @@ function SummaryLine({
   );
 }
 
-function eventNameUsesPreset(
-  name: string,
-  presetsByAreaId: Record<string, string[]>,
-): boolean {
-  const trimmed = name.trim();
-  if (!trimmed) return false;
-  return Object.values(presetsByAreaId).some((list) => list.includes(trimmed));
-}
-
 interface ReservationCreateWizardProps {
   maps: FloorMap[];
   spaces: Space[];
@@ -134,7 +131,8 @@ interface ReservationCreateWizardProps {
   restoredSelection?: InitialMapSelection;
   initialWizardConfirmed?: ReservationWizardConfirmed | null;
   eventPresetGroups: EventPresetGroup[];
-  presetsByAreaId: Record<string, string[]>;
+  presetsByAreaId: Record<string, AreaEventPreset[]>;
+  onEventDetailsConfirmed?: (eventName: string) => void;
   presetSourceAreaId: string;
   onPresetSourceAreaIdChange: (id: string) => void;
   onSelectionChange: (selection: MapDateSelection) => void;
@@ -210,6 +208,7 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
     onAreaIdChange,
     reservationAreaId,
     onReservationAreaIdChange,
+    onEventDetailsConfirmed,
   } = props;
 
   const selectableIds = isAdmin
@@ -244,6 +243,29 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
   const [eventDetailsExpanded, setEventDetailsExpanded] = React.useState(false);
   const [pendingAreaId, setPendingAreaId] = React.useState<string | null>(null);
   const [areaChangeDialogOpen, setAreaChangeDialogOpen] = React.useState(false);
+  const [presetMismatchDialogOpen, setPresetMismatchDialogOpen] =
+    React.useState(false);
+  const [appliedPresetName, setAppliedPresetName] = React.useState<
+    string | null
+  >(null);
+  const [showExceptionPicker, setShowExceptionPicker] = React.useState(false);
+
+  const presetFormHandlers = React.useMemo(
+    () => ({
+      onEventNameChange,
+      onEventDescriptionChange,
+      onEstimatedAttendeesChange,
+      onRecurrenceChange,
+      onSendEventReminderChange,
+    }),
+    [
+      onEventNameChange,
+      onEventDescriptionChange,
+      onEstimatedAttendeesChange,
+      onRecurrenceChange,
+      onSendEventReminderChange,
+    ],
+  );
 
   React.useEffect(() => {
     if (restoreApplied.current || !initialWizardConfirmed) return;
@@ -287,7 +309,20 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
       restoredSelection?.endTime ??
       addMinutesToTimeHHmm("08:00", 60),
   );
-  const [editingTime, setEditingTime] = React.useState(true);
+  function syncTimeToSelection(nextStart: string, nextEnd: string) {
+    onSelectionChange({
+      date: reservationDate,
+      startTime: nextStart,
+      endTime: nextEnd,
+      mapId:
+        selection?.mapId ??
+        restoredSelection?.mapId ??
+        maps[0]?.id ??
+        "",
+      selectedSpaceIds: selection?.selectedSpaceIds ?? [],
+      selectedResources: selection?.selectedResources ?? [],
+    });
+  }
 
   const startTime = selection?.startTime ?? draftStart;
   const endTime = selection?.endTime ?? draftEnd;
@@ -303,6 +338,12 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
 
   const areaResolved = confirmed.area && Boolean(activeAreaId);
   const eventDetailsDone = confirmed.recurrence && confirmed.scheduleCollapsed;
+
+  React.useEffect(() => {
+    if (eventDetailsDone && eventName.trim()) {
+      onEventDetailsConfirmed?.(eventName.trim());
+    }
+  }, [eventDetailsDone, eventName, onEventDetailsConfirmed]);
 
   const activeAreaRecord =
     areas.find((a) => a.id === activeAreaId) ??
@@ -326,17 +367,76 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
     setAreaChangeDialogOpen(false);
   }
 
+  function presetsForAreaId(id: string): AreaEventPreset[] {
+    return presetsByAreaId[id] ?? [];
+  }
+
   function requestAreaChange(id: string) {
-    if (!id) return;
+    if (!id || id === activeAreaId) return;
+
+    const targetPresets = presetsForAreaId(id);
+
     if (
-      id !== activeAreaId &&
-      eventNameUsesPreset(eventName, presetsByAreaId)
+      appliedPresetName &&
+      !targetPresets.some((p) => p.name === appliedPresetName)
+    ) {
+      setPendingAreaId(id);
+      setPresetMismatchDialogOpen(true);
+      return;
+    }
+
+    if (
+      !appliedPresetName &&
+      eventNameMatchesAnyPreset(eventName, presets)
     ) {
       setPendingAreaId(id);
       setAreaChangeDialogOpen(true);
       return;
     }
+
     applyAreaChange(id);
+  }
+
+  function confirmPresetMismatchAreaChange() {
+    clearEventPresetFormFields(presetFormHandlers);
+    setAppliedPresetName(null);
+    setShowExceptionPicker(false);
+    setConfirmed((c) => ({
+      ...c,
+      eventName: false,
+      eventDescription: false,
+      attendees: false,
+      recurrence: false,
+      scheduleCollapsed: false,
+    }));
+    if (pendingAreaId) applyAreaChange(pendingAreaId);
+    setPresetMismatchDialogOpen(false);
+  }
+
+  function handlePresetSelect(value: string) {
+    if (value === "__manual__") {
+      setAppliedPresetName(null);
+      return;
+    }
+    const preset = presets.find((p) => p.name === value);
+    if (!preset) return;
+    applyAreaEventPresetToForm(preset, reservationDate, presetFormHandlers);
+    setAppliedPresetName(preset.name);
+    const descOk = (preset.description ?? "").trim().length >= 3;
+    const attendeesOk = Boolean(
+      preset.estimatedAttendees && preset.estimatedAttendees > 0,
+    );
+    const recurrenceOk = Boolean(
+      preset.recurrence?.type && preset.recurrence.type !== "NONE",
+    );
+    setConfirmed((c) => ({
+      ...c,
+      eventName: preset.name.trim().length >= 3,
+      eventDescription: descOk,
+      attendees: descOk && attendeesOk,
+      recurrence: descOk && attendeesOk && recurrenceOk,
+      scheduleCollapsed: false,
+    }));
   }
 
   function applyMonthlyRelativeFromDate(dateIso: string) {
@@ -387,9 +487,11 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
   const exceptSet = new Set(recurrence.exceptDates ?? []);
 
   function handleRecurrenceTypeChange(type: RecurrenceType) {
+    setShowExceptionPicker(false);
     onRecurrenceChange({
       ...recurrence,
       type,
+      exceptDates: type === "NONE" ? [] : recurrence.exceptDates ?? [],
       customDates: type === "CUSTOM" ? recurrence.customDates ?? [] : [],
       until:
         type === "NONE" || type === "CUSTOM"
@@ -444,44 +546,61 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
             </div>
             {plannedDatesForExceptions.length > 0 && (
               <div className="space-y-2 rounded-lg border border-border p-3">
-                <p className="text-xs text-muted-foreground">
-                  Marca los días que no deben generarse (excepciones).
-                </p>
-                <ul className="max-h-44 space-y-1 overflow-y-auto rounded-md border border-border p-2">
-                  {plannedDatesForExceptions.map((isoDate) => {
-                    const isException = exceptSet.has(isoDate);
-                    const [y, m, d] = isoDate.split("-").map(Number);
-                    const label = formatDateDisplay(new Date(y, m - 1, d));
-                    return (
-                      <li key={isoDate}>
-                        <label className="flex cursor-pointer items-center gap-2 text-sm">
-                          <input
-                            type="checkbox"
-                            checked={isException}
-                            onChange={(event) => {
-                              const next = new Set(recurrence.exceptDates ?? []);
-                              if (event.target.checked) next.add(isoDate);
-                              else next.delete(isoDate);
-                              onRecurrenceChange({
-                                ...recurrence,
-                                exceptDates: [...next],
-                              });
-                            }}
-                            className="rounded border-border"
-                          />
-                          <span
-                            className={cn(
-                              isException && "text-muted-foreground line-through",
-                            )}
-                          >
-                            {label}
-                            {isException ? " (excepción)" : ""}
-                          </span>
-                        </label>
-                      </li>
-                    );
-                  })}
-                </ul>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={showExceptionPicker}
+                    onChange={(e) => {
+                      setShowExceptionPicker(e.target.checked);
+                      if (!e.target.checked) {
+                        onRecurrenceChange({
+                          ...recurrence,
+                          exceptDates: [],
+                        });
+                      }
+                    }}
+                    className="rounded border-border"
+                  />
+                  Definir excepciones (días sin reserva)
+                </label>
+                {showExceptionPicker && (
+                  <ul className="max-h-44 space-y-1 overflow-y-auto rounded-md border border-border p-2">
+                    {plannedDatesForExceptions.map((isoDate) => {
+                      const isException = exceptSet.has(isoDate);
+                      const [y, m, d] = isoDate.split("-").map(Number);
+                      const label = formatDateDisplay(new Date(y, m - 1, d));
+                      return (
+                        <li key={isoDate}>
+                          <label className="flex cursor-pointer items-center gap-2 text-sm">
+                            <input
+                              type="checkbox"
+                              checked={isException}
+                              onChange={(event) => {
+                                const next = new Set(recurrence.exceptDates ?? []);
+                                if (event.target.checked) next.add(isoDate);
+                                else next.delete(isoDate);
+                                onRecurrenceChange({
+                                  ...recurrence,
+                                  exceptDates: [...next],
+                                });
+                              }}
+                              className="rounded border-border"
+                            />
+                            <span
+                              className={cn(
+                                isException &&
+                                  "text-muted-foreground line-through",
+                              )}
+                            >
+                              {label}
+                              {isException ? " (excepción)" : ""}
+                            </span>
+                          </label>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
               </div>
             )}
             <label className="flex items-start gap-2 text-sm">
@@ -612,6 +731,37 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
         </DialogContent>
       </Dialog>
 
+      <Dialog
+        open={presetMismatchDialogOpen}
+        onOpenChange={setPresetMismatchDialogOpen}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Evento precargado no disponible</DialogTitle>
+            <DialogDescription>
+              La nueva área no incluye el evento precargado «{appliedPresetName}
+              ». Si continúas, se borrarán los datos cargados desde el
+              precargado.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setPendingAreaId(null);
+                setPresetMismatchDialogOpen(false);
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button type="button" onClick={confirmPresetMismatchAreaChange}>
+              Cambiar área y limpiar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Área */}
       {showAreaEditor && (
         <section className="space-y-2">
@@ -639,6 +789,29 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
       {/* Datos del evento — acumulativo o panel colapsado */}
       {areaResolved && !eventDetailsDone && (
         <section className="space-y-3 rounded-lg border border-border p-3">
+          {presets.length > 0 && (
+            <div className="space-y-1">
+              <Label htmlFor="wiz-preset-source">Origen de datos del evento</Label>
+              <Select
+                id="wiz-preset-source"
+                value={
+                  appliedPresetName &&
+                  presets.some((p) => p.name === appliedPresetName)
+                    ? appliedPresetName
+                    : "__manual__"
+                }
+                onChange={(e) => handlePresetSelect(e.target.value)}
+              >
+                <option value="__manual__">Datos capturados manualmente</option>
+                {presets.map((p) => (
+                  <option key={p.name} value={p.name}>
+                    Precargado: {p.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          )}
+
           {confirmed.eventName && editingSection !== "eventName" && (
             <SummaryLine
               label="Evento"
@@ -653,30 +826,32 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
               <Input
                 id="wiz-eventName"
                 value={eventName}
-                onChange={(e) => onEventNameChange(e.target.value)}
+                onChange={(e) => {
+                  setAppliedPresetName(null);
+                  onEventNameChange(e.target.value);
+                }}
                 list="wiz-event-presets"
               />
               <datalist id="wiz-event-presets">
-                {presets.map((name) => (
-                  <option key={name} value={name} />
+                {presets.map((p) => (
+                  <option key={p.name} value={p.name} />
                 ))}
               </datalist>
               {presets.length > 0 && (
                 <div className="flex flex-wrap gap-1.5">
-                  {presets.map((name) => (
+                  {presets.map((p) => (
                     <Button
-                      key={name}
+                      key={p.name}
                       type="button"
                       size="sm"
                       variant="outline"
                       className="h-7 text-xs"
                       onClick={() => {
-                        onEventNameChange(name);
-                        setConfirmed((c) => ({ ...c, eventName: true }));
+                        handlePresetSelect(p.name);
                         setEditingSection(null);
                       }}
                     >
-                      {name}
+                      {p.name}
                     </Button>
                   ))}
                 </div>
@@ -714,7 +889,10 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
                   id="wiz-eventDesc"
                   className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                   value={eventDescription}
-                  onChange={(e) => onEventDescriptionChange(e.target.value)}
+                  onChange={(e) => {
+                  setAppliedPresetName(null);
+                  onEventDescriptionChange(e.target.value);
+                }}
                 />
                 <ContinueButton
                   visible={eventDescription.trim().length >= 3}
@@ -745,7 +923,10 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
                   type="number"
                   min={1}
                   value={estimatedAttendees}
-                  onChange={(e) => onEstimatedAttendeesChange(e.target.value)}
+                  onChange={(e) => {
+                    setAppliedPresetName(null);
+                    onEstimatedAttendeesChange(e.target.value);
+                  }}
                 />
                 <ContinueButton
                   visible={estimatedNumber > 0}
@@ -794,8 +975,37 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
 
       {areaResolved && eventDetailsDone && (
         <section className="space-y-1 rounded-lg border border-border p-3">
-          <SummaryLine label="Área" value={areaLabel} />
-          <SummaryLine label="Evento" value={eventName.trim()} />
+          <SummaryLine
+            label="Área"
+            value={areaLabel}
+            onClick={
+              showAreaPicker ? () => setEditingSection("area") : undefined
+            }
+          />
+          {presets.length > 0 && eventDetailsExpanded && (
+            <div className="space-y-1 pt-1">
+              <Label htmlFor="wiz-preset-source-collapsed">
+                Origen de datos del evento
+              </Label>
+              <Select
+                id="wiz-preset-source-collapsed"
+                value={
+                  appliedPresetName &&
+                  presets.some((p) => p.name === appliedPresetName)
+                    ? appliedPresetName
+                    : "__manual__"
+                }
+                onChange={(e) => handlePresetSelect(e.target.value)}
+              >
+                <option value="__manual__">Datos capturados manualmente</option>
+                {presets.map((p) => (
+                  <option key={p.name} value={p.name}>
+                    Precargado: {p.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          )}
           <button
             type="button"
             className="flex w-full items-center justify-between rounded-md px-1 py-2 text-left text-sm font-medium hover:bg-muted/60"
@@ -824,7 +1034,10 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
                   id="wiz-eventDesc-exp"
                   className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                   value={eventDescription}
-                  onChange={(e) => onEventDescriptionChange(e.target.value)}
+                  onChange={(e) => {
+                  setAppliedPresetName(null);
+                  onEventDescriptionChange(e.target.value);
+                }}
                 />
               </div>
               <div className="space-y-2">
@@ -834,7 +1047,10 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
                   type="number"
                   min={1}
                   value={estimatedAttendees}
-                  onChange={(e) => onEstimatedAttendeesChange(e.target.value)}
+                  onChange={(e) => {
+                    setAppliedPresetName(null);
+                    onEstimatedAttendeesChange(e.target.value);
+                  }}
                 />
               </div>
               {renderRecurrenceBlock(true)}
@@ -857,8 +1073,7 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
               {formatDateDisplay(new Date(`${reservationDate}T12:00:00`))}
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
-              Toca la fecha para abrir el calendario y elegir otro día. Al
-              volver, continuarás aquí mismo.
+              Toca la fecha para abrir el calendario y elegir otro día.
             </p>
           </button>
           <Button
@@ -882,6 +1097,24 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
           >
             Continuar »
           </Button>
+        </section>
+      )}
+
+      {eventDetailsDone && confirmed.date && (
+        <section className="space-y-1">
+          <Label>Fecha</Label>
+          <button
+            type="button"
+            className="rounded-md px-1 py-0.5 text-left text-base font-semibold text-primary hover:bg-muted/50"
+            onClick={() =>
+              onReservationDatePick({ wizardConfirmed: confirmed })
+            }
+          >
+            {formatDateDisplay(new Date(`${reservationDate}T12:00:00`))}
+          </button>
+          <p className="text-xs text-muted-foreground">
+            Toca la fecha para cambiarla en el calendario.
+          </p>
         </section>
       )}
 
@@ -923,98 +1156,90 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
 
       {confirmed.date && !confirmed.time && (
         <section className="space-y-2">
-          {editingTime ? (
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1">
-                <Label htmlFor="wiz-start">Hora inicio</Label>
-                <Input
-                  id="wiz-start"
-                  type="time"
-                  value={draftStart}
-                  onChange={(e) => {
-                    setDraftStart(e.target.value);
-                    if (!draftEnd || draftEnd <= e.target.value) {
-                      setDraftEnd(addMinutesToTimeHHmm(e.target.value, 60));
-                    }
-                  }}
-                />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="wiz-end">Hora fin</Label>
-                <Input
-                  id="wiz-end"
-                  type="time"
-                  value={draftEnd}
-                  onChange={(e) => setDraftEnd(e.target.value)}
-                />
-              </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <Label htmlFor="wiz-start">Hora inicio</Label>
+              <Input
+                id="wiz-start"
+                type="time"
+                value={draftStart}
+                onChange={(e) => {
+                  const nextStart = e.target.value;
+                  let nextEnd = draftEnd;
+                  setDraftStart(nextStart);
+                  if (!nextEnd || nextEnd <= nextStart) {
+                    nextEnd = addMinutesToTimeHHmm(nextStart, 60);
+                    setDraftEnd(nextEnd);
+                  }
+                }}
+              />
             </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <Label className="text-xs">Inicio</Label>
-                <p className="font-medium">{startTime}</p>
-              </div>
-              <div>
-                <Label className="text-xs">Fin</Label>
-                <p className="font-medium">{endTime}</p>
-              </div>
+            <div className="space-y-1">
+              <Label htmlFor="wiz-end">Hora fin</Label>
+              <Input
+                id="wiz-end"
+                type="time"
+                value={draftEnd}
+                onChange={(e) => setDraftEnd(e.target.value)}
+              />
             </div>
-          )}
-          <div className="flex flex-wrap gap-2">
-            {editingTime ? (
-              <>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setEditingTime(false)}
-                >
-                  Listo
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={() => {
-                    onSelectionChange({
-                      date: reservationDate,
-                      startTime: draftStart,
-                      endTime: draftEnd,
-                      mapId:
-                        selection?.mapId ??
-                        restoredSelection?.mapId ??
-                        maps[0]?.id ??
-                        "",
-                      selectedSpaceIds: selection?.selectedSpaceIds ?? [],
-                      selectedResources: selection?.selectedResources ?? [],
-                    });
-                    setEditingTime(false);
-                    setConfirmed((c) => ({ ...c, time: true }));
-                  }}
-                >
-                  Continuar »
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setEditingTime(true)}
-                >
-                  Cambiar horario
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={() => setConfirmed((c) => ({ ...c, time: true }))}
-                >
-                  Continuar »
-                </Button>
-              </>
-            )}
           </div>
+          <p className="text-xs text-muted-foreground">
+            Ajusta inicio y fin arriba y pulsa Continuar para confirmar el
+            horario.
+          </p>
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => {
+              syncTimeToSelection(draftStart, draftEnd);
+              setConfirmed((c) => ({ ...c, time: true }));
+            }}
+          >
+            Continuar »
+          </Button>
+        </section>
+      )}
+
+      {confirmed.time && (
+        <section className="space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <Label htmlFor="wiz-start-done">Hora inicio</Label>
+              <Input
+                id="wiz-start-done"
+                type="time"
+                value={draftStart}
+                onChange={(e) => {
+                  const nextStart = e.target.value;
+                  let nextEnd = draftEnd;
+                  setDraftStart(nextStart);
+                  if (!nextEnd || nextEnd <= nextStart) {
+                    nextEnd = addMinutesToTimeHHmm(nextStart, 60);
+                    setDraftEnd(nextEnd);
+                  }
+                  syncTimeToSelection(nextStart, nextEnd);
+                }}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="wiz-end-done">Hora fin</Label>
+              <Input
+                id="wiz-end-done"
+                type="time"
+                value={draftEnd}
+                onChange={(e) => {
+                  const nextEnd = e.target.value;
+                  setDraftEnd(nextEnd);
+                  syncTimeToSelection(draftStart, nextEnd);
+                }}
+              />
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Puedes modificar el horario en cualquier momento antes de confirmar
+            la reserva.
+          </p>
         </section>
       )}
 

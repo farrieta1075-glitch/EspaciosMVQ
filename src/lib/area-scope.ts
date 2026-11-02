@@ -1,29 +1,17 @@
+import type { AreaEventPreset } from "@/types/area-event-preset";
+import {
+  parseAreaEventPresets,
+  serializeAreaEventPresets,
+} from "@/lib/event-preset-utils";
 import type { Area } from "@/types/area";
 import type { AppUser } from "@/types/user";
 
-export function parseEventPresets(raw: string | undefined | null): string[] {
-  const trimmed = raw?.trim();
-  if (!trimmed) return [];
-  if (trimmed.startsWith("[")) {
-    try {
-      const parsed = JSON.parse(trimmed) as unknown;
-      if (!Array.isArray(parsed)) return [];
-      return parsed
-        .map((item) => String(item).trim())
-        .filter(Boolean);
-    } catch {
-      return [];
-    }
-  }
-  return trimmed
-    .split(/[\n,;|]+/)
-    .map((item) => item.trim())
-    .filter(Boolean);
+export function parseEventPresets(raw: string | undefined | null): AreaEventPreset[] {
+  return parseAreaEventPresets(raw);
 }
 
-export function serializeEventPresets(presets: string[]): string {
-  const unique = [...new Set(presets.map((item) => item.trim()).filter(Boolean))];
-  return JSON.stringify(unique);
+export function serializeEventPresets(presets: AreaEventPreset[]): string {
+  return serializeAreaEventPresets(presets);
 }
 
 export function resolveUserAreaScopeIds(user: Pick<AppUser, "areaId" | "areaScopeIds">): string[] {
@@ -112,16 +100,17 @@ export function getDescendantAreaIds(rootId: string, areas: Area[]): string[] {
 export function collectInheritedEventPresets(
   areaId: string,
   areas: Area[],
-): string[] {
+): AreaEventPreset[] {
   const areasById = new Map(areas.map((area) => [area.id, area]));
-  const unique = new Set<string>();
+  const byName = new Map<string, AreaEventPreset>();
   for (const id of getDescendantAreaIds(areaId, areas)) {
     for (const preset of areasById.get(id)?.eventPresets ?? []) {
-      const trimmed = preset.trim();
-      if (trimmed) unique.add(trimmed);
+      const name = preset.name.trim();
+      if (!name || byName.has(name)) continue;
+      byName.set(name, preset);
     }
   }
-  return [...unique];
+  return [...byName.values()];
 }
 
 export function buildEventPresetAreaOptions(
@@ -168,8 +157,8 @@ export function buildEventPresetAreaOptions(
 export function buildPresetsByAreaId(
   areas: Area[],
   scopeIds: string[],
-): Record<string, string[]> {
-  const map: Record<string, string[]> = {};
+): Record<string, AreaEventPreset[]> {
+  const map: Record<string, AreaEventPreset[]> = {};
   for (const scopeId of scopeIds) {
     const presets = collectInheritedEventPresets(scopeId, areas);
     if (presets.length > 0) {
@@ -188,7 +177,7 @@ export function collectEventPresetGroups(
   label: string;
   parentLabel: string | null;
   colorHex: string;
-  events: string[];
+  events: AreaEventPreset[];
 }[] {
   const areasById = new Map(areas.map((area) => [area.id, area]));
   const groups: {
@@ -196,7 +185,7 @@ export function collectEventPresetGroups(
     label: string;
     parentLabel: string | null;
     colorHex: string;
-    events: string[];
+    events: AreaEventPreset[];
   }[] = [];
 
   for (const scopeId of scopeIds) {

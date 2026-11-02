@@ -12,6 +12,9 @@ import {
   Trash2,
 } from "lucide-react";
 import type { Area } from "@/types/area";
+import type { AreaEventPreset } from "@/types/area-event-preset";
+import { RECURRENCE_TYPE_LABELS } from "@/lib/recurrence";
+import type { RecurrenceType } from "@/types/reservation";
 import { buildAreaHierarchy } from "@/lib/area-scope";
 import { getAreaHex } from "@/lib/area-colors";
 import { Badge } from "@/components/ui/badge";
@@ -35,7 +38,7 @@ interface AreaFormState {
   code: string;
   parentId: string;
   colorHex: string;
-  eventPresetsText: string;
+  eventPresets: AreaEventPreset[];
 }
 
 const emptyForm: AreaFormState = {
@@ -43,18 +46,11 @@ const emptyForm: AreaFormState = {
   code: "",
   parentId: "",
   colorHex: "",
-  eventPresetsText: "",
+  eventPresets: [],
 };
 
-function presetsToText(presets: string[]): string {
-  return presets.join("\n");
-}
-
-function textToPresets(text: string): string[] {
-  return text
-    .split(/\n+/)
-    .map((line) => line.trim())
-    .filter(Boolean);
+function emptyPresetRow(): AreaEventPreset {
+  return { name: "", description: "", recurrence: { type: "NONE" } };
 }
 
 function subareaCountLabel(count: number): string {
@@ -109,7 +105,9 @@ export function AdminAreasClient({ initialAreas }: AdminAreasClientProps) {
       code: area.code ?? "",
       parentId: area.parentId ?? "",
       colorHex: area.colorHex ?? "",
-      eventPresetsText: presetsToText(area.eventPresets ?? []),
+      eventPresets: area.eventPresets?.length
+        ? area.eventPresets.map((p) => ({ ...p }))
+        : [],
     });
     setError(null);
     setDialogOpen(true);
@@ -125,7 +123,18 @@ export function AdminAreasClient({ initialAreas }: AdminAreasClientProps) {
       code: form.code.trim(),
       parentId: form.parentId || null,
       colorHex: form.colorHex.trim(),
-      eventPresets: textToPresets(form.eventPresetsText),
+      eventPresets: form.eventPresets
+        .map((p) => ({
+          name: p.name.trim(),
+          ...(p.description?.trim() ? { description: p.description.trim() } : {}),
+          ...(p.estimatedAttendees && p.estimatedAttendees > 0
+            ? { estimatedAttendees: p.estimatedAttendees }
+            : {}),
+          ...(p.recurrence?.type && p.recurrence.type !== "NONE"
+            ? { recurrence: p.recurrence }
+            : {}),
+        }))
+        .filter((p) => p.name.length > 0),
     };
 
     try {
@@ -426,20 +435,121 @@ export function AdminAreasClient({ initialAreas }: AdminAreasClientProps) {
                   ))}
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="areaPresets">
-                Eventos precargados (uno por línea)
-              </Label>
-              <textarea
-                id="areaPresets"
-                value={form.eventPresetsText}
-                onChange={(e) =>
-                  setForm({ ...form, eventPresetsText: e.target.value })
-                }
-                rows={6}
-                placeholder={"Alpha\nRetiro Alpha\nSanidad Emocional"}
-                className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              />
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <Label>Eventos precargados</Label>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() =>
+                    setForm({
+                      ...form,
+                      eventPresets: [...form.eventPresets, emptyPresetRow()],
+                    })
+                  }
+                >
+                  Agregar evento
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Nombre, descripción, asistentes y recurrencia se aplican al crear
+                o editar una reserva.
+              </p>
+              {form.eventPresets.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Sin eventos precargados.
+                </p>
+              ) : (
+                <div className="max-h-[min(50vh,22rem)] space-y-3 overflow-y-auto pr-1">
+                  {form.eventPresets.map((preset, index) => (
+                    <div
+                      key={index}
+                      className="space-y-2 rounded-md border border-border p-3"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-medium text-muted-foreground">
+                          Evento {index + 1}
+                        </span>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 text-destructive"
+                          onClick={() =>
+                            setForm({
+                              ...form,
+                              eventPresets: form.eventPresets.filter(
+                                (_, i) => i !== index,
+                              ),
+                            })
+                          }
+                        >
+                          Quitar
+                        </Button>
+                      </div>
+                      <Input
+                        placeholder="Nombre del evento"
+                        value={preset.name}
+                        onChange={(e) => {
+                          const next = [...form.eventPresets];
+                          next[index] = { ...next[index], name: e.target.value };
+                          setForm({ ...form, eventPresets: next });
+                        }}
+                      />
+                      <textarea
+                        placeholder="Descripción"
+                        rows={2}
+                        value={preset.description ?? ""}
+                        onChange={(e) => {
+                          const next = [...form.eventPresets];
+                          next[index] = {
+                            ...next[index],
+                            description: e.target.value,
+                          };
+                          setForm({ ...form, eventPresets: next });
+                        }}
+                        className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      />
+                      <Input
+                        type="number"
+                        min={1}
+                        placeholder="Asistentes estimados"
+                        value={preset.estimatedAttendees ?? ""}
+                        onChange={(e) => {
+                          const next = [...form.eventPresets];
+                          const n = Number(e.target.value);
+                          next[index] = {
+                            ...next[index],
+                            estimatedAttendees: n > 0 ? n : undefined,
+                          };
+                          setForm({ ...form, eventPresets: next });
+                        }}
+                      />
+                      <Select
+                        value={preset.recurrence?.type ?? "NONE"}
+                        onChange={(e) => {
+                          const type = e.target.value as RecurrenceType;
+                          const next = [...form.eventPresets];
+                          next[index] = {
+                            ...next[index],
+                            recurrence: { type },
+                          };
+                          setForm({ ...form, eventPresets: next });
+                        }}
+                      >
+                        {(Object.keys(RECURRENCE_TYPE_LABELS) as RecurrenceType[]).map(
+                          (key) => (
+                            <option key={key} value={key}>
+                              {RECURRENCE_TYPE_LABELS[key]}
+                            </option>
+                          ),
+                        )}
+                      </Select>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="flex gap-2">
               <Button

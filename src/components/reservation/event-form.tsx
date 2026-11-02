@@ -3,7 +3,9 @@
 import * as React from "react";
 import type { Area } from "@/types/area";
 import type { Space } from "@/types/space";
-import type { RecurrenceType } from "@/types/reservation";
+import type { AreaEventPreset } from "@/types/area-event-preset";
+import { applyAreaEventPresetToForm } from "@/lib/event-preset-utils";
+import type { RecurrenceConfig, RecurrenceType } from "@/types/reservation";
 import { ATTENDEE_JUSTIFICATION_OPTIONS } from "@/lib/attendee-justification";
 import { reservationNeedsAttendeeJustification } from "@/lib/capacity-validation";
 import { addMonths, formatDateISO, formatDateDisplay } from "@/lib/date-utils";
@@ -27,7 +29,7 @@ export interface EventPresetGroup {
   label: string;
   parentLabel: string | null;
   colorHex: string;
-  events: string[];
+  events: AreaEventPreset[];
 }
 
 interface EventFormProps {
@@ -63,9 +65,10 @@ interface EventFormProps {
   spaces?: Space[];
   eventPresetGroups?: EventPresetGroup[];
   eventPresetAreaOptions?: { id: string; label: string; depth: number }[];
-  presetsByAreaId?: Record<string, string[]>;
+  presetsByAreaId?: Record<string, AreaEventPreset[]>;
   presetSourceAreaId?: string;
   onPresetSourceAreaIdChange?: (areaId: string) => void;
+  onRecurrenceConfigChange?: (value: RecurrenceConfig) => void;
 }
 
 export function EventForm({
@@ -104,6 +107,7 @@ export function EventForm({
   presetsByAreaId = {},
   presetSourceAreaId,
   onPresetSourceAreaIdChange,
+  onRecurrenceConfigChange,
 }: EventFormProps) {
   const [internalPresetAreaId, setInternalPresetAreaId] = React.useState("");
   const activePresetAreaId =
@@ -238,22 +242,35 @@ export function EventForm({
                 const hex = getAreaHex(areaForColor, areas);
                 return (
                   <Button
-                    key={`${activePresetAreaId}-${preset}`}
+                    key={`${activePresetAreaId}-${preset.name}`}
                     type="button"
                     size="sm"
                     variant={
-                      eventName.trim() === preset ? "default" : "outline"
+                      eventName.trim() === preset.name ? "default" : "outline"
                     }
                     className="h-7 gap-1.5 text-xs"
                     disabled={disabled}
-                    onClick={() => onEventNameChange(preset)}
+                    onClick={() => {
+                      applyAreaEventPresetToForm(preset, baseDate, {
+                        onEventNameChange,
+                        onEventDescriptionChange,
+                        onEstimatedAttendeesChange,
+                        onRecurrenceChange: (value) => {
+                          onRecurrenceTypeChange(value.type);
+                          onRecurrenceUntilChange(value.until);
+                          onRecurrenceExceptDatesChange(value.exceptDates ?? []);
+                          onRecurrenceConfigChange?.(value);
+                        },
+                        onSendEventReminderChange,
+                      });
+                    }}
                   >
                     <span
                       className="h-2 w-2 rounded-full ring-1 ring-border"
                       style={{ backgroundColor: hex }}
                       aria-hidden
                     />
-                    {preset}
+                    {preset.name}
                   </Button>
                 );
               })}

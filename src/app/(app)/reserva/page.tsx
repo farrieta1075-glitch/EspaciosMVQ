@@ -26,16 +26,16 @@ export default async function ReservaPage({
 
   return (
     <section className="space-y-3">
-      <header>
-        <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
-          {readOnly ? "Consulta de espacios" : "Nueva reserva"}
-        </h1>
-        {readOnly && (
+      {readOnly ? (
+        <header>
+          <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
+            Consulta de espacios
+          </h1>
           <p className="text-sm text-muted-foreground">
             Consulta disponibilidad de espacios y recursos.
           </p>
-        )}
-      </header>
+        </header>
+      ) : null}
 
       {readOnly ? (
         <MapDateSelectorWrapper

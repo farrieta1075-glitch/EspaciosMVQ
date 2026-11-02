@@ -21,7 +21,7 @@ export async function createArea(input: {
   code?: string;
   parentId?: string | null;
   colorHex?: string;
-  eventPresets?: string[];
+  eventPresets?: import("@/types/area-event-preset").AreaEventPreset[];
 }): Promise<Area> {
   const { createId } = await import("@/lib/id");
   const name = input.name.trim();
@@ -51,7 +51,7 @@ export async function updateArea(
     code: string;
     parentId: string | null;
     colorHex: string;
-    eventPresets: string[];
+    eventPresets: import("@/types/area-event-preset").AreaEventPreset[];
   }>,
 ): Promise<Area | null> {
   const existing = await getAreaById(id);

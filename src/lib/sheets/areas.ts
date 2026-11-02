@@ -81,7 +81,7 @@ export async function createArea(input: {
   code?: string;
   parentId?: string | null;
   colorHex?: string;
-  eventPresets?: string[];
+  eventPresets?: Area["eventPresets"];
 }): Promise<Area> {
   if (isCatalogOnSql()) {
     const catalog = await import("@/lib/db/catalog/areas");
@@ -129,7 +129,7 @@ export async function updateArea(
     code: string;
     parentId: string | null;
     colorHex: string;
-    eventPresets: string[];
+    eventPresets: Area["eventPresets"];
   }>,
 ): Promise<Area | null> {
   if (isCatalogOnSql()) {
