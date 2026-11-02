@@ -75,7 +75,7 @@ export function AdminAreasClient({ initialAreas }: AdminAreasClientProps) {
     {},
   );
 
-  const { areasById, childrenByParent, roots } = React.useMemo(
+  const { childrenByParent, roots } = React.useMemo(
     () => buildAreaHierarchy(areas),
     [areas],
   );

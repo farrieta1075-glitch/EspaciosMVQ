@@ -2,16 +2,13 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, Loader2 } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
 import type { Area } from "@/types/area";
 import type { FloorMap, Space } from "@/types/space";
 import type { EventPresetGroup } from "@/components/reservation/event-form";
 import type { MapDateSelection, RecurrenceConfig } from "@/types/reservation";
 import { reservationNeedsAttendeeJustification } from "@/lib/capacity-validation";
-import {
-  MapDateSelector,
-  type InitialMapSelection,
-} from "@/components/map-date/map-date-selector";
+import type { InitialMapSelection } from "@/components/map-date/map-date-selector";
 import {
   buildCalendarPickUrl,
   clearReservationDraft,
@@ -92,9 +89,6 @@ export function ReservationFlow({
   const [eventPresetGroups, setEventPresetGroups] = React.useState<
     EventPresetGroup[]
   >([]);
-  const [eventPresetAreaOptions, setEventPresetAreaOptions] = React.useState<
-    { id: string; label: string; depth: number }[]
-  >([]);
   const [presetsByAreaId, setPresetsByAreaId] = React.useState<
     Record<string, string[]>
   >({});
@@ -124,7 +118,6 @@ export function ReservationFlow({
       .then((response) => (response.ok ? response.json() : null))
       .then((data) => {
         if (data?.groups) setEventPresetGroups(data.groups);
-        if (data?.areaOptions) setEventPresetAreaOptions(data.areaOptions);
         if (data?.presetsByAreaId) setPresetsByAreaId(data.presetsByAreaId);
       });
   }, [userAreaScopeIds, isAdmin]);
@@ -134,12 +127,6 @@ export function ReservationFlow({
       setPresetSourceAreaId(areaId);
     }
   }, [areaId, presetsByAreaId]);
-
-  const activeHighlightAreaId = isAdmin
-    ? areaId
-    : userAreaScopeIds.length > 1
-      ? reservationAreaId
-      : userAreaScopeIds[0] ?? userAreaId;
 
   React.useEffect(() => {
     const draft = loadReservationDraft();

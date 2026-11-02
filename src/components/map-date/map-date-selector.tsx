@@ -20,12 +20,7 @@ import { ResourcePanel } from "@/components/map-date/resource-panel";
 import { SpaceMapViewer } from "@/components/map-date/space-map-viewer";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { formatDateISO } from "@/lib/date-utils";
 import { preloadMapBackgrounds } from "@/lib/map-background-cache";
 import { readJsonResponse } from "@/lib/read-json-response";

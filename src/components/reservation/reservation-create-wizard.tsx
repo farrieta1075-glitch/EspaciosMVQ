@@ -6,7 +6,6 @@ import type { Area } from "@/types/area";
 import type { FloorMap, Space } from "@/types/space";
 import type {
   MapDateSelection,
-  MonthlyRelativeOrdinal,
   RecurrenceConfig,
   RecurrenceType,
 } from "@/types/reservation";

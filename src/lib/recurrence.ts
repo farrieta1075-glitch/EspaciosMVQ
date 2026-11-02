@@ -18,14 +18,6 @@ function addDays(iso: string, days: number): string {
   return formatDateISO(d);
 }
 
-function addMonthsKeepDay(iso: string, months: number): string {
-  const [y, m, d] = iso.split("-").map(Number);
-  const date = new Date(y, m - 1 + months, 1);
-  const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
-  date.setDate(Math.min(d, lastDay));
-  return formatDateISO(date);
-}
-
 export function listRecurrenceDates(
   date: string,
   recurrenceType: RecurrenceType,
@@ -71,7 +63,7 @@ export function listRecurrenceDates(
   }
 
   if (recurrenceType === "MONTHLY_RELATIVE" && config?.monthlyRelative) {
-    let cursor = new Date(`${date}T12:00:00`);
+    const cursor = new Date(`${date}T12:00:00`);
     while (cursor <= untilDate && dates.length < MAX_OCCURRENCES) {
       const iso = dateForMonthlyRelativeInMonth(
         cursor.getFullYear(),

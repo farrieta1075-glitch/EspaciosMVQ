@@ -33,7 +33,6 @@ export function buildReservationAreaTree(
       const children = build(area.id, depth + 1);
       const selfSelectable =
         options.isAdmin || options.selectableAreaIds.has(area.id);
-      const childSelectable = children.some((child) => child.selectable);
       return {
         area,
         children,

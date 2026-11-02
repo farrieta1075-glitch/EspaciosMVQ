@@ -1,7 +1,7 @@
 import "server-only";
 import { getPrisma } from "@/lib/db/prisma";
 import { mapDbMap } from "@/lib/db/catalog/mappers";
-import type { BackgroundType, FloorMap, MapFloorId } from "@/types/space";
+import type { FloorMap, MapFloorId } from "@/types/space";
 
 export async function getAllMaps(): Promise<FloorMap[]> {
   const rows = await getPrisma().floorMap.findMany();
