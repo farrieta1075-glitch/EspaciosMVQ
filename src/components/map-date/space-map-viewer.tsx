@@ -69,6 +69,11 @@ export function SpaceMapViewer({
 }: SpaceMapViewerProps) {
   const stageRef = React.useRef<Konva.Stage>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
+  /** Evita doble toggle en móvil (Konva dispara onTap y onClick por un mismo toque). */
+  const lastSpaceToggleRef = React.useRef<{ spaceId: string; at: number } | null>(
+    null,
+  );
+  const touchHitSlop = compact ? 28 : 20;
   const [backgroundImage, setBackgroundImage] =
     React.useState<HTMLImageElement | null>(null);
   const [loadingBg, setLoadingBg] = React.useState(true);
@@ -164,13 +169,20 @@ export function SpaceMapViewer({
     };
   }
 
-  function handleSpaceClick(
+  function handleSpacePointer(
     spaceId: string,
     paint: SpacePaintStyle,
     event: KonvaEventObject<MouseEvent | TouchEvent>,
   ) {
     event.cancelBubble = true;
     if (!paint.listening || !onSpaceToggle) return;
+
+    const now = Date.now();
+    const last = lastSpaceToggleRef.current;
+    if (last && last.spaceId === spaceId && now - last.at < 450) {
+      return;
+    }
+    lastSpaceToggleRef.current = { spaceId, at: now };
     onSpaceToggle(spaceId);
   }
 
@@ -247,7 +259,7 @@ export function SpaceMapViewer({
             height={mapHeight}
             scaleX={displayScale}
             scaleY={displayScale}
-            className="touch-none bg-white shadow-sm dark:bg-zinc-900"
+            className="touch-manipulation bg-white shadow-sm dark:bg-zinc-900"
             style={{
               width: mapWidth * displayScale,
               height: mapHeight * displayScale,
@@ -291,8 +303,10 @@ export function SpaceMapViewer({
                         fill={paint.fill}
                         stroke={paint.stroke}
                         strokeWidth={isSelected ? 3 : 2}
-                        onClick={(event) => handleSpaceClick(space.id, paint, event)}
-                        onTap={(event) => handleSpaceClick(space.id, paint, event)}
+                        onTap={(event) =>
+                          handleSpacePointer(space.id, paint, event)
+                        }
+                        hitStrokeWidth={touchHitSlop}
                         listening={paint.listening}
                       />
                       <Text
@@ -315,8 +329,10 @@ export function SpaceMapViewer({
                       fill={paint.fill}
                       stroke={paint.stroke}
                       strokeWidth={isSelected ? 3 : 2}
-                      onClick={(event) => handleSpaceClick(space.id, paint, event)}
-                      onTap={(event) => handleSpaceClick(space.id, paint, event)}
+                      onTap={(event) =>
+                        handleSpacePointer(space.id, paint, event)
+                      }
+                      hitStrokeWidth={touchHitSlop}
                       listening={paint.listening}
                     />
                     <Text

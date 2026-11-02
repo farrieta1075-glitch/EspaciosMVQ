@@ -404,14 +404,23 @@ export function MapDateSelector({
             />
           )}
 
-          {!readOnly &&
-            !isReservationLayout &&
-            selectedSpaceIds.length > 0 && (
-            <p className="text-sm text-muted-foreground">
+          {!readOnly && selectedSpaceIds.length > 0 && (
+            <p
+              className={
+                isReservationLayout
+                  ? "text-xs text-muted-foreground"
+                  : "text-sm text-muted-foreground"
+              }
+            >
               {selectedSpaceIds.length} espacio(s) seleccionado(s):{" "}
               {selectedSpaceIds
                 .map((id) => mapSpaces.find((s) => s.id === id)?.name ?? id)
                 .join(", ")}
+              {isReservationLayout ? (
+                <span className="block pt-0.5 text-[11px] opacity-80">
+                  Toca de nuevo un espacio resaltado para quitarlo.
+                </span>
+              ) : null}
             </p>
           )}
         </div>
