@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { normalizeAreaEventPreset } from "@/lib/event-preset-utils";
+import type { AreaEventPreset } from "@/types/area-event-preset";
 
 const recurrencePresetSchema = z.object({
   type: z.enum([
@@ -29,8 +30,8 @@ export const areaEventPresetSchema = z.object({
   recurrence: recurrencePresetSchema.optional(),
 });
 
-function normalizePresetList(items: unknown[]): ReturnType<typeof normalizeAreaEventPreset>[] {
-  const out = [];
+function normalizePresetList(items: unknown[]): AreaEventPreset[] {
+  const out: AreaEventPreset[] = [];
   for (const item of items) {
     const preset = normalizeAreaEventPreset(item);
     if (preset) out.push(preset);
