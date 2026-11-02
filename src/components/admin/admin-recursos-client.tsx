@@ -51,6 +51,7 @@ interface ResourceFormState {
   scope: ResourceScope;
   active: boolean;
   restrictedSpaceIds: string[];
+  scalesWithAttendees: boolean;
   imageFile: File | null;
 }
 
@@ -61,6 +62,7 @@ const emptyForm: ResourceFormState = {
   scope: "GLOBAL",
   active: true,
   restrictedSpaceIds: [],
+  scalesWithAttendees: false,
   imageFile: null,
 };
 
@@ -111,6 +113,7 @@ export function AdminRecursosClient({
       scope: resource.scope,
       active: resource.active,
       restrictedSpaceIds: resource.restrictedSpaceIds,
+      scalesWithAttendees: resource.scalesWithAttendees,
       imageFile: null,
     });
     setError(null);
@@ -150,6 +153,7 @@ export function AdminRecursosClient({
       active: form.active,
       restrictedSpaceIds:
         form.scope === "RESTRICTED" ? form.restrictedSpaceIds : [],
+      scalesWithAttendees: form.scalesWithAttendees,
     };
 
     try {
@@ -418,6 +422,21 @@ export function AdminRecursosClient({
                   }
                 />
               </div>
+
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={form.scalesWithAttendees}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      scalesWithAttendees: e.target.checked,
+                    })
+                  }
+                  className="rounded border-border"
+                />
+                Cantidad ligada a asistentes (sillas, café, etc.)
+              </label>
 
               <label className="flex items-center gap-2 text-sm">
                 <input

@@ -61,6 +61,7 @@ export const SHEET_HEADERS: Record<SheetTab, string[]> = {
     "imageUrl",
     "scope",
     "active",
+    "scalesWithAttendees",
   ],
   RecursoEspacio: ["resourceId", "spaceId"],
   Reservas: [

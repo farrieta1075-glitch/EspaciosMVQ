@@ -1,7 +1,16 @@
 "use client";
 
 import * as React from "react";
-import { ChevronDown, ChevronUp, Package } from "lucide-react";
+import {
+  Check,
+  ChevronDown,
+  ChevronUp,
+  Minus,
+  Package,
+  Plus,
+  Users,
+  X,
+} from "lucide-react";
 import type { ResourceAvailability } from "@/types/reservation";
 import type { ResourceType } from "@/types/resource";
 import { RESOURCE_TYPE_LABELS } from "@/types/resource";
@@ -21,6 +30,105 @@ import { cn } from "@/lib/utils";
 
 type ResourceFilter = "ALL" | ResourceType;
 
+function ResourceQuantityControls({
+  resource,
+  selectedQty,
+  maxQty,
+  readOnly,
+  estimatedAttendees,
+  onQuantityChange,
+}: {
+  resource: ResourceAvailability;
+  selectedQty: number;
+  maxQty: number;
+  readOnly: boolean;
+  estimatedAttendees: number;
+  onQuantityChange: (resourceId: string, quantity: number) => void;
+}) {
+  const scales = Boolean(resource.scalesWithAttendees);
+  const [modePeople, setModePeople] = React.useState(scales);
+
+  if (readOnly) {
+    return <span className="text-sm">{selectedQty}</span>;
+  }
+
+  function setQty(next: number) {
+    onQuantityChange(
+      resource.id,
+      Math.min(Math.max(next, 0), maxQty),
+    );
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {scales && (
+        <Button
+          type="button"
+          size="icon"
+          variant={modePeople ? "default" : "outline"}
+          className="h-8 w-8"
+          title="Ligar a asistentes"
+          onClick={() => {
+            setModePeople(true);
+            if (estimatedAttendees > 0) setQty(estimatedAttendees);
+          }}
+        >
+          <Users className="h-4 w-4" />
+        </Button>
+      )}
+      <Button
+        type="button"
+        size="icon"
+        variant={!scales || !modePeople ? "default" : "outline"}
+        className="h-8 w-8"
+        title="Contar unidades"
+        onClick={() => setModePeople(false)}
+      >
+        <Package className="h-4 w-4" />
+      </Button>
+      <Button
+        type="button"
+        size="icon"
+        variant="outline"
+        className="h-8 w-8"
+        disabled={selectedQty <= 0}
+        onClick={() => setQty(selectedQty - 1)}
+      >
+        <Minus className="h-4 w-4" />
+      </Button>
+      <span className="min-w-[2rem] text-center text-sm font-medium">
+        {selectedQty}
+      </span>
+      <Button
+        type="button"
+        size="icon"
+        variant="outline"
+        className="h-8 w-8"
+        disabled={selectedQty >= maxQty}
+        onClick={() => {
+          if (selectedQty === 0 && modePeople && estimatedAttendees > 0) {
+            setQty(estimatedAttendees);
+          } else {
+            setQty(selectedQty + 1);
+          }
+        }}
+      >
+        <Plus className="h-4 w-4" />
+      </Button>
+      <Button
+        type="button"
+        size="icon"
+        variant="ghost"
+        className="h-8 w-8"
+        title="Poner en cero"
+        onClick={() => setQty(0)}
+      >
+        <X className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+}
+
 interface ResourcePanelProps {
   resources: ResourceAvailability[];
   selectedResources: Record<string, number>;
@@ -29,6 +137,10 @@ interface ResourcePanelProps {
   mobileAsSheet?: boolean;
   inline?: boolean;
   className?: string;
+  reservationSheet?: boolean;
+  estimatedAttendees?: number;
+  onReservationConfirm?: () => void;
+  onReservationCancel?: () => void;
 }
 
 export function ResourcePanel({
@@ -39,6 +151,10 @@ export function ResourcePanel({
   mobileAsSheet = false,
   inline = false,
   className,
+  reservationSheet = false,
+  estimatedAttendees = 0,
+  onReservationConfirm,
+  onReservationCancel,
 }: ResourcePanelProps) {
   const [filter, setFilter] = React.useState<ResourceFilter>("ALL");
   const [collapsed, setCollapsed] = React.useState(false);
@@ -46,6 +162,9 @@ export function ResourcePanel({
   const filtered = resources.filter(
     (resource) => filter === "ALL" || resource.type === filter,
   );
+
+  const selectedCount = Object.values(selectedResources).filter((q) => q > 0)
+    .length;
 
   const content = (
     <div className="space-y-4">
@@ -103,36 +222,17 @@ export function ResourcePanel({
                     </Badge>
                   </div>
                 </div>
-                {!readOnly && (() => {
-                  const selectedQty = selectedResources[resource.id] ?? 0;
-                  const maxQty = Math.max(resource.availableQty, selectedQty);
-                  return (
-                  <div className="flex items-center gap-2">
-                    <Label
-                      htmlFor={`qty-${resource.id}`}
-                      className="sr-only"
-                    >
-                      Cantidad
-                    </Label>
-                    <Input
-                      id={`qty-${resource.id}`}
-                      type="number"
-                      min={0}
-                      max={maxQty}
-                      value={selectedQty}
-                      onChange={(event) => {
-                        const value = Math.min(
-                          Math.max(Number(event.target.value) || 0, 0),
-                          maxQty,
-                        );
-                        onQuantityChange(resource.id, value);
-                      }}
-                      className="h-8 w-20"
-                      disabled={maxQty === 0}
-                    />
-                  </div>
-                  );
-                })()}
+                <ResourceQuantityControls
+                  resource={resource}
+                  selectedQty={selectedResources[resource.id] ?? 0}
+                  maxQty={Math.max(
+                    resource.availableQty,
+                    selectedResources[resource.id] ?? 0,
+                  )}
+                  readOnly={readOnly}
+                  estimatedAttendees={estimatedAttendees}
+                  onQuantityChange={onQuantityChange}
+                />
               </div>
             </div>
           ))
@@ -140,6 +240,40 @@ export function ResourcePanel({
       </div>
     </div>
   );
+
+  if (inline && reservationSheet) {
+    return (
+      <div className={cn("flex h-full min-h-0 flex-col", className)}>
+        <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-border bg-background px-4 py-3">
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            aria-label="Cancelar"
+            onClick={onReservationCancel}
+          >
+            <X className="h-5 w-5" />
+          </Button>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold">Recursos</p>
+            <p className="text-xs text-muted-foreground">
+              {selectedCount} seleccionado(s)
+            </p>
+          </div>
+          <Button
+            type="button"
+            size="icon"
+            variant="default"
+            aria-label="Confirmar recursos"
+            onClick={onReservationConfirm}
+          >
+            <Check className="h-5 w-5" />
+          </Button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-4 py-4">{content}</div>
+      </div>
+    );
+  }
 
   if (inline) {
     return <div className={className}>{content}</div>;

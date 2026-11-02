@@ -25,6 +25,11 @@ const resourceRowSchema = z.object({
     .optional()
     .default("true")
     .transform((value) => value.toLowerCase() !== "false"),
+  scalesWithAttendees: z
+    .string()
+    .optional()
+    .default("false")
+    .transform((value) => value.trim().toLowerCase() === "true"),
 });
 
 function resourceToRow(resource: Omit<Resource, "restrictedSpaceIds">): string[] {
@@ -36,6 +41,7 @@ function resourceToRow(resource: Omit<Resource, "restrictedSpaceIds">): string[]
     resource.imageUrl,
     resource.scope,
     resource.active ? "true" : "false",
+    resource.scalesWithAttendees ? "true" : "false",
   ];
 }
 
@@ -66,6 +72,7 @@ async function buildResourcesWithRestrictions(): Promise<Resource[]> {
       imageUrl: parsed.data.imageUrl,
       scope: parsed.data.scope as ResourceScope,
       active: parsed.data.active,
+      scalesWithAttendees: parsed.data.scalesWithAttendees,
       restrictedSpaceIds,
     });
   }
@@ -108,6 +115,7 @@ export async function createResource(
     imageUrl: input.imageUrl,
     scope: input.scope,
     active: input.active,
+    scalesWithAttendees: input.scalesWithAttendees ?? false,
   };
 
   if (!resource.id) {

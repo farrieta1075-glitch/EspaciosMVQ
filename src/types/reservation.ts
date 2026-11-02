@@ -62,6 +62,7 @@ export interface ResourceAvailability {
   totalQty: number;
   availableQty: number;
   scope: string;
+  scalesWithAttendees?: boolean;
 }
 
 export interface MapDateSelection {
@@ -78,12 +79,32 @@ export interface AvailabilityResponse {
   resources: ResourceAvailability[];
 }
 
-export type RecurrenceType = "NONE" | "DAILY" | "WEEKLY";
+export type RecurrenceType =
+  | "NONE"
+  | "DAILY"
+  | "WEEKLY"
+  | "BIWEEKLY"
+  | "MONTHLY_FIXED"
+  | "MONTHLY_RELATIVE"
+  | "CUSTOM";
+
+export type MonthlyRelativeOrdinal =
+  | "FIRST"
+  | "SECOND"
+  | "THIRD"
+  | "FOURTH"
+  | "LAST";
 
 export interface RecurrenceConfig {
   type: RecurrenceType;
   until: string;
   exceptDates?: string[];
+  /** Fechas ISO para recurrencia personalizada. */
+  customDates?: string[];
+  monthlyRelative?: {
+    weekday: number;
+    ordinal: MonthlyRelativeOrdinal;
+  };
 }
 
 export interface CreateReservationInput {

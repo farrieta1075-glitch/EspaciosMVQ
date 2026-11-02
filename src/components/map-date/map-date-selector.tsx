@@ -60,6 +60,11 @@ interface MapDateSelectorProps {
   excludeReservationId?: string;
   onSelectionChange?: (selection: MapDateSelection) => void;
   onReservationDatePick?: () => void;
+  hideScheduleUI?: boolean;
+  mapOnly?: boolean;
+  emptySpaceLegend?: string;
+  estimatedAttendees?: number;
+  resourcesDisabled?: boolean;
 }
 
 export function MapDateSelector({
@@ -82,6 +87,11 @@ export function MapDateSelector({
   excludeReservationId,
   onSelectionChange,
   onReservationDatePick,
+  hideScheduleUI = false,
+  mapOnly = false,
+  emptySpaceLegend,
+  estimatedAttendees = 0,
+  resourcesDisabled = false,
 }: MapDateSelectorProps) {
   const isReservationLayout = layout === "reservation";
   const [selectedDate, setSelectedDate] = React.useState(() => {
@@ -94,10 +104,13 @@ export function MapDateSelector({
   });
   const [startTime, setStartTime] = React.useState(
     initialSelection?.startTime ??
-      (isReservationLayout ? "" : "09:00"),
+      (isReservationLayout ? "08:00" : "09:00"),
   );
   const [endTime, setEndTime] = React.useState(
-    initialSelection?.endTime ?? (isReservationLayout ? "" : "18:00"),
+    initialSelection?.endTime ??
+      (isReservationLayout
+        ? "09:00"
+        : "18:00"),
   );
   const [internalResourcesOpen, setInternalResourcesOpen] = React.useState(false);
   const resourcesOpen = resourcesSheetOpen ?? internalResourcesOpen;
@@ -323,23 +336,28 @@ export function MapDateSelector({
     );
   }
 
+  const showMapSection = !mapOnly || mapOnly;
+  const showScheduleSection = !hideScheduleUI && !mapOnly;
+
   return (
     <div className={isReservationLayout ? "space-y-2" : "space-y-4"}>
-      <DateNavigator
-        date={selectedDate}
-        startTime={startTime}
-        endTime={endTime}
-        onDateChange={setSelectedDate}
-        onStartTimeChange={setStartTime}
-        onEndTimeChange={setEndTime}
-        showCalendarLink={showCalendarLink && !isReservationLayout}
-        variant={isReservationLayout ? "reservation" : "default"}
-        onReservationDatePick={
-          isReservationLayout ? onReservationDatePick : undefined
-        }
-      />
+      {showScheduleSection && (
+        <DateNavigator
+          date={selectedDate}
+          startTime={startTime}
+          endTime={endTime}
+          onDateChange={setSelectedDate}
+          onStartTimeChange={setStartTime}
+          onEndTimeChange={setEndTime}
+          showCalendarLink={showCalendarLink && !isReservationLayout}
+          variant={isReservationLayout ? "reservation" : "default"}
+          onReservationDatePick={
+            isReservationLayout ? onReservationDatePick : undefined
+          }
+        />
+      )}
 
-      {maps.length > 1 && (
+      {showMapSection && maps.length > 1 && (
         <div
           className={
             isReservationLayout ? "space-y-1" : "max-w-xs space-y-2"
@@ -404,7 +422,7 @@ export function MapDateSelector({
             />
           )}
 
-          {!readOnly && selectedSpaceIds.length > 0 && (
+          {!readOnly && (
             <p
               className={
                 isReservationLayout
@@ -412,15 +430,24 @@ export function MapDateSelector({
                   : "text-sm text-muted-foreground"
               }
             >
-              {selectedSpaceIds.length} espacio(s) seleccionado(s):{" "}
-              {selectedSpaceIds
-                .map((id) => mapSpaces.find((s) => s.id === id)?.name ?? id)
-                .join(", ")}
-              {isReservationLayout ? (
-                <span className="block pt-0.5 text-[11px] opacity-80">
-                  Toca de nuevo un espacio resaltado para quitarlo.
-                </span>
-              ) : null}
+              {selectedSpaceIds.length > 0 ? (
+                <>
+                  {selectedSpaceIds.length} espacio(s) seleccionado(s):{" "}
+                  {selectedSpaceIds
+                    .map((id) => mapSpaces.find((s) => s.id === id)?.name ?? id)
+                    .join(", ")}
+                  {isReservationLayout ? (
+                    <span className="block pt-0.5 text-[11px] opacity-80">
+                      Toca de nuevo un espacio resaltado para quitarlo.
+                    </span>
+                  ) : null}
+                </>
+              ) : (
+                emptySpaceLegend ??
+                (isReservationLayout
+                  ? "Toca para seleccionar un espacio del mapa"
+                  : null)
+              )}
             </p>
           )}
         </div>
@@ -440,20 +467,20 @@ export function MapDateSelector({
         <Sheet open={resourcesOpen} onOpenChange={setResourcesOpen}>
           <SheetContent
             side="bottom"
-            className="max-h-[85dvh] overflow-y-auto px-4 pb-8 pt-4"
+            hideClose
+            className="flex max-h-[85dvh] flex-col gap-0 overflow-hidden px-0 pb-0 pt-0"
           >
-            <SheetHeader className="text-left">
-              <SheetTitle>Recursos</SheetTitle>
-            </SheetHeader>
-            <div className="mt-4">
-              <ResourcePanel
-                inline
-                resources={availability?.resources ?? []}
-                selectedResources={selectedResources}
-                onQuantityChange={handleResourceQuantityChange}
-                readOnly={readOnly}
-              />
-            </div>
+            <ResourcePanel
+              inline
+              reservationSheet
+              resources={availability?.resources ?? []}
+              selectedResources={selectedResources}
+              onQuantityChange={handleResourceQuantityChange}
+              readOnly={readOnly || resourcesDisabled}
+              estimatedAttendees={estimatedAttendees}
+              onReservationConfirm={() => setResourcesOpen(false)}
+              onReservationCancel={() => setResourcesOpen(false)}
+            />
           </SheetContent>
         </Sheet>
       )}

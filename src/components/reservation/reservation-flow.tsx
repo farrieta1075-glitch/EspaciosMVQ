@@ -6,7 +6,7 @@ import { CheckCircle2, Loader2 } from "lucide-react";
 import type { Area } from "@/types/area";
 import type { FloorMap, Space } from "@/types/space";
 import type { EventPresetGroup } from "@/components/reservation/event-form";
-import type { MapDateSelection, RecurrenceType } from "@/types/reservation";
+import type { MapDateSelection, RecurrenceConfig } from "@/types/reservation";
 import { reservationNeedsAttendeeJustification } from "@/lib/capacity-validation";
 import {
   MapDateSelector,
@@ -25,10 +25,8 @@ import {
   shouldRetryMutationRequest,
   sleep,
 } from "@/lib/read-json-response";
-import { EventForm } from "@/components/reservation/event-form";
+import { ReservationCreateWizard } from "@/components/reservation/reservation-create-wizard";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
 import {
   Card,
   CardContent,
@@ -43,12 +41,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
 
 interface ReservationFlowProps {
   maps: FloorMap[];
@@ -84,12 +76,12 @@ export function ReservationFlow({
     React.useState("");
   const [attendeeJustificationNote, setAttendeeJustificationNote] =
     React.useState("");
-  const [recurrenceType, setRecurrenceType] =
-    React.useState<RecurrenceType>("NONE");
-  const [recurrenceUntil, setRecurrenceUntil] = React.useState("");
-  const [recurrenceExceptDates, setRecurrenceExceptDates] = React.useState<
-    string[]
-  >([]);
+  const [recurrence, setRecurrence] = React.useState<RecurrenceConfig>({
+    type: "NONE",
+    until: "",
+    exceptDates: [],
+    customDates: [],
+  });
   const [sendEventReminder, setSendEventReminder] = React.useState(true);
   const [areaId, setAreaId] = React.useState(
     userAreaId ?? userAreaScopeIds[0] ?? areas[0]?.id ?? "",
@@ -110,7 +102,6 @@ export function ReservationFlow({
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [resourcesOpen, setResourcesOpen] = React.useState(false);
-  const [eventOpen, setEventOpen] = React.useState(false);
   const [similarPrompt, setSimilarPrompt] = React.useState<{
     name: string;
     similarity: number;
@@ -160,9 +151,12 @@ export function ReservationFlow({
     setEstimatedAttendees(draft.estimatedAttendees);
     setAttendeeJustificationCode(draft.attendeeJustificationCode);
     setAttendeeJustificationNote(draft.attendeeJustificationNote);
-    setRecurrenceType(draft.recurrenceType);
-    setRecurrenceUntil(draft.recurrenceUntil);
-    setRecurrenceExceptDates(draft.recurrenceExceptDates ?? []);
+    setRecurrence({
+      type: draft.recurrenceType,
+      until: draft.recurrenceUntil,
+      exceptDates: draft.recurrenceExceptDates ?? [],
+      customDates: [],
+    });
     setSendEventReminder(draft.sendEventReminder ?? true);
     setAreaId(draft.areaId);
 
@@ -240,10 +234,13 @@ export function ReservationFlow({
       startTime: selection.startTime,
       endTime: selection.endTime,
       recurrence: {
-        type: recurrenceType,
-        until: recurrenceType === "NONE" ? selection.date : recurrenceUntil,
+        ...recurrence,
+        until:
+          recurrence.type === "NONE" || recurrence.type === "CUSTOM"
+            ? selection.date
+            : recurrence.until,
         exceptDates:
-          recurrenceType === "NONE" ? [] : recurrenceExceptDates,
+          recurrence.type === "NONE" ? [] : recurrence.exceptDates ?? [],
       },
       sendEventReminder,
       resources: selection.selectedResources,
@@ -332,9 +329,9 @@ export function ReservationFlow({
       estimatedAttendees,
       attendeeJustificationCode,
       attendeeJustificationNote,
-      recurrenceType,
-      recurrenceUntil,
-      recurrenceExceptDates,
+      recurrenceType: recurrence.type,
+      recurrenceUntil: recurrence.until,
+      recurrenceExceptDates: recurrence.exceptDates ?? [],
       sendEventReminder,
       areaId,
       selection,
@@ -349,128 +346,50 @@ export function ReservationFlow({
 
   return (
     <div className="flex flex-col gap-2 pb-2">
-      <MapDateSelector
-        key={mapSelectorKey}
+      <ReservationCreateWizard
         maps={maps}
         spaces={spaces}
+        areas={areas}
+        isAdmin={isAdmin}
+        userAreaId={userAreaId}
+        userAreaScopeIds={userAreaScopeIds}
         initialDate={restoredSelection?.date ?? initialDate}
         initialMapId={initialMapId}
         initialSpaceId={initialSpaceId}
-        initialSelection={restoredSelection}
-        areas={areas}
-        highlightAreaId={activeHighlightAreaId}
-        layout="reservation"
-        showResourcePanel
-        showCalendarLink={false}
-        resourcesSheetOpen={resourcesOpen}
-        onResourcesSheetOpenChange={setResourcesOpen}
+        mapSelectorKey={mapSelectorKey}
+        restoredSelection={restoredSelection}
+        eventPresetGroups={eventPresetGroups}
+        presetsByAreaId={presetsByAreaId}
+        presetSourceAreaId={presetSourceAreaId}
+        onPresetSourceAreaIdChange={setPresetSourceAreaId}
         onSelectionChange={handleSelectionChange}
         onReservationDatePick={handleReservationDatePick}
+        resourcesOpen={resourcesOpen}
+        onResourcesOpenChange={setResourcesOpen}
+        resourceCount={resourceCount}
+        selection={selection}
+        onSubmit={() => submitReservation(false)}
+        canSubmit={canSubmit}
+        loading={loading}
+        eventName={eventName}
+        onEventNameChange={setEventName}
+        eventDescription={eventDescription}
+        onEventDescriptionChange={setEventDescription}
+        estimatedAttendees={estimatedAttendees}
+        onEstimatedAttendeesChange={setEstimatedAttendees}
+        attendeeJustificationCode={attendeeJustificationCode}
+        onAttendeeJustificationCodeChange={setAttendeeJustificationCode}
+        attendeeJustificationNote={attendeeJustificationNote}
+        onAttendeeJustificationNoteChange={setAttendeeJustificationNote}
+        recurrence={recurrence}
+        onRecurrenceChange={setRecurrence}
+        sendEventReminder={sendEventReminder}
+        onSendEventReminderChange={setSendEventReminder}
+        areaId={areaId}
+        onAreaIdChange={setAreaId}
+        reservationAreaId={reservationAreaId}
+        onReservationAreaIdChange={setReservationAreaId}
       />
-
-      {(isAdmin || userAreaScopeIds.length > 1) && (
-        <div className="space-y-1 pt-1">
-          <Label htmlFor="reservationAreaId" className="text-xs">
-            {isAdmin ? "Área de la reserva" : "Perfil / subárea para esta reserva"}
-          </Label>
-          <Select
-            id="reservationAreaId"
-            value={isAdmin ? areaId : reservationAreaId}
-            onChange={(event) => {
-              const value = event.target.value;
-              if (isAdmin) setAreaId(value);
-              else setReservationAreaId(value);
-            }}
-            className="h-9"
-          >
-            <option value="">Selecciona área</option>
-            {(isAdmin
-              ? areas
-              : areas.filter((area) => userAreaScopeIds.includes(area.id))
-            ).map((area) => {
-              const parent = area.parentId
-                ? areas.find((item) => item.id === area.parentId)
-                : null;
-              const label = parent
-                ? `${parent.name} · ${area.name}`
-                : area.name;
-              return (
-                <option key={area.id} value={area.id}>
-                  {label}
-                </option>
-              );
-            })}
-          </Select>
-        </div>
-      )}
-
-      <div className="grid grid-cols-2 gap-2 pt-1">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="h-9"
-          onClick={() => setResourcesOpen(true)}
-        >
-          Recursos{resourceCount > 0 ? ` (${resourceCount})` : ""}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="h-9"
-          onClick={() => setEventOpen(true)}
-        >
-          Datos del evento
-        </Button>
-      </div>
-
-      <Sheet open={eventOpen} onOpenChange={setEventOpen}>
-        <SheetContent
-          side="bottom"
-          className="max-h-[85dvh] overflow-y-auto px-4 pb-8 pt-4"
-        >
-          <SheetHeader className="text-left">
-            <SheetTitle>Datos del evento</SheetTitle>
-          </SheetHeader>
-          <div className="mt-4">
-            <EventForm
-              bare
-              eventName={eventName}
-              onEventNameChange={setEventName}
-              eventDescription={eventDescription}
-              onEventDescriptionChange={setEventDescription}
-              recurrenceType={recurrenceType}
-              onRecurrenceTypeChange={setRecurrenceType}
-              recurrenceUntil={recurrenceUntil}
-              onRecurrenceUntilChange={setRecurrenceUntil}
-              recurrenceExceptDates={recurrenceExceptDates}
-              onRecurrenceExceptDatesChange={setRecurrenceExceptDates}
-              sendEventReminder={sendEventReminder}
-              onSendEventReminderChange={setSendEventReminder}
-              baseDate={selection?.date ?? ""}
-              areaId={areaId}
-              onAreaIdChange={setAreaId}
-              areas={areas}
-              isAdmin={isAdmin}
-              hideAdminArea
-              estimatedAttendees={estimatedAttendees}
-              onEstimatedAttendeesChange={setEstimatedAttendees}
-              attendeeJustificationCode={attendeeJustificationCode}
-              onAttendeeJustificationCodeChange={setAttendeeJustificationCode}
-              attendeeJustificationNote={attendeeJustificationNote}
-              onAttendeeJustificationNoteChange={setAttendeeJustificationNote}
-              selectedSpaceIds={selection?.selectedSpaceIds ?? []}
-              spaces={spaces}
-              eventPresetGroups={eventPresetGroups}
-              eventPresetAreaOptions={eventPresetAreaOptions}
-              presetsByAreaId={presetsByAreaId}
-              presetSourceAreaId={presetSourceAreaId}
-              onPresetSourceAreaIdChange={setPresetSourceAreaId}
-            />
-          </div>
-        </SheetContent>
-      </Sheet>
 
       {similarPrompt && (
         <Card className="border-amber-500/40 bg-amber-500/10">
@@ -504,22 +423,6 @@ export function ReservationFlow({
           {error}
         </p>
       )}
-
-      <Button
-        size="lg"
-        className="h-10 w-full"
-        disabled={!canSubmit || loading}
-        onClick={() => submitReservation(false)}
-      >
-        {loading ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Guardando...
-          </>
-        ) : (
-          "Confirmar reserva"
-        )}
-      </Button>
 
       <Dialog
         open={successInfo !== null}
@@ -560,9 +463,12 @@ export function ReservationFlow({
                 setEstimatedAttendees("");
                 setAttendeeJustificationCode("");
                 setAttendeeJustificationNote("");
-                setRecurrenceType("NONE");
-                setRecurrenceUntil("");
-                setRecurrenceExceptDates([]);
+                setRecurrence({
+                  type: "NONE",
+                  until: "",
+                  exceptDates: [],
+                  customDates: [],
+                });
                 setSendEventReminder(true);
               }}
             >

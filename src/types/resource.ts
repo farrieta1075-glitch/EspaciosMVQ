@@ -11,6 +11,8 @@ export interface Resource {
   scope: ResourceScope;
   active: boolean;
   restrictedSpaceIds: string[];
+  /** Cantidad sugerida según asistentes (sillas, café, etc.). */
+  scalesWithAttendees: boolean;
 }
 
 export const RESOURCE_TYPE_LABELS: Record<ResourceType, string> = {

@@ -34,6 +34,7 @@ export async function createResource(input: {
   scope?: ResourceScope;
   active?: boolean;
   restrictedSpaceIds?: string[];
+  scalesWithAttendees?: boolean;
 }): Promise<Resource> {
   const { createId } = await import("@/lib/id");
   const id = createId("res");
@@ -46,6 +47,7 @@ export async function createResource(input: {
       imageUrl: input.imageUrl?.trim() ?? "",
       scope: input.scope ?? "GLOBAL",
       active: input.active ?? true,
+      scalesWithAttendees: input.scalesWithAttendees ?? false,
     },
   });
   if (input.scope === "RESTRICTED" && input.restrictedSpaceIds) {
@@ -64,6 +66,7 @@ export async function updateResource(
     scope: ResourceScope;
     active: boolean;
     restrictedSpaceIds: string[];
+    scalesWithAttendees: boolean;
   }>,
 ): Promise<Resource | null> {
   const existing = await getResourceById(id);
@@ -77,6 +80,8 @@ export async function updateResource(
       imageUrl: input.imageUrl ?? existing.imageUrl,
       scope: input.scope ?? existing.scope,
       active: input.active ?? existing.active,
+      scalesWithAttendees:
+        input.scalesWithAttendees ?? existing.scalesWithAttendees,
     },
   });
   if (input.restrictedSpaceIds !== undefined) {

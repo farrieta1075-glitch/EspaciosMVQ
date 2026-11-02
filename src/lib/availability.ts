@@ -110,6 +110,7 @@ export async function getAvailability(
         totalQty: resource.totalQty,
         availableQty,
         scope: resource.scope,
+        scalesWithAttendees: resource.scalesWithAttendees,
       };
     });
 

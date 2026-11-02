@@ -33,9 +33,24 @@ export async function GET() {
 }
 
 const recurrenceSchema = z.object({
-  type: z.enum(["NONE", "DAILY", "WEEKLY"]),
+  type: z.enum([
+    "NONE",
+    "DAILY",
+    "WEEKLY",
+    "BIWEEKLY",
+    "MONTHLY_FIXED",
+    "MONTHLY_RELATIVE",
+    "CUSTOM",
+  ]),
   until: z.string().optional().default(""),
   exceptDates: z.array(z.string()).optional().default([]),
+  customDates: z.array(z.string()).optional().default([]),
+  monthlyRelative: z
+    .object({
+      weekday: z.number().min(0).max(6),
+      ordinal: z.enum(["FIRST", "SECOND", "THIRD", "FOURTH", "LAST"]),
+    })
+    .optional(),
 });
 
 const createSchema = z.object({

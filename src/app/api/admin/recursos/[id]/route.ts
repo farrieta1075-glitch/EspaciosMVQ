@@ -15,6 +15,7 @@ const updateResourceSchema = z.object({
   scope: z.enum(["GLOBAL", "RESTRICTED"]).optional(),
   active: z.boolean().optional(),
   restrictedSpaceIds: z.array(z.string()).optional(),
+  scalesWithAttendees: z.boolean().optional(),
 });
 
 export async function GET(

@@ -72,6 +72,7 @@ model Resource {
   imageUrl String  @default("") @db.NVarChar(2048)
   scope    String  @default("") @db.NVarChar(64)
   active   Boolean @default(true)
+  scalesWithAttendees Boolean @default(false)
 
   @@map("Resources")
 }

@@ -98,6 +98,7 @@ export function mapDbResource(row: DbResource): Omit<Resource, "restrictedSpaceI
     imageUrl: row.imageUrl,
     scope: row.scope as ResourceScope,
     active: row.active,
+    scalesWithAttendees: row.scalesWithAttendees,
   };
 }
 
