@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth/index";
+import { getVapidServerDiagnostics } from "@/lib/push/vapid-config";
 import { getPushSubscriptionsForUser } from "@/lib/sheets/push-subscriptions";
 
 export const runtime = "nodejs";
@@ -13,19 +14,21 @@ export async function GET(request: Request) {
   const deviceId =
     new URL(request.url).searchParams.get("deviceId")?.trim() || undefined;
 
-  const vapidPublic = Boolean(
-    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY?.trim(),
-  );
-  const vapidPrivate = Boolean(process.env.VAPID_PRIVATE_KEY?.trim());
+  const vapidDiag = getVapidServerDiagnostics();
   const subscriptions = await getPushSubscriptionsForUser(session.user.id);
   const currentDeviceRegistered = deviceId
     ? subscriptions.some((item) => item.deviceId === deviceId)
     : undefined;
 
   return NextResponse.json({
-    serverConfigured: vapidPublic && vapidPrivate,
-    vapidPublic,
-    vapidPrivate,
+    serverConfigured: vapidDiag.configured && vapidDiag.keysMatch,
+    vapid: {
+      keysMatch: vapidDiag.keysMatch,
+      subjectAcceptable: vapidDiag.subjectAcceptable,
+      usingDefaultSubject: vapidDiag.usingDefaultSubject,
+      publicKeyFingerprint: vapidDiag.publicKeyFingerprint,
+      issues: vapidDiag.issues,
+    },
     subscriptionCount: subscriptions.length,
     currentDeviceRegistered,
     subscriptions: subscriptions.map((item) => ({

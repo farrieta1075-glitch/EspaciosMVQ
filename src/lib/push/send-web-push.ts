@@ -1,16 +1,21 @@
 import "server-only";
 import webpush, { type RequestOptions } from "web-push";
 import { getPushSubscriptionsForUser } from "@/lib/sheets/push-subscriptions";
+import {
+  getVapidPrivateKeyFromEnv,
+  getVapidPublicKeyFromEnv,
+  getVapidServerDiagnostics,
+  getVapidSubjectFromEnv,
+} from "@/lib/push/vapid-config";
 
 let vapidConfigured = false;
 
 function ensureVapid(): boolean {
   if (vapidConfigured) return true;
 
-  const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY?.trim();
-  const privateKey = process.env.VAPID_PRIVATE_KEY?.trim();
-  const subject =
-    process.env.WEB_PUSH_VAPID_SUBJECT?.trim() || "mailto:soporte@mvqro.local";
+  const publicKey = getVapidPublicKeyFromEnv();
+  const privateKey = getVapidPrivateKeyFromEnv();
+  const subject = getVapidSubjectFromEnv();
 
   if (!publicKey || !privateKey) {
     console.warn(
@@ -85,10 +90,25 @@ export type WebPushUserError = {
   hint: string;
 };
 
+function appleVapid403Hint(): string {
+  const diag = getVapidServerDiagnostics();
+  if (!diag.keysMatch) {
+    return "iOS rechazó VAPID: la clave privada en Vercel no coincide con NEXT_PUBLIC_VAPID_PUBLIC_KEY. Genera un par (npm run generate:vapid), pon las dos claves en Vercel, redeploy y sincroniza de nuevo.";
+  }
+  if (!diag.subjectAcceptable) {
+    return "iOS rechazó VAPID: falta WEB_PUSH_VAPID_SUBJECT en Vercel. Añade mailto:tu-correo@tudominio.com (correo real), redeploy, luego «Sincronizar dispositivo» en el iPhone.";
+  }
+  return "iOS rechazó VAPID tras el envío. En Vercel confirma el par de claves y WEB_PUSH_VAPID_SUBJECT, redeploy, sincroniza el iPhone y vuelve a probar con la app en segundo plano.";
+}
+
 function userHintForFailure(detail: WebPushDeliveryDetail): string {
   if (detail.platform === "apple") {
     if (detail.statusCode === 403) {
-      return "iOS rechazó VAPID. En Vercel usa WEB_PUSH_VAPID_SUBJECT=mailto:correo@tudominio.com y el mismo par de claves VAPID que al activar push.";
+      const base = appleVapid403Hint();
+      if (detail.error?.trim()) {
+        return `${base} (Apple: ${detail.error.trim()})`;
+      }
+      return base;
     }
     if (detail.statusCode === 410 || detail.statusCode === 404) {
       return "Suscripción iOS expirada. Pulsa «Sincronizar dispositivo» de nuevo.";

@@ -3,12 +3,19 @@
 import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { getOrCreateDeviceId } from "@/lib/push/device-id";
+import { getVapidPublicKey } from "@/lib/push/client-config";
 import {
   isIosDevice,
   isStandaloneDisplayMode,
   requestWebPushPermissionAndSubscribe,
   syncWebPushSubscription,
 } from "@/lib/push/subscribe-web-push";
+
+function localVapidFingerprint(): string {
+  const key = getVapidPublicKey().trim();
+  if (key.length < 16) return "";
+  return `${key.slice(0, 6)}…${key.slice(-6)}`;
+}
 
 interface PushDeviceActionsProps {
   userId: string;
@@ -30,6 +37,7 @@ export function PushDeviceActions({
   const [serverConfigured, setServerConfigured] = React.useState<
     boolean | null
   >(null);
+  const [vapidIssues, setVapidIssues] = React.useState<string[]>([]);
   const [message, setMessage] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
 
@@ -44,10 +52,23 @@ export function PushDeviceActions({
         subscriptionCount: number;
         serverConfigured: boolean;
         currentDeviceRegistered?: boolean;
+        vapid?: {
+          publicKeyFingerprint?: string;
+          issues?: string[];
+        };
       };
       setSubscriptionCount(data.subscriptionCount);
       setServerConfigured(data.serverConfigured);
       setCurrentDeviceRegistered(data.currentDeviceRegistered ?? null);
+      const issues = [...(data.vapid?.issues ?? [])];
+      const serverFp = data.vapid?.publicKeyFingerprint?.trim();
+      const localFp = localVapidFingerprint();
+      if (serverFp && localFp && serverFp !== localFp) {
+        issues.push(
+          "La app instalada usa otra clave VAPID que el servidor. En Vercel actualiza NEXT_PUBLIC_VAPID_PUBLIC_KEY y VAPID_PRIVATE_KEY juntas y espera un redeploy completo.",
+        );
+      }
+      setVapidIssues(issues);
     } catch {
       /* ignore */
     }
@@ -149,9 +170,16 @@ export function PushDeviceActions({
       ) : null}
       {serverConfigured === false ? (
         <p className="text-xs text-destructive">
-          El servidor no tiene claves VAPID (Vercel). Solo funcionan avisos
-          dentro de la app.
+          El servidor no tiene claves VAPID válidas (Vercel). Solo funcionan
+          avisos dentro de la app.
         </p>
+      ) : null}
+      {vapidIssues.length > 0 ? (
+        <ul className="list-disc space-y-1 pl-4 text-xs text-amber-800 dark:text-amber-400">
+          {vapidIssues.map((issue) => (
+            <li key={issue}>{issue}</li>
+          ))}
+        </ul>
       ) : null}
       {permission === "default" ? (
         <p className="text-xs text-muted-foreground">
