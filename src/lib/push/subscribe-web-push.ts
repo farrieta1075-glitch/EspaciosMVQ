@@ -31,14 +31,20 @@ async function registerPushServiceWorker(): Promise<ServiceWorkerRegistration | 
 
 async function obtainBrowserPushSubscription(
   registration: ServiceWorkerRegistration,
+  options?: { forceRefresh?: boolean },
 ): Promise<PushSubscription> {
   const vapidKey = getVapidPublicKey();
   const applicationServerKey = urlBase64ToUint8Array(vapidKey);
   const storedVapid = localStorage.getItem(VAPID_STORAGE_KEY);
+  const forceRefresh =
+    options?.forceRefresh ?? isIosDevice();
 
   let subscription = await registration.pushManager.getSubscription();
 
-  if (subscription && storedVapid && storedVapid !== vapidKey) {
+  if (
+    subscription &&
+    (forceRefresh || (storedVapid && storedVapid !== vapidKey))
+  ) {
     await subscription.unsubscribe();
     subscription = null;
   }
@@ -100,7 +106,9 @@ export async function syncWebPushSubscription(
 
   let subscription: PushSubscription;
   try {
-    subscription = await obtainBrowserPushSubscription(registration);
+    subscription = await obtainBrowserPushSubscription(registration, {
+      forceRefresh: isIosDevice(),
+    });
   } catch (error) {
     return {
       ok: false,

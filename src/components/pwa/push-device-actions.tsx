@@ -2,7 +2,10 @@
 
 import * as React from "react";
 import { Button } from "@/components/ui/button";
+import { getOrCreateDeviceId } from "@/lib/push/device-id";
 import {
+  isIosDevice,
+  isStandaloneDisplayMode,
   requestWebPushPermissionAndSubscribe,
   syncWebPushSubscription,
 } from "@/lib/push/subscribe-web-push";
@@ -21,6 +24,9 @@ export function PushDeviceActions({
   const [subscriptionCount, setSubscriptionCount] = React.useState<
     number | null
   >(null);
+  const [currentDeviceRegistered, setCurrentDeviceRegistered] = React.useState<
+    boolean | null
+  >(null);
   const [serverConfigured, setServerConfigured] = React.useState<
     boolean | null
   >(null);
@@ -29,14 +35,19 @@ export function PushDeviceActions({
 
   async function refreshStatus() {
     try {
-      const response = await fetch("/api/push/status");
+      const deviceId = getOrCreateDeviceId();
+      const response = await fetch(
+        `/api/push/status?deviceId=${encodeURIComponent(deviceId)}`,
+      );
       if (!response.ok) return;
       const data = (await response.json()) as {
         subscriptionCount: number;
         serverConfigured: boolean;
+        currentDeviceRegistered?: boolean;
       };
       setSubscriptionCount(data.subscriptionCount);
       setServerConfigured(data.serverConfigured);
+      setCurrentDeviceRegistered(data.currentDeviceRegistered ?? null);
     } catch {
       /* ignore */
     }
@@ -87,12 +98,17 @@ export function PushDeviceActions({
     setBusy(true);
     setMessage(null);
     try {
-      const response = await fetch("/api/push/test", { method: "POST" });
+      const response = await fetch("/api/push/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deviceId: getOrCreateDeviceId() }),
+      });
       const data = (await response.json()) as {
         ok?: boolean;
         error?: string;
         sent?: number;
         failed?: number;
+        errors?: { host: string; statusCode?: number; hint: string }[];
       };
       if (!response.ok) {
         setMessage(data.error ?? "No se pudo enviar la prueba.");
@@ -100,11 +116,15 @@ export function PushDeviceActions({
       }
       if (data.sent && data.sent > 0) {
         setMessage(
-          "Prueba enviada. Minimiza la app y revisa la bandeja del sistema.",
+          isIosDevice()
+            ? "Prueba enviada. Cierra o minimiza la app (icono de inicio) y revisa el centro de notificaciones."
+            : "Prueba enviada. Minimiza la app y revisa la bandeja del sistema.",
         );
       } else {
+        const detail = data.errors?.[0]?.hint;
         setMessage(
-          "No llegó al dispositivo. Toca «Sincronizar dispositivo» e intenta de nuevo.",
+          detail ??
+            "No llegó al dispositivo. Pulsa «Sincronizar dispositivo» e intenta de nuevo.",
         );
       }
     } catch {
@@ -144,13 +164,25 @@ export function PushDeviceActions({
           notificaciones para MVQro Espacios.
         </p>
       ) : (
-        <p className="text-xs text-muted-foreground">
-          {subscriptionCount === null
-            ? "Comprobando registro…"
-            : subscriptionCount > 0
-              ? `${subscriptionCount} dispositivo(s) registrado(s).`
-              : "Permiso concedido, pero el dispositivo no está registrado en el servidor."}
-        </p>
+        <>
+          <p className="text-xs text-muted-foreground">
+            {subscriptionCount === null
+              ? "Comprobando registro…"
+              : currentDeviceRegistered
+                ? subscriptionCount > 1
+                  ? `Este dispositivo registrado (${subscriptionCount} en total).`
+                  : "Este dispositivo registrado en el servidor."
+                : subscriptionCount > 0
+                  ? "Hay otros dispositivos registrados, pero no este iPhone. Pulsa «Sincronizar dispositivo»."
+                  : "Permiso concedido, pero el dispositivo no está registrado en el servidor."}
+          </p>
+          {isIosDevice() && !isStandaloneDisplayMode() ? (
+            <p className="text-xs text-amber-700 dark:text-amber-400">
+              En iPhone, abre la app desde el icono en la pantalla de inicio (no
+              desde Safari) para que lleguen las notificaciones push.
+            </p>
+          ) : null}
+        </>
       )}
       <div className="flex flex-wrap gap-2">
         {permission === "default" ? (
@@ -180,7 +212,7 @@ export function PushDeviceActions({
               type="button"
               size="sm"
               className="touch-manipulation"
-              disabled={busy || (subscriptionCount ?? 0) === 0}
+              disabled={busy || currentDeviceRegistered !== true}
               onClick={() => void sendTest()}
             >
               Enviar prueba

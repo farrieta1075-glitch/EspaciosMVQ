@@ -3,26 +3,31 @@
 self.addEventListener("push", (event) => {
   let payload = {
     title: "MVQro Espacios",
-    body: "",
+    body: "Tienes una nueva notificación.",
     url: "/reservas",
     tag: "mvqro-notification",
   };
 
   try {
     if (event.data) {
-      payload = { ...payload, ...event.data.json() };
+      const parsed = event.data.json();
+      payload = { ...payload, ...parsed };
     }
   } catch {
     if (event.data) {
-      payload.body = event.data.text();
+      const text = event.data.text();
+      if (text) payload.body = text;
     }
+  }
+
+  if (!payload.body?.trim()) {
+    payload.body = "Tienes una nueva notificación.";
   }
 
   event.waitUntil(
     self.registration.showNotification(payload.title, {
       body: payload.body,
       tag: payload.tag || "mvqro-notification",
-      renotify: true,
       data: { url: payload.url || "/reservas" },
     }),
   );
