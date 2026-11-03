@@ -6,8 +6,10 @@ import {
   canConfirmAttendance,
   canModifyReservation,
 } from "@/lib/auth/reservation-permissions";
+import { resolveUserAreaScopeIds } from "@/lib/area-scope";
 import { isPastReservation } from "@/lib/reservation-utils";
 import { AttendanceConfirmFlow } from "@/components/reservation/attendance-confirm-flow";
+import { getUserById } from "@/lib/sheets/users";
 import { getAllAreas } from "@/lib/sheets/areas";
 import { getAllMaps } from "@/lib/sheets/maps";
 import { getAllSpaces } from "@/lib/sheets/spaces";
@@ -51,6 +53,15 @@ export default async function EditarReservaPage({
 
   if (!detail) notFound();
 
+  const userRecord = session.user.id
+    ? await getUserById(session.user.id)
+    : null;
+  const userAreaScopeIds = userRecord
+    ? resolveUserAreaScopeIds(userRecord)
+    : [];
+  const showAttendanceSection =
+    past && admin && canConfirmAttendance(session.user, reservation);
+
   return (
     <section className="space-y-3">
       <header>
@@ -68,13 +79,23 @@ export default async function EditarReservaPage({
       {attendanceOnly ? (
         <AttendanceConfirmFlow reservation={detail} />
       ) : (
-        <ReservationEditFlow
-          reservation={detail}
-          maps={maps}
-          spaces={spaces}
-          areas={areas}
-          isAdmin={admin}
-        />
+        <>
+          <ReservationEditFlow
+            reservation={detail}
+            maps={maps}
+            spaces={spaces}
+            areas={areas}
+            isAdmin={admin}
+            userAreaId={session.user.areaId ?? null}
+            userAreaScopeIds={userAreaScopeIds}
+          />
+          {showAttendanceSection && (
+            <div id="asistencia" className="scroll-mt-4 space-y-2 pt-2">
+              <h2 className="text-lg font-semibold">Registrar asistencia</h2>
+              <AttendanceConfirmFlow reservation={detail} />
+            </div>
+          )}
+        </>
       )}
     </section>
   );

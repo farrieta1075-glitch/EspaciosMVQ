@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, Loader2 } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
 import type { Area } from "@/types/area";
 import type { FloorMap, Space } from "@/types/space";
 import type { MapDateSelection, ReservationDetail } from "@/types/reservation";
@@ -12,29 +12,23 @@ import {
   extractTimeFromIso,
 } from "@/lib/date-utils";
 import { reservationNeedsAttendeeJustification } from "@/lib/capacity-validation";
-import {
-  MapDateSelector,
-  type InitialMapSelection,
-} from "@/components/map-date/map-date-selector";
+import { parseRecurrenceRule } from "@/lib/recurrence";
+import type { InitialMapSelection } from "@/components/map-date/map-date-selector";
 import {
   buildCalendarPickUrl,
   clearReservationDraft,
   consumePickedReservationDate,
   loadReservationDraft,
   saveReservationDraft,
+  type ReservationWizardConfirmed,
 } from "@/lib/reservation-draft-storage";
 import {
   readJsonResponse,
   shouldRetryMutationRequest,
   sleep,
 } from "@/lib/read-json-response";
-import {
-  EventForm,
-  type EventPresetGroup,
-} from "@/components/reservation/event-form";
+import { ReservationCreateWizard } from "@/components/reservation/reservation-create-wizard";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
 import {
   Card,
   CardContent,
@@ -49,12 +43,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+
+const EDIT_WIZARD_CONFIRMED: ReservationWizardConfirmed = {
+  area: true,
+  eventName: true,
+  eventDescription: true,
+  attendees: true,
+  recurrence: true,
+  scheduleCollapsed: true,
+  date: true,
+  time: true,
+};
 
 interface ReservationEditFlowProps {
   reservation: ReservationDetail;
@@ -62,6 +61,8 @@ interface ReservationEditFlowProps {
   spaces: Space[];
   areas: Area[];
   isAdmin: boolean;
+  userAreaId: string | null;
+  userAreaScopeIds: string[];
 }
 
 export function ReservationEditFlow({
@@ -70,6 +71,8 @@ export function ReservationEditFlow({
   spaces,
   areas,
   isAdmin,
+  userAreaId,
+  userAreaScopeIds,
 }: ReservationEditFlowProps) {
   const router = useRouter();
   const defaultMapId =
@@ -84,29 +87,13 @@ export function ReservationEditFlow({
     reservation.endAt,
   );
 
-  const initialMapSelection = React.useMemo(
-    () => ({
-      date: initialDate,
-      startTime: initialStartTime,
-      endTime: initialEndTime,
-      mapId: defaultMapId,
-      selectedSpaceIds: reservation.spaceIds,
-      selectedResources: Object.fromEntries(
-        reservation.resources.map((resource) => [
-          resource.resourceId,
-          resource.quantity,
-        ]),
-      ),
-    }),
-    [
-      defaultMapId,
-      initialDate,
-      initialEndTime,
-      initialStartTime,
-      reservation.resources,
-      reservation.spaceIds,
-    ],
-  );
+  const parsedRecurrence =
+    parseRecurrenceRule(reservation.recurrenceRule) ?? {
+      type: "NONE" as const,
+      until: "",
+      exceptDates: [],
+      customDates: [],
+    };
 
   const [selection, setSelection] = React.useState<MapDateSelection | null>(
     null,
@@ -124,47 +111,57 @@ export function ReservationEditFlow({
     React.useState(reservation.attendeeJustificationCode ?? "");
   const [attendeeJustificationNote, setAttendeeJustificationNote] =
     React.useState(reservation.attendeeJustificationNote ?? "");
+  const [recurrence, setRecurrence] = React.useState(parsedRecurrence);
+  const [sendEventReminder, setSendEventReminder] = React.useState(true);
   const [areaId, setAreaId] = React.useState(reservation.areaId);
+  const [reservationAreaId, setReservationAreaId] = React.useState(
+    reservation.areaId,
+  );
+  const [presetsByAreaId, setPresetsByAreaId] = React.useState<
+    Record<string, import("@/types/area-event-preset").AreaEventPreset[]>
+  >({});
+  const [presetSourceAreaId, setPresetSourceAreaId] = React.useState(
+    reservation.areaId,
+  );
+  const [eventDetailsHeaderEl, setEventDetailsHeaderEl] =
+    React.useState<HTMLElement | null>(null);
+  const [, setEventDetailsDone] = React.useState(true);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [resourcesOpen, setResourcesOpen] = React.useState(false);
-  const [eventOpen, setEventOpen] = React.useState(false);
-  const [successOpen, setSuccessOpen] = React.useState(false);
-  const [successPending, setSuccessPending] = React.useState(false);
   const [similarPrompt, setSimilarPrompt] = React.useState<{
     name: string;
     similarity: number;
   } | null>(null);
+  const [successOpen, setSuccessOpen] = React.useState(false);
+  const [successPending, setSuccessPending] = React.useState(false);
   const [mapSelectorKey, setMapSelectorKey] = React.useState(0);
   const [restoredSelection, setRestoredSelection] = React.useState<
     InitialMapSelection | undefined
-  >(undefined);
-  const [eventPresetGroups, setEventPresetGroups] = React.useState<
-    EventPresetGroup[]
-  >([]);
-  const [eventPresetAreaOptions, setEventPresetAreaOptions] = React.useState<
-    { id: string; label: string; depth: number }[]
-  >([]);
-  const [presetsByAreaId, setPresetsByAreaId] = React.useState<
-    Record<string, import("@/types/area-event-preset").AreaEventPreset[]>
-  >({});
-  const [presetSourceAreaId, setPresetSourceAreaId] = React.useState("");
+  >({
+    date: initialDate,
+    startTime: initialStartTime,
+    endTime: initialEndTime,
+    mapId: defaultMapId,
+    selectedSpaceIds: reservation.spaceIds,
+    selectedResources: Object.fromEntries(
+      reservation.resources.map((r) => [r.resourceId, r.quantity]),
+    ),
+  });
+  const [calendarDateChangeConfirm, setCalendarDateChangeConfirm] =
+    React.useState<{ anchorDate: string; newDate: string } | null>(null);
 
   React.useEffect(() => {
-    void fetch("/api/areas/event-presets")
+    const scopeQuery = userAreaScopeIds.join(",");
+    if (!scopeQuery && !isAdmin) return;
+    void fetch(
+      `/api/areas/event-presets${scopeQuery ? `?scopeIds=${encodeURIComponent(scopeQuery)}` : ""}`,
+    )
       .then((response) => (response.ok ? response.json() : null))
       .then((data) => {
-        if (data?.groups) setEventPresetGroups(data.groups);
-        if (data?.areaOptions) setEventPresetAreaOptions(data.areaOptions);
         if (data?.presetsByAreaId) setPresetsByAreaId(data.presetsByAreaId);
       });
-  }, []);
-
-  React.useEffect(() => {
-    if (areaId && presetsByAreaId[areaId]?.length) {
-      setPresetSourceAreaId(areaId);
-    }
-  }, [areaId, presetsByAreaId]);
+  }, [userAreaScopeIds, isAdmin]);
 
   React.useEffect(() => {
     const draft = loadReservationDraft();
@@ -182,12 +179,25 @@ export function ReservationEditFlow({
     setEstimatedAttendees(draft.estimatedAttendees);
     setAttendeeJustificationCode(draft.attendeeJustificationCode);
     setAttendeeJustificationNote(draft.attendeeJustificationNote);
+    setRecurrence({
+      type: draft.recurrenceType,
+      until: draft.recurrenceUntil,
+      exceptDates: draft.recurrenceExceptDates ?? [],
+      customDates: draft.recurrenceCustomDates ?? [],
+    });
     setAreaId(draft.areaId);
 
+    const anchorDate =
+      draft.calendarAnchorDate ??
+      draft.selection?.date ??
+      picked ??
+      initialDate;
+
     if (draft.selection) {
-      setSelection(draft.selection);
+      const resolvedDate = picked ?? draft.selection.date;
+      setSelection({ ...draft.selection, date: resolvedDate });
       setRestoredSelection({
-        date: picked ?? draft.selection.date,
+        date: resolvedDate,
         startTime: draft.selection.startTime,
         endTime: draft.selection.endTime,
         mapId: draft.selection.mapId,
@@ -200,15 +210,18 @@ export function ReservationEditFlow({
         ),
       });
     } else if (picked) {
-      setRestoredSelection({
-        ...initialMapSelection,
-        date: picked,
-      });
+      setRestoredSelection((current) =>
+        current ? { ...current, date: picked } : { date: picked },
+      );
+    }
+
+    if (picked) {
+      setCalendarDateChangeConfirm({ anchorDate, newDate: picked });
     }
 
     clearReservationDraft();
     setMapSelectorKey((value) => value + 1);
-  }, [initialMapSelection, reservation.id]);
+  }, [initialDate, reservation.id]);
 
   const handleSelectionChange = React.useCallback(
     (value: MapDateSelection) => {
@@ -217,19 +230,19 @@ export function ReservationEditFlow({
     [],
   );
 
+  const estimatedNumber = Number(estimatedAttendees);
   const activeSelection = selection ?? {
-    date: initialDate,
-    startTime: initialStartTime,
-    endTime: initialEndTime,
-    mapId: defaultMapId,
-    selectedSpaceIds: reservation.spaceIds,
-    selectedResources: reservation.resources.map((r) => ({
-      resourceId: r.resourceId,
-      quantity: r.quantity,
-    })),
+    date: restoredSelection?.date ?? initialDate,
+    startTime: restoredSelection?.startTime ?? initialStartTime,
+    endTime: restoredSelection?.endTime ?? initialEndTime,
+    mapId: restoredSelection?.mapId ?? defaultMapId,
+    selectedSpaceIds:
+      restoredSelection?.selectedSpaceIds ?? reservation.spaceIds,
+    selectedResources: Object.entries(
+      restoredSelection?.selectedResources ?? {},
+    ).map(([resourceId, quantity]) => ({ resourceId, quantity })),
   };
 
-  const estimatedNumber = Number(estimatedAttendees);
   const needsJustification = reservationNeedsAttendeeJustification(
     spaces,
     activeSelection.selectedSpaceIds,
@@ -244,7 +257,7 @@ export function ReservationEditFlow({
       (Boolean(attendeeJustificationCode) &&
         (attendeeJustificationCode !== "OTHER" ||
           attendeeJustificationNote.trim().length > 0))) &&
-    (!isAdmin || Boolean(areaId));
+    (isAdmin ? Boolean(areaId) : true);
 
   async function submitUpdate(confirmSimilarName = false) {
     if (!canSubmit) return;
@@ -274,7 +287,12 @@ export function ReservationEditFlow({
 
     try {
       let response!: Response;
-      let data!: { error?: string; similarName?: string; similarity?: number; pending?: boolean };
+      let data!: {
+        error?: string;
+        similarName?: string;
+        similarity?: number;
+        pending?: boolean;
+      };
 
       for (let attempt = 0; attempt < 2; attempt++) {
         try {
@@ -321,9 +339,9 @@ export function ReservationEditFlow({
     activeSelection.selectedResources.filter((item) => item.quantity > 0)
       .length ?? 0;
 
-  const mapInitialSelection = restoredSelection ?? initialMapSelection;
-
-  function handleReservationDatePick() {
+  function handleReservationDatePick(ctx: {
+    wizardConfirmed: ReservationWizardConfirmed;
+  }) {
     saveReservationDraft({
       kind: "edit",
       editReservationId: reservation.id,
@@ -332,138 +350,129 @@ export function ReservationEditFlow({
       estimatedAttendees,
       attendeeJustificationCode,
       attendeeJustificationNote,
-      recurrenceType: "NONE",
-      recurrenceUntil: "",
-      recurrenceExceptDates: [],
-      sendEventReminder: true,
+      recurrenceType: recurrence.type,
+      recurrenceUntil: recurrence.until,
+      recurrenceExceptDates: recurrence.exceptDates ?? [],
+      recurrenceCustomDates: recurrence.customDates ?? [],
+      sendEventReminder,
       areaId,
+      reservationAreaId,
       selection: selection ?? {
-        date: mapInitialSelection.date ?? initialDate,
-        startTime: mapInitialSelection.startTime ?? initialStartTime,
-        endTime: mapInitialSelection.endTime ?? initialEndTime,
-        mapId: mapInitialSelection.mapId ?? defaultMapId,
-        selectedSpaceIds: mapInitialSelection.selectedSpaceIds ?? [],
-        selectedResources: Object.entries(
-          mapInitialSelection.selectedResources ?? {},
-        ).map(([resourceId, quantity]) => ({ resourceId, quantity })),
+        date: activeSelection.date,
+        startTime: activeSelection.startTime,
+        endTime: activeSelection.endTime,
+        mapId: activeSelection.mapId,
+        selectedSpaceIds: activeSelection.selectedSpaceIds,
+        selectedResources: activeSelection.selectedResources,
       },
+      wizardConfirmed: ctx.wizardConfirmed,
+      calendarAnchorDate: activeSelection.date,
     });
     router.push(
       buildCalendarPickUrl(
         `/reservas/${reservation.id}/editar`,
-        selection?.date ?? mapInitialSelection.date ?? initialDate,
+        activeSelection.date,
       ),
     );
   }
 
+  function handleCalendarDateChangeConfirm(options: {
+    newDate: string;
+    anchorDate: string;
+    keepRecurrence: boolean;
+    keepExceptions: boolean;
+    exceptDates?: string[];
+    recurrence?: typeof recurrence;
+  }) {
+    const {
+      newDate,
+      keepRecurrence,
+      keepExceptions,
+      exceptDates,
+      recurrence: nextRecurrence,
+    } = options;
+    setCalendarDateChangeConfirm(null);
+
+    setRecurrence(() => {
+      if (!keepRecurrence || !nextRecurrence) {
+        return {
+          type: "NONE",
+          until: "",
+          exceptDates: [],
+          customDates: [],
+        };
+      }
+      if (keepExceptions) {
+        return {
+          ...nextRecurrence,
+          exceptDates: exceptDates ?? nextRecurrence.exceptDates ?? [],
+        };
+      }
+      return { ...nextRecurrence, exceptDates: [] };
+    });
+
+    setSelection((current) =>
+      current ? { ...current, date: newDate } : current,
+    );
+    setRestoredSelection((current) =>
+      current ? { ...current, date: newDate } : { date: newDate },
+    );
+    setMapSelectorKey((value) => value + 1);
+  }
+
   return (
     <div className="flex flex-col gap-2 pb-2">
-      <MapDateSelector
-        key={`${reservation.id}-${mapSelectorKey}`}
+      <header ref={setEventDetailsHeaderEl} className="min-h-[2.5rem]" />
+      <ReservationCreateWizard
         maps={maps}
         spaces={spaces}
-        layout="reservation"
-        showResourcePanel
-        showCalendarLink={false}
-        excludeReservationId={reservation.id}
-        initialSelection={mapInitialSelection}
         areas={areas}
-        highlightAreaId={isAdmin ? areaId : reservation.areaId}
-        resourcesSheetOpen={resourcesOpen}
-        onResourcesSheetOpenChange={setResourcesOpen}
+        isAdmin={isAdmin}
+        userAreaId={userAreaId}
+        userAreaScopeIds={userAreaScopeIds}
+        initialDate={restoredSelection?.date ?? initialDate}
+        mapSelectorKey={mapSelectorKey}
+        restoredSelection={restoredSelection}
+        initialWizardConfirmed={EDIT_WIZARD_CONFIRMED}
+        eventPresetGroups={[]}
+        presetsByAreaId={presetsByAreaId}
+        presetSourceAreaId={presetSourceAreaId}
+        onPresetSourceAreaIdChange={setPresetSourceAreaId}
         onSelectionChange={handleSelectionChange}
         onReservationDatePick={handleReservationDatePick}
+        resourcesOpen={resourcesOpen}
+        onResourcesOpenChange={setResourcesOpen}
+        resourceCount={resourceCount}
+        selection={selection}
+        onSubmit={() => submitUpdate(false)}
+        canSubmit={canSubmit}
+        loading={loading}
+        eventName={eventName}
+        onEventNameChange={setEventName}
+        eventDescription={eventDescription}
+        onEventDescriptionChange={setEventDescription}
+        estimatedAttendees={estimatedAttendees}
+        onEstimatedAttendeesChange={setEstimatedAttendees}
+        attendeeJustificationCode={attendeeJustificationCode}
+        onAttendeeJustificationCodeChange={setAttendeeJustificationCode}
+        attendeeJustificationNote={attendeeJustificationNote}
+        onAttendeeJustificationNoteChange={setAttendeeJustificationNote}
+        recurrence={recurrence}
+        onRecurrenceChange={setRecurrence}
+        sendEventReminder={sendEventReminder}
+        onSendEventReminderChange={setSendEventReminder}
+        areaId={areaId}
+        onAreaIdChange={setAreaId}
+        reservationAreaId={reservationAreaId}
+        onReservationAreaIdChange={setReservationAreaId}
+        eventDetailsHeaderEl={eventDetailsHeaderEl}
+        onEventDetailsDoneChange={setEventDetailsDone}
+        calendarDateChangeConfirm={calendarDateChangeConfirm}
+        onCalendarDateChangeConfirm={handleCalendarDateChangeConfirm}
+        onCalendarDateChangeCancel={() => setCalendarDateChangeConfirm(null)}
+        excludeReservationId={reservation.id}
+        submitButtonLabel="Guardar cambios"
       />
-
-      {isAdmin && (
-        <div className="space-y-1 pt-1">
-          <Label htmlFor="editReservationAreaId" className="text-xs">
-            Área
-          </Label>
-          <Select
-            id="editReservationAreaId"
-            value={areaId}
-            onChange={(event) => setAreaId(event.target.value)}
-            className="h-9"
-          >
-            {areas.map((area) => (
-              <option key={area.id} value={area.id}>
-                {area.name}
-              </option>
-            ))}
-          </Select>
-        </div>
-      )}
-
-      <div className="grid grid-cols-2 gap-2 pt-1">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="h-9"
-          onClick={() => setResourcesOpen(true)}
-        >
-          Recursos{resourceCount > 0 ? ` (${resourceCount})` : ""}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="h-9"
-          onClick={() => setEventOpen(true)}
-        >
-          Datos del evento
-        </Button>
-      </div>
-
-      <Sheet open={eventOpen} onOpenChange={setEventOpen}>
-        <SheetContent
-          side="bottom"
-          className="max-h-[85dvh] overflow-y-auto px-4 pb-8 pt-4"
-        >
-          <SheetHeader className="text-left">
-            <SheetTitle>Datos del evento</SheetTitle>
-          </SheetHeader>
-          <div className="mt-4">
-            <EventForm
-              bare
-              hideRecurrence
-              hideEventReminder
-              eventName={eventName}
-              onEventNameChange={setEventName}
-              eventDescription={eventDescription}
-              onEventDescriptionChange={setEventDescription}
-              recurrenceType="NONE"
-              onRecurrenceTypeChange={() => undefined}
-              recurrenceUntil=""
-              onRecurrenceUntilChange={() => undefined}
-              recurrenceExceptDates={[]}
-              onRecurrenceExceptDatesChange={() => undefined}
-              sendEventReminder
-              onSendEventReminderChange={() => undefined}
-              baseDate={activeSelection.date}
-              areaId={areaId}
-              onAreaIdChange={setAreaId}
-              areas={areas}
-              isAdmin={isAdmin}
-              hideAdminArea
-              estimatedAttendees={estimatedAttendees}
-              onEstimatedAttendeesChange={setEstimatedAttendees}
-              attendeeJustificationCode={attendeeJustificationCode}
-              onAttendeeJustificationCodeChange={setAttendeeJustificationCode}
-              attendeeJustificationNote={attendeeJustificationNote}
-              onAttendeeJustificationNoteChange={setAttendeeJustificationNote}
-              selectedSpaceIds={activeSelection.selectedSpaceIds}
-              spaces={spaces}
-              eventPresetGroups={eventPresetGroups}
-              eventPresetAreaOptions={eventPresetAreaOptions}
-              presetsByAreaId={presetsByAreaId}
-              presetSourceAreaId={presetSourceAreaId}
-              onPresetSourceAreaIdChange={setPresetSourceAreaId}
-            />
-          </div>
-        </SheetContent>
-      </Sheet>
 
       {similarPrompt && (
         <Card className="border-amber-500/40 bg-amber-500/10">
@@ -491,22 +500,6 @@ export function ReservationEditFlow({
         </p>
       )}
 
-      <Button
-        size="lg"
-        className="h-10 w-full"
-        disabled={!canSubmit || loading}
-        onClick={() => submitUpdate(false)}
-      >
-        {loading ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Guardando...
-          </>
-        ) : (
-          "Guardar cambios"
-        )}
-      </Button>
-
       <Dialog open={successOpen} onOpenChange={() => undefined}>
         <DialogContent
           onPointerDownOutside={(event) => event.preventDefault()}
@@ -519,13 +512,11 @@ export function ReservationEditFlow({
             </DialogTitle>
             <DialogDescription>
               {successPending
-                ? "Los cambios quedaron pendientes de autorización."
+                ? "Un administrador debe autorizar el cambio."
                 : "Los cambios se guardaron correctamente."}
             </DialogDescription>
           </DialogHeader>
-          <Button onClick={() => router.push("/reservas")}>
-            Volver a mis reservas
-          </Button>
+          <Button onClick={() => router.push("/reservas")}>Ver reservas</Button>
         </DialogContent>
       </Dialog>
     </div>

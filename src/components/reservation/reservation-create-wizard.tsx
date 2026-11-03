@@ -25,6 +25,7 @@ import {
   needsFourthVsLastPrompt,
   weekdayNameEs,
 } from "@/lib/monthly-relative-recurrence";
+import { MonthlyRelativeFourthVsLastPrompt } from "@/components/reservation/monthly-relative-fourth-vs-last-prompt";
 import { defaultRecurrenceUntil } from "@/lib/recurrence-default-until";
 import {
   RECURRENCE_TYPE_LABELS,
@@ -155,6 +156,8 @@ interface ReservationCreateWizardProps {
     recurrence?: RecurrenceConfig;
   }) => void;
   onCalendarDateChangeCancel?: () => void;
+  excludeReservationId?: string;
+  submitButtonLabel?: string;
   presetSourceAreaId: string;
   onPresetSourceAreaIdChange: (id: string) => void;
   onSelectionChange: (selection: MapDateSelection) => void;
@@ -235,6 +238,8 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
     calendarDateChangeConfirm,
     onCalendarDateChangeConfirm,
     onCalendarDateChangeCancel,
+    excludeReservationId,
+    submitButtonLabel = "Confirmar reserva",
   } = props;
 
   const selectableIds = isAdmin
@@ -281,6 +286,8 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
   const [showExceptionPicker, setShowExceptionPicker] = React.useState(false);
   const [confirmDialogRecurrence, setConfirmDialogRecurrence] =
     React.useState<RecurrenceConfig>(recurrence);
+  const [confirmDialogRelativeDisambiguation, setConfirmDialogRelativeDisambiguation] =
+    React.useState<"FOURTH" | "LAST" | null>(null);
   const [frozenRecurrence, setFrozenRecurrence] =
     React.useState<RecurrenceConfig | null>(null);
   const [confirmDialogUntil, setConfirmDialogUntil] = React.useState("");
@@ -298,6 +305,10 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
     const frozen = cloneRecurrenceConfig(recurrence);
     setFrozenRecurrence(frozen);
     setConfirmDialogRecurrence(cloneRecurrenceConfig(recurrence));
+    const ord = recurrence.monthlyRelative?.ordinal;
+    setConfirmDialogRelativeDisambiguation(
+      ord === "FOURTH" || ord === "LAST" ? ord : null,
+    );
     const until =
       recurrence.until?.trim() ||
       (recurrence.type !== "NONE" && recurrence.type !== "CUSTOM"
@@ -341,16 +352,41 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
       },
       calendarDateChangeConfirm.anchorDate,
     );
+    let next = base;
     if (base.type !== "NONE" && base.type !== "CUSTOM") {
-      return { ...base, until: confirmDialogUntil || base.until };
+      next = { ...base, until: confirmDialogUntil || base.until };
     }
-    return base;
+    if (
+      next.type === "MONTHLY_RELATIVE" &&
+      confirmDialogRelativeDisambiguation &&
+      calendarDateChangeConfirm
+    ) {
+      const inferred = inferMonthlyRelativeFromDate(
+        calendarDateChangeConfirm.newDate,
+      );
+      next = {
+        ...next,
+        monthlyRelative: {
+          weekday: inferred.weekday,
+          ordinal: confirmDialogRelativeDisambiguation,
+        },
+      };
+    }
+    return next;
   }, [
     calendarDateChangeConfirm,
     confirmDialogRecurrence,
     confirmDialogUntil,
+    confirmDialogRelativeDisambiguation,
     recurrence,
   ]);
+
+  const calendarDialogMonthlyNeedsChoice = Boolean(
+    calendarDateChangeConfirm &&
+      confirmDialogRecurrence.type === "MONTHLY_RELATIVE" &&
+      needsFourthVsLastPrompt(calendarDateChangeConfirm.newDate) &&
+      !confirmDialogRelativeDisambiguation,
+  );
 
   const afterPreviewDates = React.useMemo(() => {
     if (!calendarDateChangeConfirm || !afterRecurrenceForPreview) return [];
@@ -438,7 +474,16 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
   const [customDateDraft, setCustomDateDraft] = React.useState("");
   const [relativeDisambiguation, setRelativeDisambiguation] = React.useState<
     "FOURTH" | "LAST" | null
-  >(null);
+  >(() => {
+    const ord = recurrence.monthlyRelative?.ordinal;
+    if (ord === "FOURTH" || ord === "LAST") return ord;
+    return null;
+  });
+
+  const monthlyRelativeNeedsChoice =
+    recurrence.type === "MONTHLY_RELATIVE" &&
+    needsFourthVsLastPrompt(reservationDate) &&
+    !relativeDisambiguation;
 
   const [draftStart, setDraftStart] = React.useState(
     selection?.startTime ?? restoredSelection?.startTime ?? "08:00",
@@ -1144,6 +1189,7 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
                       if (type === "NONE") {
                         setConfirmNewExceptDates(new Set());
                       }
+                      setConfirmDialogRelativeDisambiguation(null);
                     }}
                   >
                     {(Object.keys(RECURRENCE_TYPE_LABELS) as RecurrenceType[])
@@ -1155,6 +1201,17 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
                       ))}
                   </Select>
                 </div>
+                {confirmDialogRecurrence.type === "MONTHLY_RELATIVE" &&
+                  calendarDateChangeConfirm &&
+                  needsFourthVsLastPrompt(calendarDateChangeConfirm.newDate) &&
+                  !confirmDialogRelativeDisambiguation && (
+                    <MonthlyRelativeFourthVsLastPrompt
+                      dateIso={calendarDateChangeConfirm.newDate}
+                      onChoose={(ordinal) =>
+                        setConfirmDialogRelativeDisambiguation(ordinal)
+                      }
+                    />
+                  )}
                 {confirmDialogRecurrence.type !== "NONE" && (
                   <>
                   {frozenRecurrence && beforePreviewDates.length > 0 && (
@@ -1288,8 +1345,13 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
             </Button>
             <Button
               type="button"
+              disabled={calendarDialogMonthlyNeedsChoice}
               onClick={() => {
                 if (!calendarDateChangeConfirm) return;
+                if (calendarDialogMonthlyNeedsChoice) return;
+                if (confirmDialogRelativeDisambiguation) {
+                  setRelativeDisambiguation(confirmDialogRelativeDisambiguation);
+                }
                 const exceptDates = Array.from(confirmNewExceptDates);
                 const usesRecurrence =
                   confirmDialogRecurrence.type !== "NONE" &&
@@ -1543,40 +1605,12 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
       )}
 
       {eventDetailsDone &&
-        !confirmed.date &&
-        needsFourthVsLastPrompt(reservationDate) &&
         recurrence.type === "MONTHLY_RELATIVE" &&
-        !relativeDisambiguation && (
-          <section className="space-y-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
-            <p>
-              La fecha cae en los últimos 7 días del mes y hay 5{" "}
-              {weekdayNameEs(new Date(`${reservationDate}T12:00:00`).getDay())}
-              s en el mes. ¿La repetición será el{" "}
-              <strong>cuarto</strong> o el <strong>último</strong> de cada mes?
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() => setRelativeDisambiguation("FOURTH")}
-              >
-                Cuarto{" "}
-                {weekdayNameEs(new Date(`${reservationDate}T12:00:00`).getDay())}{" "}
-                del mes
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() => setRelativeDisambiguation("LAST")}
-              >
-                Último{" "}
-                {weekdayNameEs(new Date(`${reservationDate}T12:00:00`).getDay())}{" "}
-                del mes
-              </Button>
-            </div>
-          </section>
+        monthlyRelativeNeedsChoice && (
+          <MonthlyRelativeFourthVsLastPrompt
+            dateIso={reservationDate}
+            onChoose={(ordinal) => setRelativeDisambiguation(ordinal)}
+          />
         )}
 
       {confirmed.date && !confirmed.time && (
@@ -1705,6 +1739,7 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
             emptySpaceLegend="Toca para seleccionar un espacio del mapa"
             resourcesSheetOpen={resourcesOpen}
             onResourcesSheetOpenChange={onResourcesOpenChange}
+            excludeReservationId={excludeReservationId}
             onSelectionChange={onSelectionChange}
             estimatedAttendees={estimatedNumber}
             resourcesDisabled={
@@ -1763,7 +1798,7 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
           <Button
             size="lg"
             className="h-10 w-full"
-            disabled={!canSubmit || loading}
+            disabled={!canSubmit || loading || monthlyRelativeNeedsChoice}
             onClick={onSubmit}
           >
             {loading ? (
@@ -1772,7 +1807,7 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
                 Guardando...
               </>
             ) : (
-              "Confirmar reserva"
+              submitButtonLabel
             )}
           </Button>
         </>

@@ -327,10 +327,13 @@ export function ReservationsList({
               onKeyDown={(event) => event.stopPropagation()}
             >
               {canConfirmAttendance(viewerUser, reservation) &&
-                isPastReservation(reservation) &&
-                !isAdmin && (
-                  <Button asChild size="sm" variant="default">
-                    <Link href={`/reservas/${reservation.id}/editar`}>
+                isPastReservation(reservation) && (
+                  <Button
+                    asChild
+                    size="sm"
+                    variant={isAdmin ? "outline" : "default"}
+                  >
+                    <Link href={`/reservas/${reservation.id}/editar#asistencia`}>
                       Registrar asistencia
                     </Link>
                   </Button>
