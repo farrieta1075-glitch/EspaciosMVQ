@@ -19,8 +19,10 @@ export function WebPushRegister() {
     if (attemptedRef.current === userId) return;
     attemptedRef.current = userId;
 
-    void syncWebPushSubscription(userId).catch((error) => {
-      console.warn("[web-push] No se pudo registrar la suscripción:", error);
+    void syncWebPushSubscription(userId).then((result) => {
+      if (!result.ok) {
+        console.warn("[web-push] Sync al iniciar sesión:", result.error);
+      }
     });
   }, [session?.user?.id, status]);
 

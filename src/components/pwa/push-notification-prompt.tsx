@@ -9,8 +9,8 @@ import {
   canUseWebPush,
   isIosDevice,
   isStandaloneDisplayMode,
-  requestWebPushPermissionAndSubscribe,
 } from "@/lib/push/subscribe-web-push";
+import { PushDeviceActions } from "@/components/pwa/push-device-actions";
 
 const DISMISS_KEY = "mvqro_push_prompt_dismissed";
 
@@ -19,8 +19,6 @@ export function PushNotificationPrompt() {
   const [permission, setPermission] =
     React.useState<NotificationPermission>("default");
   const [dismissed, setDismissed] = React.useState(false);
-  const [busy, setBusy] = React.useState(false);
-
   React.useEffect(() => {
     if (typeof Notification === "undefined") return;
     setPermission(Notification.permission);
@@ -33,22 +31,19 @@ export function PushNotificationPrompt() {
 
   if (status !== "authenticated" || !session?.user?.id) return null;
   if (!isWebPushConfigured()) return null;
-  if (dismissed) return null;
-  if (permission === "granted" || permission === "denied") return null;
+  if (dismissed && permission !== "granted") return null;
+  if (permission === "denied") return null;
 
   const ios = isIosDevice();
   const standalone = isStandaloneDisplayMode();
   const pushReady = canUseWebPush();
 
-  async function enableNotifications() {
-    if (!session?.user?.id) return;
-    setBusy(true);
-    try {
-      const next = await requestWebPushPermissionAndSubscribe(session.user.id);
-      setPermission(next);
-    } finally {
-      setBusy(false);
-    }
+  if (permission === "granted" && session.user?.id) {
+    return (
+      <div className="mb-4">
+        <PushDeviceActions userId={session.user.id} />
+      </div>
+    );
   }
 
   function dismiss() {
@@ -86,18 +81,10 @@ export function PushNotificationPrompt() {
               dispositivo.
             </p>
           )}
-          <div className="flex flex-wrap gap-2">
-            {pushReady && (!ios || standalone) ? (
-              <Button
-                type="button"
-                size="sm"
-                className="touch-manipulation"
-                disabled={busy}
-                onClick={() => void enableNotifications()}
-              >
-                {busy ? "Activando…" : "Activar notificaciones"}
-              </Button>
-            ) : null}
+          {pushReady && (!ios || standalone) && session.user?.id ? (
+            <PushDeviceActions userId={session.user.id} compact />
+          ) : null}
+          <div className="flex flex-wrap gap-2 pt-1">
             <Button
               type="button"
               size="sm"

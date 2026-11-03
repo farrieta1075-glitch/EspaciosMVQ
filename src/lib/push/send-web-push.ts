@@ -33,12 +33,19 @@ export async function sendWebPushToUser(
     tag?: string;
   },
 ): Promise<{ sent: number; failed: number }> {
-  if (!userId || !ensureVapid()) {
+  if (!userId) {
+    return { sent: 0, failed: 0 };
+  }
+  if (!ensureVapid()) {
+    console.warn("[web-push] Envío omitido: VAPID no configurado en el servidor.");
     return { sent: 0, failed: 0 };
   }
 
   const subscriptions = await getPushSubscriptionsForUser(userId);
   if (subscriptions.length === 0) {
+    console.info(
+      `[web-push] Usuario ${userId} sin dispositivos registrados en PushSubscriptions.`,
+    );
     return { sent: 0, failed: 0 };
   }
 
@@ -63,6 +70,11 @@ export async function sendWebPushToUser(
           },
         },
         body,
+        {
+          TTL: 60 * 60 * 24,
+          urgency: "high",
+          topic: payload.tag?.slice(0, 32),
+        },
       );
       sent += 1;
     } catch (error) {

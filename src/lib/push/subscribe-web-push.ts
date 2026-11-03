@@ -9,10 +9,49 @@ import {
 } from "@/lib/push/client-config";
 
 const SW_URL = "/sw-push.js";
+const VAPID_STORAGE_KEY = "mvqro_vapid_public_key";
+
+export type SyncPushResult = {
+  ok: boolean;
+  error?: string;
+};
 
 async function registerPushServiceWorker(): Promise<ServiceWorkerRegistration | null> {
   if (!("serviceWorker" in navigator)) return null;
-  return navigator.serviceWorker.register(SW_URL, { scope: "/" });
+  try {
+    return await navigator.serviceWorker.register(SW_URL, {
+      scope: "/",
+      updateViaCache: "none",
+    });
+  } catch (error) {
+    console.warn("[web-push] No se pudo registrar el service worker:", error);
+    return null;
+  }
+}
+
+async function obtainBrowserPushSubscription(
+  registration: ServiceWorkerRegistration,
+): Promise<PushSubscription> {
+  const vapidKey = getVapidPublicKey();
+  const applicationServerKey = urlBase64ToUint8Array(vapidKey);
+  const storedVapid = localStorage.getItem(VAPID_STORAGE_KEY);
+
+  let subscription = await registration.pushManager.getSubscription();
+
+  if (subscription && storedVapid && storedVapid !== vapidKey) {
+    await subscription.unsubscribe();
+    subscription = null;
+  }
+
+  if (!subscription) {
+    subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey,
+    });
+  }
+
+  localStorage.setItem(VAPID_STORAGE_KEY, vapidKey);
+  return subscription;
 }
 
 export function canUseWebPush(): boolean {
@@ -34,58 +73,87 @@ export function isStandaloneDisplayMode(): boolean {
   if (typeof window === "undefined") return false;
   return (
     window.matchMedia("(display-mode: standalone)").matches ||
-    // iOS Safari
     ("standalone" in navigator &&
       Boolean((navigator as Navigator & { standalone?: boolean }).standalone))
   );
 }
 
-/** Registra la suscripción push (requiere permiso ya concedido). */
-export async function syncWebPushSubscription(userId: string): Promise<boolean> {
-  if (!canUseWebPush()) return false;
-  if (Notification.permission !== "granted") return false;
+/** Registra la suscripción push en el servidor (requiere permiso ya concedido). */
+export async function syncWebPushSubscription(
+  userId: string,
+): Promise<SyncPushResult> {
+  if (!canUseWebPush()) {
+    return { ok: false, error: "Este dispositivo no admite Web Push." };
+  }
+  if (Notification.permission !== "granted") {
+    return { ok: false, error: "Permiso de notificaciones no concedido." };
+  }
 
   rememberLastLoggedInUserId(userId);
 
   const registration = await registerPushServiceWorker();
-  if (!registration) return false;
+  if (!registration) {
+    return { ok: false, error: "No se pudo registrar el service worker." };
+  }
 
   await navigator.serviceWorker.ready;
 
-  const vapidKey = getVapidPublicKey();
-  const existing = await registration.pushManager.getSubscription();
-  const subscription =
-    existing ??
-    (await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(vapidKey),
-    }));
+  let subscription: PushSubscription;
+  try {
+    subscription = await obtainBrowserPushSubscription(registration);
+  } catch (error) {
+    return {
+      ok: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "No se pudo crear la suscripción push en el navegador.",
+    };
+  }
 
   const json = subscription.toJSON();
   const endpoint = json.endpoint;
   const p256dh = json.keys?.p256dh;
   const auth = json.keys?.auth;
-  if (!endpoint || !p256dh || !auth) return false;
+  if (!endpoint || !p256dh || !auth) {
+    return { ok: false, error: "Suscripción incompleta (faltan claves)." };
+  }
 
-  const response = await fetch("/api/push/subscribe", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      deviceId: getOrCreateDeviceId(),
-      endpoint,
-      keys: { p256dh, auth },
-    }),
-  });
+  let response: Response;
+  try {
+    response = await fetch("/api/push/subscribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        deviceId: getOrCreateDeviceId(),
+        endpoint,
+        keys: { p256dh, auth },
+      }),
+    });
+  } catch {
+    return { ok: false, error: "Error de red al registrar el dispositivo." };
+  }
 
-  return response.ok;
+  if (!response.ok) {
+    let message = "El servidor no guardó la suscripción.";
+    try {
+      const data = (await response.json()) as { error?: string };
+      if (data.error) message = data.error;
+    } catch {
+      /* ignore */
+    }
+    return { ok: false, error: message };
+  }
+
+  return { ok: true };
 }
 
 /** Pide permiso (gesto del usuario) y sincroniza suscripción. */
 export async function requestWebPushPermissionAndSubscribe(
   userId: string,
-): Promise<NotificationPermission> {
+): Promise<{ permission: NotificationPermission; sync: SyncPushResult | null }> {
   if (!canUseWebPush()) {
-    return Notification.permission;
+    return { permission: Notification.permission, sync: null };
   }
 
   const permission =
@@ -93,9 +161,10 @@ export async function requestWebPushPermissionAndSubscribe(
       ? await Notification.requestPermission()
       : Notification.permission;
 
-  if (permission === "granted") {
-    await syncWebPushSubscription(userId);
+  if (permission !== "granted") {
+    return { permission, sync: null };
   }
 
-  return permission;
+  const sync = await syncWebPushSubscription(userId);
+  return { permission, sync };
 }

@@ -21,9 +21,8 @@ self.addEventListener("push", (event) => {
   event.waitUntil(
     self.registration.showNotification(payload.title, {
       body: payload.body,
-      icon: "/logo.svg",
-      badge: "/logo.svg",
       tag: payload.tag || "mvqro-notification",
+      renotify: true,
       data: { url: payload.url || "/reservas" },
     }),
   );

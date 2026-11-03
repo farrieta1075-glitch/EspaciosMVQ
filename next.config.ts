@@ -31,6 +31,21 @@ const withPWA = withPWAInit({
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   serverExternalPackages: ["pdfjs-dist", "@prisma/client", "prisma"],
+  async headers() {
+    return [
+      {
+        source: "/sw-push.js",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "no-cache, no-store, must-revalidate",
+          },
+          { key: "Service-Worker-Allowed", value: "/" },
+          { key: "Content-Type", value: "application/javascript; charset=utf-8" },
+        ],
+      },
+    ];
+  },
   images: {
     remotePatterns: [
       {
