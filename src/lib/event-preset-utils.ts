@@ -163,3 +163,61 @@ export function eventNameMatchesAnyPreset(
   if (!trimmed) return false;
   return presets.some((p) => p.name === trimmed);
 }
+
+export function hasCapturedEventPresetData(
+  eventName: string,
+  eventDescription: string,
+  estimatedAttendees: string,
+  recurrence: RecurrenceConfig,
+): boolean {
+  return (
+    eventName.trim().length >= 3 ||
+    eventDescription.trim().length >= 3 ||
+    Number(estimatedAttendees) > 0 ||
+    recurrence.type !== "NONE"
+  );
+}
+
+/** True if current form matches an event preset defined for the target area. */
+export function currentEventDataFitsAreaPresets(
+  presets: AreaEventPreset[],
+  eventName: string,
+  eventDescription: string,
+  estimatedAttendees: string,
+  recurrence: RecurrenceConfig,
+): boolean {
+  if (
+    !hasCapturedEventPresetData(
+      eventName,
+      eventDescription,
+      estimatedAttendees,
+      recurrence,
+    )
+  ) {
+    return true;
+  }
+
+  const name = eventName.trim();
+  const preset = presets.find((p) => p.name.trim() === name);
+  if (!preset) return false;
+
+  if (preset.description?.trim()) {
+    if (eventDescription.trim() !== preset.description.trim()) return false;
+  } else if (eventDescription.trim().length >= 3) {
+    return false;
+  }
+
+  if (preset.estimatedAttendees && preset.estimatedAttendees > 0) {
+    if (Number(estimatedAttendees) !== preset.estimatedAttendees) return false;
+  } else if (Number(estimatedAttendees) > 0) {
+    return false;
+  }
+
+  if (preset.recurrence?.type && preset.recurrence.type !== "NONE") {
+    if (recurrence.type !== preset.recurrence.type) return false;
+  } else if (recurrence.type !== "NONE") {
+    return false;
+  }
+
+  return true;
+}

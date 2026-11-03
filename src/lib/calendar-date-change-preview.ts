@@ -9,7 +9,7 @@ import {
   ordinalLabelEs,
   RECURRENCE_TYPE_LABELS,
 } from "@/lib/recurrence";
-import type { RecurrenceConfig } from "@/types/reservation";
+import type { RecurrenceConfig, RecurrenceType } from "@/types/reservation";
 
 const PREVIEW_OCCURRENCE_COUNT = 8;
 
@@ -23,6 +23,54 @@ function shiftDateIso(iso: string, deltaDays: number): string {
   const d = new Date(`${iso}T12:00:00`);
   d.setDate(d.getDate() + deltaDays);
   return formatDateISO(d);
+}
+
+export function buildRecurrenceForTypeAtDate(
+  type: RecurrenceType,
+  newDate: string,
+  previous: RecurrenceConfig,
+): RecurrenceConfig {
+  if (type === "NONE") {
+    return {
+      type: "NONE",
+      until: "",
+      exceptDates: [],
+      customDates: [],
+    };
+  }
+
+  const until =
+    type === "CUSTOM"
+      ? previous.until
+      : defaultRecurrenceUntil(newDate, type);
+
+  if (type === "MONTHLY_RELATIVE") {
+    const inferred = inferMonthlyRelativeFromDate(newDate);
+    return {
+      type,
+      until,
+      exceptDates: previous.exceptDates ?? [],
+      customDates: [],
+      monthlyRelative: {
+        weekday: inferred.weekday,
+        ordinal: inferred.ordinal,
+      },
+    };
+  }
+
+  return {
+    type,
+    until,
+    exceptDates: previous.exceptDates ?? [],
+    customDates:
+      type === "CUSTOM"
+        ? (previous.customDates?.length
+            ? previous.customDates
+            : [newDate]
+          ).filter(Boolean)
+        : [],
+    monthlyRelative: undefined,
+  };
 }
 
 export function applyRecurrenceToNewStartDate(
@@ -149,13 +197,12 @@ export function buildCalendarDateChangePreview(
   anchorDate: string,
   newDate: string,
   recurrence: RecurrenceConfig,
+  afterRecurrenceOverride?: RecurrenceConfig,
 ): CalendarDateChangePreview {
   const beforeRecurrence = recurrence;
-  const afterRecurrence = applyRecurrenceToNewStartDate(
-    newDate,
-    recurrence,
-    anchorDate,
-  );
+  const afterRecurrence =
+    afterRecurrenceOverride ??
+    applyRecurrenceToNewStartDate(newDate, recurrence, anchorDate);
 
   const beforePattern = describeRecurrencePattern(anchorDate, beforeRecurrence);
   const afterPattern = describeRecurrencePattern(newDate, afterRecurrence);

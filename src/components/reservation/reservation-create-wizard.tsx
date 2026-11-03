@@ -53,9 +53,14 @@ import type { AreaEventPreset } from "@/types/area-event-preset";
 import {
   applyAreaEventPresetToForm,
   clearEventPresetFormFields,
+  currentEventDataFitsAreaPresets,
   eventNameMatchesAnyPreset,
 } from "@/lib/event-preset-utils";
-import { buildCalendarDateChangePreview } from "@/lib/calendar-date-change-preview";
+import {
+  applyRecurrenceToNewStartDate,
+  buildCalendarDateChangePreview,
+  buildRecurrenceForTypeAtDate,
+} from "@/lib/calendar-date-change-preview";
 import { cn } from "@/lib/utils";
 
 const DEFAULT_CONFIRMED: ReservationWizardConfirmed = {
@@ -144,6 +149,7 @@ interface ReservationCreateWizardProps {
     keepRecurrence: boolean;
     keepExceptions: boolean;
     exceptDates?: string[];
+    recurrence?: RecurrenceConfig;
   }) => void;
   onCalendarDateChangeCancel?: () => void;
   presetSourceAreaId: string;
@@ -275,21 +281,50 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
   const [confirmExceptionKeeps, setConfirmExceptionKeeps] = React.useState<
     Record<string, boolean>
   >({});
+  const [confirmDialogRecurrence, setConfirmDialogRecurrence] =
+    React.useState<RecurrenceConfig>(recurrence);
 
   const MANUAL_EVENT_NAME_PREFIX = "__custom__:";
 
-  const calendarDateChangePreview = React.useMemo(() => {
+  const afterRecurrenceForPreview = React.useMemo(() => {
     if (!calendarDateChangeConfirm) return null;
+    if (!confirmKeepRecurrence) {
+      return buildRecurrenceForTypeAtDate(
+        "NONE",
+        calendarDateChangeConfirm.newDate,
+        recurrence,
+      );
+    }
+    return applyRecurrenceToNewStartDate(
+      calendarDateChangeConfirm.newDate,
+      confirmDialogRecurrence,
+      calendarDateChangeConfirm.anchorDate,
+    );
+  }, [
+    calendarDateChangeConfirm,
+    confirmKeepRecurrence,
+    confirmDialogRecurrence,
+    recurrence,
+  ]);
+
+  const calendarDateChangePreview = React.useMemo(() => {
+    if (!calendarDateChangeConfirm || !afterRecurrenceForPreview) return null;
     return buildCalendarDateChangePreview(
       calendarDateChangeConfirm.anchorDate,
       calendarDateChangeConfirm.newDate,
       recurrence,
+      afterRecurrenceForPreview,
     );
+  }, [calendarDateChangeConfirm, recurrence, afterRecurrenceForPreview]);
+
+  React.useEffect(() => {
+    if (!calendarDateChangeConfirm) return;
+    setConfirmDialogRecurrence({ ...recurrence });
+    setConfirmKeepRecurrence(recurrence.type !== "NONE");
   }, [calendarDateChangeConfirm, recurrence]);
 
   React.useEffect(() => {
     if (!calendarDateChangeConfirm) return;
-    setConfirmKeepRecurrence(recurrence.type !== "NONE");
     const mapped = calendarDateChangePreview?.mappedExceptions ?? [];
     setConfirmKeepExceptions(mapped.length > 0);
     const keeps: Record<string, boolean> = {};
@@ -297,7 +332,12 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
       keeps[row.from] = true;
     }
     setConfirmExceptionKeeps(keeps);
-  }, [calendarDateChangeConfirm, recurrence.type, calendarDateChangePreview]);
+  }, [
+    calendarDateChangeConfirm,
+    calendarDateChangePreview?.mappedExceptions,
+    confirmDialogRecurrence.type,
+    confirmKeepRecurrence,
+  ]);
 
   const presetFormHandlers = React.useMemo(
     () => ({
@@ -423,10 +463,42 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
 
   const areaLabel = getAreaLabel(activeAreaRecord, areas);
 
+  function resetEventCaptureAfterAreaChange() {
+    clearEventPresetFormFields(presetFormHandlers);
+    setAppliedPresetName(null);
+    setUseEventNameCombobox(false);
+    setManualEventNameOption(null);
+    setShowExceptionPicker(false);
+    setEventDetailsExpanded(false);
+    setConfirmed((c) => ({
+      ...c,
+      eventName: false,
+      eventDescription: false,
+      attendees: false,
+      recurrence: false,
+      scheduleCollapsed: false,
+    }));
+  }
+
   function applyAreaChange(id: string) {
+    const newPresets = presetsForAreaId(id);
+    const areaChanging = id !== activeAreaId;
+
+    if (
+      areaChanging &&
+      !currentEventDataFitsAreaPresets(
+        newPresets,
+        eventName,
+        eventDescription,
+        estimatedAttendees,
+        recurrence,
+      )
+    ) {
+      resetEventCaptureAfterAreaChange();
+    }
+
     if (isAdmin) onAreaIdChange(id);
     else onReservationAreaIdChange(id);
-    const newPresets = presetsForAreaId(id);
     if (
       !appliedPresetName &&
       eventName.trim().length >= 3 &&
@@ -448,7 +520,9 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
   function requestAreaChange(id: string) {
     if (!id) return;
     if (id === activeAreaId) {
-      applyAreaChange(id);
+      setEditingSection(null);
+      setPendingAreaId(null);
+      setAreaChangeDialogOpen(false);
       return;
     }
 
@@ -476,19 +550,7 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
   }
 
   function confirmPresetMismatchAreaChange() {
-    clearEventPresetFormFields(presetFormHandlers);
-    setAppliedPresetName(null);
-    setUseEventNameCombobox(false);
-    setManualEventNameOption(null);
-    setShowExceptionPicker(false);
-    setConfirmed((c) => ({
-      ...c,
-      eventName: false,
-      eventDescription: false,
-      attendees: false,
-      recurrence: false,
-      scheduleCollapsed: false,
-    }));
+    resetEventCaptureAfterAreaChange();
     if (pendingAreaId) applyAreaChange(pendingAreaId);
     setPresetMismatchDialogOpen(false);
   }
@@ -1009,88 +1071,129 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
                   )}
                 </p>
               )}
-              {recurrence.type === "NONE" ? (
-                <p className="rounded-md bg-muted/50 px-2 py-1.5 text-muted-foreground">
-                  Recurrencia: sin recurrencia. Confirma que esta fecha es la
-                  correcta.
-                </p>
-              ) : (
-                <>
-                  <label className="flex items-start gap-2">
-                    <input
-                      type="checkbox"
-                      checked={confirmKeepRecurrence}
+              <label className="flex items-start gap-2">
+                <input
+                  type="checkbox"
+                  checked={confirmKeepRecurrence}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setConfirmKeepRecurrence(checked);
+                    if (!checked) {
+                      setConfirmKeepExceptions(false);
+                      return;
+                    }
+                    if (confirmDialogRecurrence.type === "NONE") {
+                      setConfirmDialogRecurrence(
+                        buildRecurrenceForTypeAtDate(
+                          "WEEKLY",
+                          calendarDateChangeConfirm.newDate,
+                          recurrence,
+                        ),
+                      );
+                    }
+                  }}
+                  className="mt-0.5 rounded border-border"
+                />
+                <span>Usar recurrencia para la nueva fecha</span>
+              </label>
+              {confirmKeepRecurrence && calendarDateChangeConfirm && (
+                <div className="space-y-2">
+                  <div className="space-y-1">
+                    <Label htmlFor="cal-confirm-recurrence">Tipo de recurrencia</Label>
+                    <Select
+                      id="cal-confirm-recurrence"
+                      value={confirmDialogRecurrence.type}
                       onChange={(e) => {
-                        setConfirmKeepRecurrence(e.target.checked);
-                        if (!e.target.checked) setConfirmKeepExceptions(false);
+                        const type = e.target.value as RecurrenceType;
+                        setConfirmDialogRecurrence(
+                          buildRecurrenceForTypeAtDate(
+                            type,
+                            calendarDateChangeConfirm.newDate,
+                            confirmDialogRecurrence,
+                          ),
+                        );
+                        if (type === "NONE") {
+                          setConfirmKeepRecurrence(false);
+                          setConfirmKeepExceptions(false);
+                        }
                       }}
-                      className="mt-0.5 rounded border-border"
-                    />
-                    <span>
-                      Mantener recurrencia (
-                      {RECURRENCE_TYPE_LABELS[recurrence.type]})
-                    </span>
-                  </label>
-                  {confirmKeepRecurrence && calendarDateChangePreview && (
-                    <div className="space-y-2 rounded-md border border-border bg-muted/30 p-2.5 text-xs">
-                      <p>
-                        <span className="text-muted-foreground">Antes: </span>
-                        {calendarDateChangePreview.beforePattern}
-                      </p>
-                      {calendarDateChangePreview.patternChanged ? (
+                    >
+                      {(Object.keys(RECURRENCE_TYPE_LABELS) as RecurrenceType[])
+                        .filter((type) => type !== "CUSTOM")
+                        .map((type) => (
+                          <option key={type} value={type}>
+                            {RECURRENCE_TYPE_LABELS[type]}
+                          </option>
+                        ))}
+                    </Select>
+                  </div>
+                  {calendarDateChangePreview &&
+                    confirmDialogRecurrence.type !== "NONE" && (
+                      <div className="space-y-2 rounded-md border border-border bg-muted/30 p-2.5 text-xs">
                         <p>
-                          <span className="text-muted-foreground">
-                            Después:{" "}
-                          </span>
-                          <strong className="text-foreground">
-                            {calendarDateChangePreview.afterPattern}
-                          </strong>
+                          <span className="text-muted-foreground">Antes: </span>
+                          {calendarDateChangePreview.beforePattern}
                         </p>
-                      ) : (
-                        <p className="text-muted-foreground">
-                          La regla se mantiene; cambia la fecha de inicio del
-                          ciclo.
-                        </p>
-                      )}
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        <div>
-                          <p className="font-medium text-muted-foreground">
-                            Próximas fechas (actual)
+                        {calendarDateChangePreview.patternChanged ? (
+                          <p>
+                            <span className="text-muted-foreground">
+                              Después:{" "}
+                            </span>
+                            <strong className="text-foreground">
+                              {calendarDateChangePreview.afterPattern}
+                            </strong>
                           </p>
-                          <ul className="mt-1 list-inside list-disc space-y-0.5">
-                            {calendarDateChangePreview.beforeSampleDates.map(
-                              (iso) => (
-                                <li key={`before-${iso}`}>
-                                  {formatDateDisplay(
-                                    new Date(`${iso}T12:00:00`),
-                                  )}
-                                </li>
-                              ),
-                            )}
-                          </ul>
-                        </div>
-                        <div>
-                          <p className="font-medium text-muted-foreground">
-                            Próximas fechas (nuevo)
+                        ) : (
+                          <p className="text-muted-foreground">
+                            La regla se mantiene; cambia la fecha de inicio del
+                            ciclo.
                           </p>
-                          <ul className="mt-1 list-inside list-disc space-y-0.5">
-                            {calendarDateChangePreview.afterSampleDates.map(
-                              (iso) => (
-                                <li key={`after-${iso}`}>
-                                  {formatDateDisplay(
-                                    new Date(`${iso}T12:00:00`),
-                                  )}
-                                </li>
-                              ),
-                            )}
-                          </ul>
+                        )}
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div>
+                            <p className="font-medium text-muted-foreground">
+                              Próximas fechas (actual)
+                            </p>
+                            <ul className="mt-1 list-inside list-disc space-y-0.5">
+                              {calendarDateChangePreview.beforeSampleDates.map(
+                                (iso) => (
+                                  <li key={`before-${iso}`}>
+                                    {formatDateDisplay(
+                                      new Date(`${iso}T12:00:00`),
+                                    )}
+                                  </li>
+                                ),
+                              )}
+                            </ul>
+                          </div>
+                          <div>
+                            <p className="font-medium text-muted-foreground">
+                              Próximas fechas (nuevo)
+                            </p>
+                            <ul className="mt-1 list-inside list-disc space-y-0.5">
+                              {calendarDateChangePreview.afterSampleDates.map(
+                                (iso) => (
+                                  <li key={`after-${iso}`}>
+                                    {formatDateDisplay(
+                                      new Date(`${iso}T12:00:00`),
+                                    )}
+                                  </li>
+                                ),
+                              )}
+                            </ul>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
-                </>
+                    )}
+                </div>
+              )}
+              {!confirmKeepRecurrence && (
+                <p className="rounded-md bg-muted/50 px-2 py-1.5 text-xs text-muted-foreground">
+                  Solo se reservará la nueva fecha (sin repetición).
+                </p>
               )}
               {confirmKeepRecurrence &&
+                confirmDialogRecurrence.type !== "NONE" &&
                 (calendarDateChangePreview?.mappedExceptions.length ?? 0) >
                   0 && (
                   <div className="space-y-2">
@@ -1164,19 +1267,24 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
                   calendarDateChangePreview?.mappedExceptions
                     .filter((row) => confirmExceptionKeeps[row.from])
                     .map((row) => row.to) ?? [];
+                const usesRecurrence =
+                  confirmKeepRecurrence &&
+                  (afterRecurrenceForPreview?.type ?? "NONE") !== "NONE";
                 onCalendarDateChangeConfirm?.({
                   newDate: calendarDateChangeConfirm.newDate,
                   anchorDate: calendarDateChangeConfirm.anchorDate,
-                  keepRecurrence:
-                    recurrence.type === "NONE" ? false : confirmKeepRecurrence,
+                  keepRecurrence: usesRecurrence,
                   keepExceptions:
-                    confirmKeepRecurrence &&
+                    usesRecurrence &&
                     confirmKeepExceptions &&
                     mappedExceptDates.length > 0,
                   exceptDates:
-                    confirmKeepRecurrence && confirmKeepExceptions
+                    usesRecurrence && confirmKeepExceptions
                       ? mappedExceptDates
                       : [],
+                  recurrence: usesRecurrence
+                    ? afterRecurrenceForPreview ?? undefined
+                    : undefined,
                 });
               }}
             >
@@ -1218,6 +1326,16 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
       </Dialog>
 
       {/* Área */}
+      {areaResolved && showAreaPicker && (
+        <SummaryLine
+          label="Área"
+          value={areaLabel}
+          onClick={() =>
+            setEditingSection((current) => (current === "area" ? null : "area"))
+          }
+        />
+      )}
+
       {showAreaEditor && (
         <section className="space-y-2">
           <Label className="text-sm font-medium">Área o subárea de la reserva</Label>
@@ -1229,16 +1347,6 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
             onChange={requestAreaChange}
           />
         </section>
-      )}
-
-      {areaResolved && !showAreaEditor && (
-        <SummaryLine
-          label="Área"
-          value={areaLabel}
-          onClick={
-            showAreaPicker ? () => setEditingSection("area") : undefined
-          }
-        />
       )}
 
       {/* Datos del evento — acumulativo o panel colapsado */}

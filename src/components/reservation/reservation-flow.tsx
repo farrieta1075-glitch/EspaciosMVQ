@@ -18,7 +18,6 @@ import {
   type ReservationWizardConfirmed,
 } from "@/lib/reservation-draft-storage";
 import { formatDateISO } from "@/lib/date-utils";
-import { applyRecurrenceToNewStartDate } from "@/lib/calendar-date-change-preview";
 import {
   readJsonResponse,
   shouldRetryMutationRequest,
@@ -375,13 +374,19 @@ export function ReservationFlow({
     keepRecurrence: boolean;
     keepExceptions: boolean;
     exceptDates?: string[];
+    recurrence?: import("@/types/reservation").RecurrenceConfig;
   }) {
-    const { newDate, anchorDate, keepRecurrence, keepExceptions, exceptDates } =
-      options;
+    const {
+      newDate,
+      keepRecurrence,
+      keepExceptions,
+      exceptDates,
+      recurrence: nextRecurrence,
+    } = options;
     setCalendarDateChangeConfirm(null);
 
-    setRecurrence((current) => {
-      if (!keepRecurrence) {
+    setRecurrence(() => {
+      if (!keepRecurrence || !nextRecurrence) {
         return {
           type: "NONE",
           until: "",
@@ -389,16 +394,13 @@ export function ReservationFlow({
           customDates: [],
         };
       }
-      let next = applyRecurrenceToNewStartDate(newDate, current, anchorDate);
       if (keepExceptions) {
-        next = {
-          ...next,
-          exceptDates: exceptDates ?? current.exceptDates ?? [],
+        return {
+          ...nextRecurrence,
+          exceptDates: exceptDates ?? nextRecurrence.exceptDates ?? [],
         };
-      } else {
-        next = { ...next, exceptDates: [] };
       }
-      return next;
+      return { ...nextRecurrence, exceptDates: [] };
     });
 
     setSelection((current) =>
