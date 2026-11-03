@@ -18,8 +18,7 @@ import {
   type ReservationWizardConfirmed,
 } from "@/lib/reservation-draft-storage";
 import { formatDateISO } from "@/lib/date-utils";
-import { inferMonthlyRelativeFromDate } from "@/lib/monthly-relative-recurrence";
-import { defaultRecurrenceUntil } from "@/lib/recurrence-default-until";
+import { applyRecurrenceToNewStartDate } from "@/lib/calendar-date-change-preview";
 import {
   readJsonResponse,
   shouldRetryMutationRequest,
@@ -372,10 +371,13 @@ export function ReservationFlow({
 
   function handleCalendarDateChangeConfirm(options: {
     newDate: string;
+    anchorDate: string;
     keepRecurrence: boolean;
     keepExceptions: boolean;
+    exceptDates?: string[];
   }) {
-    const { newDate, keepRecurrence, keepExceptions } = options;
+    const { newDate, anchorDate, keepRecurrence, keepExceptions, exceptDates } =
+      options;
     setCalendarDateChangeConfirm(null);
 
     setRecurrence((current) => {
@@ -387,23 +389,14 @@ export function ReservationFlow({
           customDates: [],
         };
       }
-      let next = { ...current };
-      if (!keepExceptions) {
-        next = { ...next, exceptDates: [] };
-      }
-      if (next.type === "MONTHLY_RELATIVE") {
-        const inferred = inferMonthlyRelativeFromDate(newDate);
+      let next = applyRecurrenceToNewStartDate(newDate, current, anchorDate);
+      if (keepExceptions) {
         next = {
           ...next,
-          monthlyRelative: {
-            weekday: inferred.weekday,
-            ordinal: inferred.ordinal,
-          },
-          until:
-            next.until?.trim() && next.until >= newDate
-              ? next.until
-              : defaultRecurrenceUntil(newDate, "MONTHLY_RELATIVE"),
+          exceptDates: exceptDates ?? current.exceptDates ?? [],
         };
+      } else {
+        next = { ...next, exceptDates: [] };
       }
       return next;
     });

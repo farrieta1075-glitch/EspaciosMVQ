@@ -55,6 +55,7 @@ import {
   clearEventPresetFormFields,
   eventNameMatchesAnyPreset,
 } from "@/lib/event-preset-utils";
+import { buildCalendarDateChangePreview } from "@/lib/calendar-date-change-preview";
 import { cn } from "@/lib/utils";
 
 const DEFAULT_CONFIRMED: ReservationWizardConfirmed = {
@@ -139,8 +140,10 @@ interface ReservationCreateWizardProps {
   calendarDateChangeConfirm?: { anchorDate: string; newDate: string } | null;
   onCalendarDateChangeConfirm?: (options: {
     newDate: string;
+    anchorDate: string;
     keepRecurrence: boolean;
     keepExceptions: boolean;
+    exceptDates?: string[];
   }) => void;
   onCalendarDateChangeCancel?: () => void;
   presetSourceAreaId: string;
@@ -269,14 +272,32 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
   const [showExceptionPicker, setShowExceptionPicker] = React.useState(false);
   const [confirmKeepRecurrence, setConfirmKeepRecurrence] = React.useState(true);
   const [confirmKeepExceptions, setConfirmKeepExceptions] = React.useState(true);
+  const [confirmExceptionKeeps, setConfirmExceptionKeeps] = React.useState<
+    Record<string, boolean>
+  >({});
 
   const MANUAL_EVENT_NAME_PREFIX = "__custom__:";
+
+  const calendarDateChangePreview = React.useMemo(() => {
+    if (!calendarDateChangeConfirm) return null;
+    return buildCalendarDateChangePreview(
+      calendarDateChangeConfirm.anchorDate,
+      calendarDateChangeConfirm.newDate,
+      recurrence,
+    );
+  }, [calendarDateChangeConfirm, recurrence]);
 
   React.useEffect(() => {
     if (!calendarDateChangeConfirm) return;
     setConfirmKeepRecurrence(recurrence.type !== "NONE");
-    setConfirmKeepExceptions((recurrence.exceptDates?.length ?? 0) > 0);
-  }, [calendarDateChangeConfirm, recurrence.type, recurrence.exceptDates]);
+    const mapped = calendarDateChangePreview?.mappedExceptions ?? [];
+    setConfirmKeepExceptions(mapped.length > 0);
+    const keeps: Record<string, boolean> = {};
+    for (const row of mapped) {
+      keeps[row.from] = true;
+    }
+    setConfirmExceptionKeeps(keeps);
+  }, [calendarDateChangeConfirm, recurrence.type, calendarDateChangePreview]);
 
   const presetFormHandlers = React.useMemo(
     () => ({
@@ -868,7 +889,7 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
           className="flex w-full items-center justify-between rounded-md py-1.5 text-left text-xl font-semibold tracking-tight hover:bg-muted/60 sm:text-2xl"
           onClick={() => setEventDetailsExpanded((v) => !v)}
         >
-          Datos del evento
+          {eventName.trim() || "Nombre del evento"}
           {eventDetailsExpanded ? (
             <ChevronUp className="h-5 w-5 shrink-0" />
           ) : (
@@ -994,42 +1015,137 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
                   correcta.
                 </p>
               ) : (
-                <label className="flex items-start gap-2">
-                  <input
-                    type="checkbox"
-                    checked={confirmKeepRecurrence}
-                    onChange={(e) => {
-                      setConfirmKeepRecurrence(e.target.checked);
-                      if (!e.target.checked) setConfirmKeepExceptions(false);
-                    }}
-                    className="mt-0.5 rounded border-border"
-                  />
-                  <span>
-                    Mantener recurrencia:{" "}
-                    <strong>{RECURRENCE_TYPE_LABELS[recurrence.type]}</strong>
-                    {recurrence.until
-                      ? ` (hasta ${formatDateDisplay(new Date(`${recurrence.until}T12:00:00`))})`
-                      : ""}
-                  </span>
-                </label>
+                <>
+                  <label className="flex items-start gap-2">
+                    <input
+                      type="checkbox"
+                      checked={confirmKeepRecurrence}
+                      onChange={(e) => {
+                        setConfirmKeepRecurrence(e.target.checked);
+                        if (!e.target.checked) setConfirmKeepExceptions(false);
+                      }}
+                      className="mt-0.5 rounded border-border"
+                    />
+                    <span>
+                      Mantener recurrencia (
+                      {RECURRENCE_TYPE_LABELS[recurrence.type]})
+                    </span>
+                  </label>
+                  {confirmKeepRecurrence && calendarDateChangePreview && (
+                    <div className="space-y-2 rounded-md border border-border bg-muted/30 p-2.5 text-xs">
+                      <p>
+                        <span className="text-muted-foreground">Antes: </span>
+                        {calendarDateChangePreview.beforePattern}
+                      </p>
+                      {calendarDateChangePreview.patternChanged ? (
+                        <p>
+                          <span className="text-muted-foreground">
+                            Después:{" "}
+                          </span>
+                          <strong className="text-foreground">
+                            {calendarDateChangePreview.afterPattern}
+                          </strong>
+                        </p>
+                      ) : (
+                        <p className="text-muted-foreground">
+                          La regla se mantiene; cambia la fecha de inicio del
+                          ciclo.
+                        </p>
+                      )}
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div>
+                          <p className="font-medium text-muted-foreground">
+                            Próximas fechas (actual)
+                          </p>
+                          <ul className="mt-1 list-inside list-disc space-y-0.5">
+                            {calendarDateChangePreview.beforeSampleDates.map(
+                              (iso) => (
+                                <li key={`before-${iso}`}>
+                                  {formatDateDisplay(
+                                    new Date(`${iso}T12:00:00`),
+                                  )}
+                                </li>
+                              ),
+                            )}
+                          </ul>
+                        </div>
+                        <div>
+                          <p className="font-medium text-muted-foreground">
+                            Próximas fechas (nuevo)
+                          </p>
+                          <ul className="mt-1 list-inside list-disc space-y-0.5">
+                            {calendarDateChangePreview.afterSampleDates.map(
+                              (iso) => (
+                                <li key={`after-${iso}`}>
+                                  {formatDateDisplay(
+                                    new Date(`${iso}T12:00:00`),
+                                  )}
+                                </li>
+                              ),
+                            )}
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
-              {(recurrence.exceptDates?.length ?? 0) > 0 && (
-                <label className="flex items-start gap-2">
-                  <input
-                    type="checkbox"
-                    checked={confirmKeepExceptions && confirmKeepRecurrence}
-                    disabled={!confirmKeepRecurrence}
-                    onChange={(e) =>
-                      setConfirmKeepExceptions(e.target.checked)
-                    }
-                    className="mt-0.5 rounded border-border"
-                  />
-                  <span>
-                    Mantener {recurrence.exceptDates?.length ?? 0}{" "}
-                    excepción(es) de días sin reserva
-                  </span>
-                </label>
-              )}
+              {confirmKeepRecurrence &&
+                (calendarDateChangePreview?.mappedExceptions.length ?? 0) >
+                  0 && (
+                  <div className="space-y-2">
+                    <label className="flex items-start gap-2">
+                      <input
+                        type="checkbox"
+                        checked={confirmKeepExceptions}
+                        onChange={(e) =>
+                          setConfirmKeepExceptions(e.target.checked)
+                        }
+                        className="mt-0.5 rounded border-border"
+                      />
+                      <span>
+                        Mantener excepciones (días sin reserva), ajustadas al
+                        nuevo patrón
+                      </span>
+                    </label>
+                    {confirmKeepExceptions && calendarDateChangePreview && (
+                      <ul className="space-y-1.5 rounded-md border border-border bg-muted/20 p-2 text-xs">
+                        {calendarDateChangePreview.mappedExceptions.map(
+                          (row) => (
+                            <li key={row.from}>
+                              <label className="flex items-start gap-2">
+                                <input
+                                  type="checkbox"
+                                  checked={
+                                    confirmExceptionKeeps[row.from] ?? false
+                                  }
+                                  onChange={(e) =>
+                                    setConfirmExceptionKeeps((current) => ({
+                                      ...current,
+                                      [row.from]: e.target.checked,
+                                    }))
+                                  }
+                                  className="mt-0.5 rounded border-border"
+                                />
+                                <span>
+                                  {formatDateDisplay(
+                                    new Date(`${row.from}T12:00:00`),
+                                  )}
+                                  {" → "}
+                                  <strong>
+                                    {formatDateDisplay(
+                                      new Date(`${row.to}T12:00:00`),
+                                    )}
+                                  </strong>
+                                </span>
+                              </label>
+                            </li>
+                          ),
+                        )}
+                      </ul>
+                    )}
+                  </div>
+                )}
             </div>
           ) : null}
           <DialogFooter className="gap-2 sm:gap-0">
@@ -1044,12 +1160,23 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
               type="button"
               onClick={() => {
                 if (!calendarDateChangeConfirm) return;
+                const mappedExceptDates =
+                  calendarDateChangePreview?.mappedExceptions
+                    .filter((row) => confirmExceptionKeeps[row.from])
+                    .map((row) => row.to) ?? [];
                 onCalendarDateChangeConfirm?.({
                   newDate: calendarDateChangeConfirm.newDate,
+                  anchorDate: calendarDateChangeConfirm.anchorDate,
                   keepRecurrence:
                     recurrence.type === "NONE" ? false : confirmKeepRecurrence,
                   keepExceptions:
-                    confirmKeepRecurrence && confirmKeepExceptions,
+                    confirmKeepRecurrence &&
+                    confirmKeepExceptions &&
+                    mappedExceptDates.length > 0,
+                  exceptDates:
+                    confirmKeepRecurrence && confirmKeepExceptions
+                      ? mappedExceptDates
+                      : [],
                 });
               }}
             >
