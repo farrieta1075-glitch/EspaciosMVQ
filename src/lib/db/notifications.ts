@@ -1,4 +1,6 @@
 import "server-only";
+import type { AdminAlertKind } from "@/lib/admin-alert-notifications";
+import { adminAlertMessageMatchesBatch } from "@/lib/admin-alert-notifications";
 import { getPrisma } from "@/lib/db/prisma";
 import type { AppNotification, NotificationType } from "@/types/notification";
 
@@ -53,18 +55,20 @@ export async function hasApprovalNotificationForBatchSql(input: {
   alertKind: string;
 }): Promise<boolean> {
   const batchId = input.approvalBatchId.trim();
-  const kind = input.alertKind.trim();
+  const kind = input.alertKind.trim() as AdminAlertKind;
   if (!batchId || !kind) return false;
 
-  const needle = `[batch:${batchId}:${kind}]`;
   const prisma = getPrisma();
-  const row = await prisma.notification.findFirst({
-    where: {
-      type: "APPROVAL_NEEDED",
-      message: { contains: needle },
-    },
+  const rows = await prisma.notification.findMany({
+    where: { type: "APPROVAL_NEEDED" },
+    select: { message: true },
+    orderBy: { createdAt: "desc" },
+    take: 400,
   });
-  return Boolean(row);
+
+  return rows.some((row) =>
+    adminAlertMessageMatchesBatch(row.message ?? "", batchId, kind),
+  );
 }
 
 export async function createNotificationSql(input: {

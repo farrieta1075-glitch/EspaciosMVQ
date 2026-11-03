@@ -45,6 +45,18 @@ import type {
 } from "@/types/reservation";
 import { parsePendingPayload } from "@/types/reservation";
 
+async function ensureAdminsNotifiedForPendingCreate(
+  reservation: Reservation | null | undefined,
+  occurrenceCount?: number,
+): Promise<void> {
+  if (!reservation || reservation.status !== "PENDING") return;
+  if (reservation.pendingAction) return;
+  await notifyAdminsReservationApprovalNeeded(reservation, {
+    occurrenceCount,
+    alertKind: "create",
+  });
+}
+
 function createApprovalToken(): string {
   return randomUUID().replace(/-/g, "");
 }
@@ -251,6 +263,11 @@ export async function createReservation(
     occurrences,
   });
   if (duplicateBatch) {
+    const anchor = await getReservationById(duplicateBatch.ids[0] ?? "");
+    await ensureAdminsNotifiedForPendingCreate(
+      anchor,
+      duplicateBatch.count > 1 ? duplicateBatch.count : undefined,
+    );
     return duplicateBatch;
   }
 
@@ -279,6 +296,11 @@ export async function createReservation(
       const existingBatch =
         await findPendingReservationsByApprovalBatchId(approvalBatchId);
       if (existingBatch.length > 0) {
+        const anchor = existingBatch[0];
+        await ensureAdminsNotifiedForPendingCreate(
+          anchor,
+          existingBatch.length > 1 ? existingBatch.length : undefined,
+        );
         return {
           ids: existingBatch.map((item) => item.id),
           count: existingBatch.length,
@@ -342,9 +364,10 @@ export async function createReservation(
   }
 
   if (pendingNotifySample) {
-    await notifyAdminsReservationApprovalNeeded(pendingNotifySample, {
-      occurrenceCount: occurrences.length > 1 ? occurrences.length : undefined,
-    });
+    await ensureAdminsNotifiedForPendingCreate(
+      pendingNotifySample,
+      occurrences.length > 1 ? occurrences.length : undefined,
+    );
   }
 
   if (input.createdByAdmin && createdIds[0]) {
@@ -564,7 +587,7 @@ export async function cancelReservation(
     approvalToken: createApprovalToken(),
   };
   await updateReservationRecord(updated);
-  await notifyAdminsReservationApprovalNeeded(updated);
+  await notifyAdminsReservationApprovalNeeded(updated, { alertKind: "cancel" });
   return { pending: true };
 }
 
@@ -659,7 +682,7 @@ export async function updateReservation(
       approvalToken: createApprovalToken(),
     };
     await updateReservationRecord(updated);
-    await notifyAdminsReservationApprovalNeeded(updated);
+    await notifyAdminsReservationApprovalNeeded(updated, { alertKind: "update" });
     return { pending: true };
   }
 

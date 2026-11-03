@@ -27,7 +27,8 @@ import { addMinutesToTimeHHmm, formatDateISO } from "@/lib/date-utils";
 import { readJsonResponse } from "@/lib/read-json-response";
 import {
   clearReservationCreateBatchId,
-  getOrCreateReservationCreateBatchId,
+  newReservationCreateBatchId,
+  rememberReservationCreateBatchId,
 } from "@/lib/reservation-create-batch-id";
 import { ReservationCreateWizard } from "@/components/reservation/reservation-create-wizard";
 import { Button } from "@/components/ui/button";
@@ -123,6 +124,22 @@ export function ReservationFlow({
     React.useState<{ anchorDate: string; newDate: string } | null>(null);
   const [wizardResetKey, setWizardResetKey] = React.useState(0);
   const submitInFlightRef = React.useRef(false);
+  const submitBatchIdRef = React.useRef("");
+
+  function resolveSubmitApprovalBatchId(): string {
+    if (submitBatchIdRef.current.trim()) {
+      return submitBatchIdRef.current;
+    }
+    const id = newReservationCreateBatchId();
+    submitBatchIdRef.current = id;
+    rememberReservationCreateBatchId(id);
+    return id;
+  }
+
+  function resetSubmitApprovalBatchId(): void {
+    submitBatchIdRef.current = "";
+    clearReservationCreateBatchId();
+  }
 
   React.useEffect(() => {
     const scopeQuery = userAreaScopeIds.join(",");
@@ -320,7 +337,7 @@ export function ReservationFlow({
         needsJustification && attendeeJustificationCode === "OTHER"
           ? attendeeJustificationNote.trim()
           : "",
-      approvalBatchId: getOrCreateReservationCreateBatchId(),
+      approvalBatchId: resolveSubmitApprovalBatchId(),
     };
 
     try {
@@ -361,7 +378,7 @@ export function ReservationFlow({
       }
 
       setSimilarPrompt(null);
-      clearReservationCreateBatchId();
+      resetSubmitApprovalBatchId();
       setSuccessInfo({
         count: data.count ?? data.ids.length,
         pending: Boolean(data.pending),
@@ -378,7 +395,7 @@ export function ReservationFlow({
     selection?.selectedResources.filter((item) => item.quantity > 0).length ?? 0;
 
   function resetCreateFlowForNewReservation() {
-    clearReservationCreateBatchId();
+    resetSubmitApprovalBatchId();
     clearAllReservationDraftState();
     releaseRadixBodyScrollLock();
     setSuccessInfo(null);

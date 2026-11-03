@@ -165,11 +165,9 @@ export async function hasAdminAlertForBatch(input: {
   const batchId = input.approvalBatchId.trim();
   if (!batchId) return false;
 
-  const { buildAdminAlertBatchMarker } = await import(
+  const { adminAlertMessageMatchesBatch } = await import(
     "@/lib/admin-alert-notifications"
   );
-  const needle = buildAdminAlertBatchMarker(batchId, input.alertKind);
-  const legacyCreateMarker = `[batch:${batchId}]`;
 
   if (isSqlDatabaseEnabled()) {
     const { hasApprovalNotificationForBatchSql } = await import(
@@ -184,12 +182,12 @@ export async function hasAdminAlertForBatch(input: {
   const { rows } = await getSheetRows(SHEET_TABS.NOTIFICACIONES);
   for (const row of rows) {
     if (row.type !== "APPROVAL_NEEDED") continue;
-    const message = row.message ?? "";
-    if (message.includes(needle)) return true;
     if (
-      input.alertKind === "create" &&
-      message.includes(legacyCreateMarker) &&
-      !message.includes(`${legacyCreateMarker}:`)
+      adminAlertMessageMatchesBatch(
+        row.message ?? "",
+        batchId,
+        input.alertKind,
+      )
     ) {
       return true;
     }

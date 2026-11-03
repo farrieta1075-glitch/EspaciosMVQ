@@ -14,6 +14,7 @@
     "list:admin-emails": "node --env-file=.env.local scripts/list-admin-emails.mjs",
     "migrate:uploads-to-blob": "node --env-file=.env.local scripts/migrate-uploads-to-blob.mjs",
     "generate:vapid": "node scripts/generate-vapid-keys.mjs",
+    "generate:install-guide-pdf": "node scripts/generate-install-guide-pdf.mjs",
     "postinstall": "prisma generate",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",

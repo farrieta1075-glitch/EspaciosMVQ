@@ -2,6 +2,7 @@ import "server-only";
 import {
   adminAlertPushTitle,
   buildAdminAlertMessage,
+  resolveAdminAlertBatchId,
   resolveAdminAlertKind,
   stripAdminAlertBatchMarker,
   type AdminAlertKind,
@@ -28,18 +29,8 @@ async function notifyAdminsInAppAndPush(
   options?: { occurrenceCount?: number; alertKind?: AdminAlertKind },
 ): Promise<void> {
   const batch = await getPendingCreateBatchMembers(reservation);
-  const batchId =
-    reservation.approvalBatchId?.trim() ||
-    batch[0]?.approvalBatchId?.trim() ||
-    reservation.id;
   const alertKind = resolveAdminAlertKind(reservation, options?.alertKind);
-
-  if (await hasAdminAlertForBatch({ approvalBatchId: batchId, alertKind })) {
-    console.info(
-      `[notifications] Aviso «${alertKind}» ya enviado para lote ${batchId}`,
-    );
-    return;
-  }
+  const batchId = resolveAdminAlertBatchId(reservation, alertKind, batch);
 
   const [admins, area] = await Promise.all([
     listAdminsForApprovalAlerts(),
@@ -87,10 +78,7 @@ export async function notifyAdminsReservationApprovalNeeded(
   }
 
   const batch = await getPendingCreateBatchMembers(reservation);
-  const batchId =
-    reservation.approvalBatchId?.trim() ||
-    batch[0]?.approvalBatchId?.trim() ||
-    reservation.id;
+  const batchId = resolveAdminAlertBatchId(reservation, alertKind, batch);
   const alreadyNotified = await hasAdminAlertForBatch({
     approvalBatchId: batchId,
     alertKind,

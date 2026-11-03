@@ -13,11 +13,49 @@ export function resolveAdminAlertKind(
   return "create";
 }
 
+/** Clave de deduplicación de avisos (correo, push, campana). */
+export function resolveAdminAlertBatchId(
+  reservation: Reservation,
+  alertKind: AdminAlertKind,
+  batch: Reservation[],
+): string {
+  if (alertKind === "cancel" || alertKind === "update") {
+    const token = reservation.approvalToken?.trim();
+    if (token) return `${reservation.id}:${token}`;
+    return reservation.id;
+  }
+
+  const batchId =
+    reservation.approvalBatchId?.trim() ||
+    batch[0]?.approvalBatchId?.trim();
+  if (batchId) return batchId;
+  return batch[0]?.id ?? reservation.id;
+}
+
 export function buildAdminAlertBatchMarker(
   batchId: string,
   kind: AdminAlertKind,
 ): string {
   return `[batch:${batchId.trim()}:${kind}]`;
+}
+
+/** Comparación literal (evita LIKE de SQL Server con corchetes en Prisma `contains`). */
+export function adminAlertMessageMatchesBatch(
+  message: string,
+  batchId: string,
+  alertKind: AdminAlertKind,
+): boolean {
+  const id = batchId.trim();
+  if (!id) return false;
+  const needle = buildAdminAlertBatchMarker(id, alertKind);
+  if (message.includes(needle)) return true;
+  if (alertKind === "create") {
+    const legacy = `[batch:${id}]`;
+    if (message.includes(legacy) && !message.includes(`${legacy}:`)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 export function stripAdminAlertBatchMarker(message: string): string {
