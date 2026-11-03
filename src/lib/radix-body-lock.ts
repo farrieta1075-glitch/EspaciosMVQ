@@ -8,7 +8,7 @@ export function releaseRadixBodyScrollLock(): void {
   document.body.removeAttribute("data-scroll-locked");
 
   document.documentElement.style.removeProperty("overflow");
-  document.documentElement.removeProperty("padding-right");
+  document.documentElement.style.removeProperty("padding-right");
   document.documentElement.removeAttribute("data-scroll-locked");
 }
 
