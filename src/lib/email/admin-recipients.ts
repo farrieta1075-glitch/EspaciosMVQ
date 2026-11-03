@@ -23,11 +23,19 @@ export async function listActiveAdminUsers(): Promise<AppUser[]> {
   return users.filter((user) => user.role === "ADMIN");
 }
 
+/** Mismo criterio que correo: ADMIN activo con «Recibir correos para autorizar». */
+export async function listAdminsForApprovalAlerts(): Promise<AppUser[]> {
+  const users = await getActiveUsers();
+  return users.filter(
+    (user) => user.role === "ADMIN" && user.receiveApprovalEmails,
+  );
+}
+
 export async function getAdminNotificationEmails(): Promise<{
   emails: string[];
   skipped: { id: string; reason: string }[];
 }> {
-  const admins = await listActiveAdminUsers();
+  const admins = await listAdminsForApprovalAlerts();
   const emails: string[] = [];
   const skipped: { id: string; reason: string }[] = [];
 
@@ -36,7 +44,7 @@ export async function getAdminNotificationEmails(): Promise<{
     if (!email) {
       skipped.push({
         id: admin.id,
-        reason: "sin correo en columna email (revisa hoja Usuarios)",
+        reason: "sin correo en columna email (revisa usuario ADMIN en SQL)",
       });
       continue;
     }
@@ -44,13 +52,6 @@ export async function getAdminNotificationEmails(): Promise<{
       skipped.push({
         id: admin.id,
         reason: `correo inválido: ${email}`,
-      });
-      continue;
-    }
-    if (!admin.receiveApprovalEmails) {
-      skipped.push({
-        id: admin.id,
-        reason: "notificaciones de autorización desactivadas",
       });
       continue;
     }

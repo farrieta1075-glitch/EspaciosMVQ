@@ -28,6 +28,8 @@ self.addEventListener("push", (event) => {
     self.registration.showNotification(payload.title, {
       body: payload.body,
       tag: payload.tag || "mvqro-notification",
+      icon: "/logo.svg",
+      badge: "/logo.svg",
       data: { url: payload.url || "/reservas" },
     }),
   );

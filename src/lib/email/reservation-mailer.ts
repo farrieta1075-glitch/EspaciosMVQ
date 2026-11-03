@@ -1,4 +1,11 @@
 import "server-only";
+import {
+  adminAlertPushTitle,
+  buildAdminAlertMessage,
+  resolveAdminAlertKind,
+  stripAdminAlertBatchMarker,
+  type AdminAlertKind,
+} from "@/lib/admin-alert-notifications";
 import { getAreaById } from "@/lib/sheets/areas";
 import type { Reservation } from "@/types/reservation";
 import { reservationNeedsAdminAction } from "@/types/reservation";
@@ -7,51 +14,55 @@ import { isEmailTransportConfigured } from "@/lib/email/mail-transport";
 import { sendMail } from "@/lib/email/send-mail";
 import {
   getAdminNotificationEmails,
-  listActiveAdminUsers,
+  listAdminsForApprovalAlerts,
 } from "@/lib/email/admin-recipients";
 import { buildAdminApprovalEmailContent } from "@/lib/email/approval-email-content";
 import {
   createNotification,
-  hasApprovalNotificationForBatch,
+  hasAdminAlertForBatch,
 } from "@/lib/sheets/notifications";
 import { getPendingCreateBatchMembers } from "@/lib/approval-batch";
 
 async function notifyAdminsInAppAndPush(
   reservation: Reservation,
-  options?: { occurrenceCount?: number },
+  options?: { occurrenceCount?: number; alertKind?: AdminAlertKind },
 ): Promise<void> {
   const batch = await getPendingCreateBatchMembers(reservation);
   const batchId =
     reservation.approvalBatchId?.trim() ||
     batch[0]?.approvalBatchId?.trim() ||
     reservation.id;
-  const alreadyNotified = await hasApprovalNotificationForBatch({
-    reservationIds: batch.map((item) => item.id),
-    approvalBatchId: batchId,
-  });
-  if (alreadyNotified) {
+  const alertKind = resolveAdminAlertKind(reservation, options?.alertKind);
+
+  if (await hasAdminAlertForBatch({ approvalBatchId: batchId, alertKind })) {
     console.info(
-      `[notifications] Aviso de autorización ya enviado para lote ${batchId}`,
+      `[notifications] Aviso «${alertKind}» ya enviado para lote ${batchId}`,
     );
     return;
   }
 
   const [admins, area] = await Promise.all([
-    listActiveAdminUsers(),
+    listAdminsForApprovalAlerts(),
     getAreaById(reservation.areaId),
   ]);
   if (admins.length === 0) {
     console.warn(
-      "[notifications] No hay administradores activos para notificar (revisa usuarios ADMIN en SQL).",
+      "[notifications] No hay administradores con avisos habilitados (ADMIN + recibir correos de autorización).",
     );
     return;
   }
 
   const areaName = area?.name ?? reservation.areaId;
   const count = options?.occurrenceCount ?? batch.length;
-  const occLabel = count > 1 ? ` (${count} fechas)` : "";
-  const message = `[batch:${batchId}] Solicitud pendiente: «${reservation.eventName}» en ${areaName}${occLabel}.`;
-  const pushTag = `approval-${batchId}`;
+  const message = buildAdminAlertMessage({
+    kind: alertKind,
+    batchId,
+    eventName: reservation.eventName,
+    areaName,
+    occurrenceCount: count > 1 ? count : undefined,
+  });
+  const pushTag = `approval-${alertKind}-${batchId}`.slice(0, 64);
+  const pushTitle = adminAlertPushTitle(alertKind);
 
   for (const admin of admins) {
     await createNotification({
@@ -61,24 +72,28 @@ async function notifyAdminsInAppAndPush(
       type: "APPROVAL_NEEDED",
       message,
       pushTag,
+      pushTitle,
     });
   }
 }
 
 export async function notifyAdminsReservationApprovalNeeded(
   reservation: Reservation,
-  options?: { occurrenceCount?: number },
+  options?: { occurrenceCount?: number; alertKind?: AdminAlertKind },
 ): Promise<void> {
-  if (!reservationNeedsAdminAction(reservation)) return;
+  const alertKind = resolveAdminAlertKind(reservation, options?.alertKind);
+  if (alertKind !== "withdraw" && !reservationNeedsAdminAction(reservation)) {
+    return;
+  }
 
   const batch = await getPendingCreateBatchMembers(reservation);
   const batchId =
     reservation.approvalBatchId?.trim() ||
     batch[0]?.approvalBatchId?.trim() ||
     reservation.id;
-  const alreadyNotified = await hasApprovalNotificationForBatch({
-    reservationIds: batch.map((item) => item.id),
+  const alreadyNotified = await hasAdminAlertForBatch({
     approvalBatchId: batchId,
+    alertKind,
   });
 
   try {
@@ -93,14 +108,49 @@ export async function notifyAdminsReservationApprovalNeeded(
   }
 
   try {
-    if (!alreadyNotified) {
+    if (!alreadyNotified && alertKind !== "withdraw") {
       await sendAdminApprovalEmails(reservation, options);
+    } else if (!alreadyNotified && alertKind === "withdraw") {
+      await sendAdminWithdrawalEmails(reservation, options);
     }
   } catch (error) {
     console.error(
       "[email] No se pudo enviar aviso a administradores:",
       error instanceof Error ? error.message : error,
     );
+  }
+}
+
+async function sendAdminWithdrawalEmails(
+  reservation: Reservation,
+  options?: { occurrenceCount?: number },
+): Promise<void> {
+  const [{ emails: adminEmails, skipped }, area] = await Promise.all([
+    getAdminNotificationEmails(),
+    getAreaById(reservation.areaId),
+  ]);
+
+  if (skipped.length > 0) {
+    console.warn("[email] Administradores omitidos:", skipped);
+  }
+  if (adminEmails.length === 0) {
+    console.warn("[email] No hay correos de admin para aviso de retiro.");
+    return;
+  }
+
+  const areaName = area?.name ?? reservation.areaId;
+  const count = options?.occurrenceCount;
+  const countNote = count && count > 1 ? ` (${count} fechas)` : "";
+  const subject = `MVQro Espacios — ${areaName}: solicitud retirada${countNote}`;
+  const text = [
+    `El solicitante retiró la reserva pendiente «${reservation.eventName}» en ${areaName}${countNote}.`,
+    "No requiere autorización: la reserva ya quedó cancelada en el sistema.",
+  ].join("\n");
+  const html = `<p>${text.replace(/\n/g, "<br/>")}</p>`;
+
+  const result = await sendMail({ to: adminEmails, subject, text, html });
+  if (!result.sent) {
+    console.info("[email] Aviso de retiro no enviado por correo.");
   }
 }
 
@@ -119,7 +169,7 @@ async function sendAdminApprovalEmails(
 
   if (adminEmails.length === 0) {
     console.warn(
-      "No hay administradores con correo válido para notificar. Revisa la hoja Usuarios (rol ADMIN, active=true, columna email).",
+      "No hay administradores con correo válido para notificar. Revisa usuarios ADMIN en SQL (email + recibir correos de autorización).",
     );
     return;
   }
@@ -213,4 +263,3 @@ export async function notifyUserReservationDecision(input: {
     html: `<p>${input.message}</p>`,
   });
 }
-

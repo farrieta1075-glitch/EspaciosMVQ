@@ -535,6 +535,28 @@ export async function cancelReservation(
     return { pending: false };
   }
 
+  if (reservation.status === "PENDING" && !reservation.pendingAction) {
+    const { getPendingCreateBatchMembers } = await import(
+      "@/lib/approval-batch"
+    );
+    const batch = await getPendingCreateBatchMembers(reservation);
+    for (const item of batch) {
+      await updateReservationRecord({
+        ...item,
+        status: "CANCELLED",
+        pendingAction: "",
+        pendingPayload: "",
+        approvalToken: "",
+      });
+    }
+    const anchor = batch[0] ?? reservation;
+    await notifyAdminsReservationApprovalNeeded(anchor, {
+      occurrenceCount: batch.length > 1 ? batch.length : undefined,
+      alertKind: "withdraw",
+    });
+    return { pending: false };
+  }
+
   const updated: Reservation = {
     ...reservation,
     pendingAction: "CANCEL",

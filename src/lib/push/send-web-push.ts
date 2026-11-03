@@ -49,14 +49,12 @@ function buildRequestOptions(
     return { TTL: 60 * 60 * 24 };
   }
 
-  const options: RequestOptions = {
+  // FCM (Android): no usar header `topic` con tags arbitrarios; rompe el envío.
+  // El tag de colapso va en el JSON del payload y en showNotification del SW.
+  return {
     TTL: 60 * 60 * 24,
     urgency: "high",
   };
-  if (tag) {
-    options.topic = tag.slice(0, 32);
-  }
-  return options;
 }
 
 function extractPushError(error: unknown): {

@@ -49,29 +49,22 @@ export async function getEventReminderReservationIdsSql(): Promise<Set<string>> 
 }
 
 export async function hasApprovalNotificationForBatchSql(input: {
-  reservationIds: string[];
-  approvalBatchId?: string;
+  approvalBatchId: string;
+  alertKind: string;
 }): Promise<boolean> {
-  const ids = [...new Set(input.reservationIds.filter(Boolean))];
-  const batchId = input.approvalBatchId?.trim();
-  if (ids.length === 0 && !batchId) return false;
+  const batchId = input.approvalBatchId.trim();
+  const kind = input.alertKind.trim();
+  if (!batchId || !kind) return false;
 
+  const needle = `[batch:${batchId}:${kind}]`;
   const prisma = getPrisma();
-  const orFilters: Array<Record<string, unknown>> = [];
-  if (ids.length > 0) {
-    orFilters.push({ reservationId: { in: ids } });
-  }
-  if (batchId) {
-    orFilters.push({ message: { contains: `[batch:${batchId}]` } });
-  }
-
-  const count = await prisma.notification.count({
+  const row = await prisma.notification.findFirst({
     where: {
       type: "APPROVAL_NEEDED",
-      OR: orFilters,
+      message: { contains: needle },
     },
   });
-  return count > 0;
+  return Boolean(row);
 }
 
 export async function createNotificationSql(input: {

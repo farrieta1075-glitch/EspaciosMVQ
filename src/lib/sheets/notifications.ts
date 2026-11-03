@@ -102,13 +102,18 @@ async function dispatchWebPush(
   message: string,
   tag: string,
   type: NotificationType,
+  pushTitle?: string,
 ): Promise<void> {
-  const { url, title } = pushTargetForNotificationType(type);
+  const { stripAdminAlertBatchMarker } = await import(
+    "@/lib/admin-alert-notifications"
+  );
+  const { url, title: defaultTitle } = pushTargetForNotificationType(type);
+  const body = stripAdminAlertBatchMarker(message);
   try {
     const { sendWebPushToUser } = await import("@/lib/push/send-web-push");
     const result = await sendWebPushToUser(userId, {
-      title,
-      body: message,
+      title: pushTitle?.trim() || defaultTitle,
+      body: body || message,
       url,
       tag,
     });
@@ -153,26 +158,41 @@ export async function getEventReminderReservationIds(): Promise<Set<string>> {
   return reminderSent;
 }
 
-export async function hasApprovalNotificationForBatch(input: {
-  reservationIds: string[];
-  approvalBatchId?: string;
+export async function hasAdminAlertForBatch(input: {
+  approvalBatchId: string;
+  alertKind: import("@/lib/admin-alert-notifications").AdminAlertKind;
 }): Promise<boolean> {
-  const ids = [...new Set(input.reservationIds.filter(Boolean))];
-  const batchId = input.approvalBatchId?.trim();
-  if (ids.length === 0 && !batchId) return false;
+  const batchId = input.approvalBatchId.trim();
+  if (!batchId) return false;
+
+  const { buildAdminAlertBatchMarker } = await import(
+    "@/lib/admin-alert-notifications"
+  );
+  const needle = buildAdminAlertBatchMarker(batchId, input.alertKind);
+  const legacyCreateMarker = `[batch:${batchId}]`;
 
   if (isSqlDatabaseEnabled()) {
     const { hasApprovalNotificationForBatchSql } = await import(
       "@/lib/db/notifications"
     );
-    return hasApprovalNotificationForBatchSql(input);
+    return hasApprovalNotificationForBatchSql({
+      approvalBatchId: batchId,
+      alertKind: input.alertKind,
+    });
   }
 
   const { rows } = await getSheetRows(SHEET_TABS.NOTIFICACIONES);
   for (const row of rows) {
     if (row.type !== "APPROVAL_NEEDED") continue;
-    if (ids.includes(row.reservationId?.trim() ?? "")) return true;
-    if (batchId && row.message?.includes(`[batch:${batchId}]`)) return true;
+    const message = row.message ?? "";
+    if (message.includes(needle)) return true;
+    if (
+      input.alertKind === "create" &&
+      message.includes(legacyCreateMarker) &&
+      !message.includes(`${legacyCreateMarker}:`)
+    ) {
+      return true;
+    }
   }
   return false;
 }
@@ -189,6 +209,7 @@ export async function createNotification(input: {
   type: NotificationType;
   message: string;
   pushTag?: string;
+  pushTitle?: string;
 }): Promise<AppNotification> {
   const { createId } = await import("@/lib/id");
   const notification: AppNotification = {
@@ -217,6 +238,7 @@ export async function createNotification(input: {
       input.message,
       input.pushTag ?? saved.id,
       input.type,
+      input.pushTitle,
     );
     return saved;
   }
@@ -227,6 +249,7 @@ export async function createNotification(input: {
     input.message,
     input.pushTag ?? notification.id,
     input.type,
+    input.pushTitle,
   );
   return notification;
 }
