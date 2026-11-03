@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { createPortal } from "react-dom";
 import { ChevronDown, ChevronUp, Loader2 } from "lucide-react";
 import type { Area } from "@/types/area";
@@ -26,6 +27,7 @@ import {
   weekdayNameEs,
 } from "@/lib/monthly-relative-recurrence";
 import { MonthlyRelativeFourthVsLastPrompt } from "@/components/reservation/monthly-relative-fourth-vs-last-prompt";
+import { releaseRadixBodyScrollLockIfIdle } from "@/lib/radix-body-lock";
 import { defaultRecurrenceUntil } from "@/lib/recurrence-default-until";
 import {
   RECURRENCE_TYPE_LABELS,
@@ -161,6 +163,7 @@ interface ReservationCreateWizardProps {
   presetSourceAreaId: string;
   onPresetSourceAreaIdChange: (id: string) => void;
   onSelectionChange: (selection: MapDateSelection) => void;
+  calendarPickHref: string;
   onReservationDatePick: (ctx: {
     wizardConfirmed: ReservationWizardConfirmed;
   }) => void;
@@ -207,6 +210,7 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
     initialWizardConfirmed,
     presetsByAreaId,
     onSelectionChange,
+    calendarPickHref,
     onReservationDatePick,
     resourcesOpen,
     onResourcesOpenChange,
@@ -1136,7 +1140,12 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
       <Dialog
         open={Boolean(calendarDateChangeConfirm)}
         onOpenChange={(open) => {
-          if (!open) onCalendarDateChangeCancel?.();
+          if (!open) {
+            onCalendarDateChangeCancel?.();
+            window.requestAnimationFrame(() =>
+              releaseRadixBodyScrollLockIfIdle(),
+            );
+          }
         }}
       >
         <DialogContent className="flex max-h-[min(90dvh,720px)] w-[min(92vw,32rem)] flex-col overflow-hidden p-0">
@@ -1549,9 +1558,10 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
         <section className="space-y-3">
           <div className="space-y-2">
             <Label>Fecha</Label>
-            <button
-              type="button"
-              className="w-full rounded-md border border-dashed border-border px-3 py-2 text-left hover:bg-muted/50"
+            <Link
+              href={calendarPickHref}
+              prefetch
+              className="block w-full touch-manipulation rounded-md border border-dashed border-border px-3 py-2 text-left hover:bg-muted/50 active:bg-muted/60"
               onClick={() =>
                 onReservationDatePick({ wizardConfirmed: confirmed })
               }
@@ -1562,7 +1572,7 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
               <p className="mt-1 text-xs text-muted-foreground">
                 Toca la fecha para abrir el calendario y elegir otro día.
               </p>
-            </button>
+            </Link>
           </div>
           {renderRecurrenceBlock()}
           <ContinueButton
@@ -1589,15 +1599,16 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
       {eventDetailsDone && confirmed.date && (
         <section className="space-y-1">
           <Label>Fecha</Label>
-          <button
-            type="button"
-            className="rounded-md px-1 py-0.5 text-left text-base font-semibold text-primary hover:bg-muted/50"
+          <Link
+            href={calendarPickHref}
+            prefetch
+            className="inline-block touch-manipulation rounded-md px-1 py-0.5 text-left text-base font-semibold text-primary hover:bg-muted/50 active:bg-muted/60"
             onClick={() =>
               onReservationDatePick({ wizardConfirmed: confirmed })
             }
           >
             {formatDateDisplay(new Date(`${reservationDate}T12:00:00`))}
-          </button>
+          </Link>
           <p className="text-xs text-muted-foreground">
             Toca la fecha para cambiarla en el calendario.
           </p>

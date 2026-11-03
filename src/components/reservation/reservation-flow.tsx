@@ -17,6 +17,7 @@ import {
   saveReservationDraft,
   type ReservationWizardConfirmed,
 } from "@/lib/reservation-draft-storage";
+import { releaseRadixBodyScrollLockIfIdle } from "@/lib/radix-body-lock";
 import { applyRecurrenceToNewStartDate } from "@/lib/calendar-date-change-preview";
 import { formatDateISO } from "@/lib/date-utils";
 import {
@@ -375,13 +376,15 @@ export function ReservationFlow({
         initialDate ??
         formatDateISO(new Date()),
     });
-    const date =
-      selection?.date ??
+  }
+
+  const calendarPickHref = buildCalendarPickUrl(
+    "/reserva",
+    selection?.date ??
       restoredSelection?.date ??
       initialDate ??
-      formatDateISO(new Date());
-    router.push(buildCalendarPickUrl("/reserva", date));
-  }
+      formatDateISO(new Date()),
+  );
 
   function handleCalendarDateChangeConfirm(options: {
     newDate: string;
@@ -458,9 +461,15 @@ export function ReservationFlow({
         presetSourceAreaId={presetSourceAreaId}
         onPresetSourceAreaIdChange={setPresetSourceAreaId}
         onSelectionChange={handleSelectionChange}
+        calendarPickHref={calendarPickHref}
         onReservationDatePick={handleReservationDatePick}
         resourcesOpen={resourcesOpen}
-        onResourcesOpenChange={setResourcesOpen}
+        onResourcesOpenChange={(open) => {
+          setResourcesOpen(open);
+          if (!open) {
+            window.requestAnimationFrame(() => releaseRadixBodyScrollLockIfIdle());
+          }
+        }}
         resourceCount={resourceCount}
         selection={selection}
         onSubmit={() => submitReservation(false)}

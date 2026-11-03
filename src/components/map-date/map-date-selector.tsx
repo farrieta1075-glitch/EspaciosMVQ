@@ -33,6 +33,7 @@ import { Button } from "@/components/ui/button";
 import { formatDateISO } from "@/lib/date-utils";
 import { preloadMapBackgrounds } from "@/lib/map-background-cache";
 import { readJsonResponse } from "@/lib/read-json-response";
+import { releaseRadixBodyScrollLockIfIdle } from "@/lib/radix-body-lock";
 
 export interface InitialMapSelection {
   date?: string;
@@ -369,6 +370,9 @@ export function MapDateSelector({
     (open: boolean) => {
       if (open && resourcesBlocked) return;
       setResourcesOpen(open);
+      if (!open) {
+        window.requestAnimationFrame(() => releaseRadixBodyScrollLockIfIdle());
+      }
     },
     [resourcesBlocked, setResourcesOpen],
   );

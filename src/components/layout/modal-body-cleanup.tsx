@@ -2,6 +2,10 @@
 
 import * as React from "react";
 import { usePathname } from "next/navigation";
+import {
+  releaseRadixBodyScrollLock,
+  releaseRadixBodyScrollLockIfIdle,
+} from "@/lib/radix-body-lock";
 
 /** Restores body interactivity if a Radix sheet/dialog leaves scroll lock behind. */
 export function ModalBodyCleanup() {
@@ -9,13 +13,27 @@ export function ModalBodyCleanup() {
 
   React.useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
-      document.body.style.removeProperty("pointer-events");
-      document.body.style.removeProperty("overflow");
-      document.body.removeAttribute("data-scroll-locked");
+      releaseRadixBodyScrollLock();
     });
 
     return () => window.cancelAnimationFrame(frame);
   }, [pathname]);
+
+  React.useEffect(() => {
+    const observer = new MutationObserver(() => {
+      releaseRadixBodyScrollLockIfIdle();
+    });
+
+    observer.observe(document.body, {
+      attributes: true,
+      subtree: true,
+      attributeFilter: ["data-state", "data-scroll-locked", "style"],
+    });
+
+    releaseRadixBodyScrollLockIfIdle();
+
+    return () => observer.disconnect();
+  }, []);
 
   return null;
 }

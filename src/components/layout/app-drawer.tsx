@@ -8,6 +8,7 @@ import { signOut } from "next-auth/react";
 import type { SessionUser } from "@/types/user";
 import { can, isAdmin } from "@/lib/auth/permissions";
 import { cn } from "@/lib/utils";
+import { releaseRadixBodyScrollLock } from "@/lib/radix-body-lock";
 import { useHeaderSheet } from "@/components/layout/header-sheet-context";
 import { Button } from "@/components/ui/button";
 import {
@@ -104,7 +105,14 @@ export function AppDrawer({ user }: AppDrawerProps) {
       onOpenChange={(nextOpen) => setSheetOpen("menu", nextOpen)}
     >
       <SheetTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label="Abrir menú" type="button">
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Abrir menú"
+          type="button"
+          className="touch-manipulation"
+          onPointerDown={() => releaseRadixBodyScrollLock()}
+        >
           <Menu className="h-5 w-5" />
         </Button>
       </SheetTrigger>
@@ -120,7 +128,10 @@ export function AppDrawer({ user }: AppDrawerProps) {
                 key={item.href}
                 href={item.href}
                 prefetch
-                onClick={() => setSheetOpen("menu", false)}
+                onClick={() => {
+                  releaseRadixBodyScrollLock();
+                  setSheetOpen("menu", false);
+                }}
                 className={cn(
                   "rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
                   pathname.startsWith(item.href)

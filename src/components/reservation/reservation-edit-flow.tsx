@@ -22,6 +22,7 @@ import {
   saveReservationDraft,
   type ReservationWizardConfirmed,
 } from "@/lib/reservation-draft-storage";
+import { releaseRadixBodyScrollLockIfIdle } from "@/lib/radix-body-lock";
 import {
   readJsonResponse,
   shouldRetryMutationRequest,
@@ -378,13 +379,12 @@ export function ReservationEditFlow({
       wizardConfirmed: ctx.wizardConfirmed,
       calendarAnchorDate: activeSelection.date,
     });
-    router.push(
-      buildCalendarPickUrl(
-        `/reservas/${reservation.id}/editar`,
-        activeSelection.date,
-      ),
-    );
   }
+
+  const calendarPickHref = buildCalendarPickUrl(
+    `/reservas/${reservation.id}/editar`,
+    activeSelection.date,
+  );
 
   function handleCalendarDateChangeConfirm(options: {
     newDate: string;
@@ -449,9 +449,15 @@ export function ReservationEditFlow({
         presetSourceAreaId={presetSourceAreaId}
         onPresetSourceAreaIdChange={setPresetSourceAreaId}
         onSelectionChange={handleSelectionChange}
+        calendarPickHref={calendarPickHref}
         onReservationDatePick={handleReservationDatePick}
         resourcesOpen={resourcesOpen}
-        onResourcesOpenChange={setResourcesOpen}
+        onResourcesOpenChange={(open) => {
+          setResourcesOpen(open);
+          if (!open) {
+            window.requestAnimationFrame(() => releaseRadixBodyScrollLockIfIdle());
+          }
+        }}
         resourceCount={resourceCount}
         selection={selection}
         onSubmit={() => submitUpdate(false)}
