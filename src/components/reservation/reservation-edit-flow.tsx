@@ -96,7 +96,17 @@ export function ReservationEditFlow({
     };
 
   const [selection, setSelection] = React.useState<MapDateSelection | null>(
-    null,
+    () => ({
+      date: initialDate,
+      startTime: initialStartTime,
+      endTime: initialEndTime,
+      mapId: defaultMapId,
+      selectedSpaceIds: reservation.spaceIds,
+      selectedResources: reservation.resources.map((r) => ({
+        resourceId: r.resourceId,
+        quantity: r.quantity,
+      })),
+    }),
   );
   const [eventName, setEventName] = React.useState(reservation.eventName);
   const [eventDescription, setEventDescription] = React.useState(

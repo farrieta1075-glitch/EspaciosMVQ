@@ -1720,14 +1720,23 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
               date: reservationDate,
               startTime,
               endTime,
-              mapId: restoredSelection?.mapId ?? initialMapId,
-              selectedSpaceIds: selection?.selectedSpaceIds ?? [],
-              selectedResources: Object.fromEntries(
-                (selection?.selectedResources ?? []).map((r) => [
-                  r.resourceId,
-                  r.quantity,
-                ]),
-              ),
+              mapId:
+                selection?.mapId ??
+                restoredSelection?.mapId ??
+                initialMapId,
+              selectedSpaceIds:
+                selection?.selectedSpaceIds ??
+                restoredSelection?.selectedSpaceIds ??
+                [],
+              selectedResources:
+                selection?.selectedResources?.length
+                  ? Object.fromEntries(
+                      selection.selectedResources.map((r) => [
+                        r.resourceId,
+                        r.quantity,
+                      ]),
+                    )
+                  : (restoredSelection?.selectedResources ?? {}),
             }}
             areas={areas}
             highlightAreaId={activeHighlightAreaId}
