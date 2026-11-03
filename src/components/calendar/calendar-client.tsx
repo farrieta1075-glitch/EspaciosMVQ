@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { Area } from "@/types/area";
 import type { FloorMap, Space } from "@/types/space";
@@ -22,6 +21,7 @@ import {
   isSameMonth,
 } from "@/lib/date-utils";
 import { canSelectCalendarDay } from "@/lib/calendar-date-selection";
+import { hardNavigate } from "@/lib/hard-navigate";
 import { setPickedReservationDate } from "@/lib/reservation-draft-storage";
 import type { SessionUser, UserRole } from "@/types/user";
 
@@ -81,7 +81,6 @@ export function CalendarClient({
   pickMode = false,
   returnTo,
 }: CalendarClientProps) {
-  const router = useRouter();
   const [viewMode, setViewMode] = React.useState<CalendarViewMode>("month");
   const [showAreaLegend, setShowAreaLegend] = React.useState(false);
   const [anchorDate, setAnchorDate] = React.useState(() => {
@@ -190,7 +189,7 @@ export function CalendarClient({
     setSheetDate(date);
     if (pickMode && returnTo) {
       setPickedReservationDate(formatDateISO(date));
-      router.push(returnTo);
+      hardNavigate(returnTo);
       return;
     }
     openDaySheet(date);

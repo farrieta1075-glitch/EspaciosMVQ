@@ -527,66 +527,71 @@ export function MapDateSelector({
         />
       )}
 
-      {isReservationLayout && showResourcePanel && !readOnly && (
-        <Sheet open={resourcesOpen} onOpenChange={handleResourcesOpenChange}>
-          <SheetContent
-            side="bottom"
-            hideClose
-            className="flex max-h-[85dvh] flex-col gap-0 overflow-hidden px-0 pb-0 pt-0"
-          >
-            <ResourcePanel
-              inline
-              reservationSheet
-              resources={availability?.resources ?? []}
-              selectedResources={selectedResources}
-              onQuantityChange={handleResourceQuantityChange}
-              readOnly={readOnly || resourcesBlocked}
-              estimatedAttendees={estimatedAttendees}
-              onReservationConfirm={() => handleResourcesOpenChange(false)}
-              onReservationCancel={() => handleResourcesOpenChange(false)}
-            />
-          </SheetContent>
-        </Sheet>
-      )}
-
-      <Dialog
-        open={resourceConflictNames.length > 0}
-        onOpenChange={(open) => {
-          if (!open) setResourceConflictNames([]);
-        }}
-      >
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Recursos no disponibles para el espacio</DialogTitle>
-            <DialogDescription asChild>
-              <div className="space-y-2 text-sm text-muted-foreground">
-                <p>
-                  Al cambiar el espacio seleccionado, algunos recursos ya no
-                  aplican por restricción de disponibilidad:
-                </p>
-                <ul className="list-inside list-disc">
-                  {resourceConflictNames.map((name) => (
-                    <li key={name}>{name}</li>
-                  ))}
-                </ul>
-                <p>
-                  Se eliminó la selección de esos recursos. Los demás se
-                  mantienen. Revisa que tu reserva incluya todo lo que
-                  necesitas.
-                </p>
-              </div>
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              type="button"
-              onClick={() => setResourceConflictNames([])}
+      {isReservationLayout &&
+        showResourcePanel &&
+        !readOnly &&
+        resourcesOpen && (
+          <Sheet open onOpenChange={handleResourcesOpenChange}>
+            <SheetContent
+              side="bottom"
+              hideClose
+              className="flex max-h-[85dvh] flex-col gap-0 overflow-hidden px-0 pb-0 pt-0"
             >
-              Entendido
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+              <ResourcePanel
+                inline
+                reservationSheet
+                resources={availability?.resources ?? []}
+                selectedResources={selectedResources}
+                onQuantityChange={handleResourceQuantityChange}
+                readOnly={readOnly || resourcesBlocked}
+                estimatedAttendees={estimatedAttendees}
+                onReservationConfirm={() => handleResourcesOpenChange(false)}
+                onReservationCancel={() => handleResourcesOpenChange(false)}
+              />
+            </SheetContent>
+          </Sheet>
+        )}
+
+      {resourceConflictNames.length > 0 && (
+        <Dialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setResourceConflictNames([]);
+          }}
+        >
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Recursos no disponibles para el espacio</DialogTitle>
+              <DialogDescription asChild>
+                <div className="space-y-2 text-sm text-muted-foreground">
+                  <p>
+                    Al cambiar el espacio seleccionado, algunos recursos ya no
+                    aplican por restricción de disponibilidad:
+                  </p>
+                  <ul className="list-inside list-disc">
+                    {resourceConflictNames.map((name) => (
+                      <li key={name}>{name}</li>
+                    ))}
+                  </ul>
+                  <p>
+                    Se eliminó la selección de esos recursos. Los demás se
+                    mantienen. Revisa que tu reserva incluya todo lo que
+                    necesitas.
+                  </p>
+                </div>
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button
+                type="button"
+                onClick={() => setResourceConflictNames([])}
+              >
+                Entendido
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

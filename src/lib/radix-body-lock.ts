@@ -22,7 +22,21 @@ export function hasOpenRadixOverlay(): boolean {
   );
 }
 
+function dismissClosedRadixOverlays(): void {
+  if (typeof document === "undefined") return;
+
+  document
+    .querySelectorAll('[data-radix-dialog-overlay][data-state="closed"]')
+    .forEach((node) => {
+      if (node instanceof HTMLElement) {
+        node.style.pointerEvents = "none";
+        node.style.visibility = "hidden";
+      }
+    });
+}
+
 export function releaseRadixBodyScrollLockIfIdle(): void {
+  dismissClosedRadixOverlays();
   if (!hasOpenRadixOverlay()) {
     releaseRadixBodyScrollLock();
   }

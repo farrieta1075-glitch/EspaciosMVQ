@@ -1,14 +1,18 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Loader2, LogOut, Menu } from "lucide-react";
 import { signOut } from "next-auth/react";
 import type { SessionUser } from "@/types/user";
 import { can, isAdmin } from "@/lib/auth/permissions";
 import { cn } from "@/lib/utils";
+import { hardNavigate } from "@/lib/hard-navigate";
 import { releaseRadixBodyScrollLock } from "@/lib/radix-body-lock";
+import {
+  clearAllReservationDraftState,
+  isReservationFormPath,
+} from "@/lib/reservation-draft-storage";
 import { useHeaderSheet } from "@/components/layout/header-sheet-context";
 import { Button } from "@/components/ui/button";
 import {
@@ -91,6 +95,8 @@ export function AppDrawer({ user }: AppDrawerProps) {
 
     setSigningOut(true);
     setSheetOpen("menu", false);
+    clearAllReservationDraftState();
+    releaseRadixBodyScrollLock();
 
     try {
       await signOut({ redirectTo: "/login" });
@@ -124,23 +130,30 @@ export function AppDrawer({ user }: AppDrawerProps) {
         <nav className="min-h-0 flex-1 overflow-y-auto px-2 py-3 sm:px-3">
           <div className="flex flex-col gap-1">
             {navItems.map((item) => (
-              <Link
+              <a
                 key={item.href}
                 href={item.href}
-                prefetch
-                onClick={() => {
+                onClick={(event) => {
+                  event.preventDefault();
                   releaseRadixBodyScrollLock();
                   setSheetOpen("menu", false);
+                  if (
+                    isReservationFormPath(pathname) &&
+                    item.href !== pathname
+                  ) {
+                    clearAllReservationDraftState();
+                  }
+                  hardNavigate(item.href);
                 }}
                 className={cn(
-                  "rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
+                  "block touch-manipulation rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
                   pathname.startsWith(item.href)
                     ? "bg-primary text-primary-foreground"
                     : "text-foreground hover:bg-accent",
                 )}
               >
                 {item.label}
-              </Link>
+              </a>
             ))}
           </div>
         </nav>

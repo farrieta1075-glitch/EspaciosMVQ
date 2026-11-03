@@ -20,19 +20,29 @@ export function ModalBodyCleanup() {
   }, [pathname]);
 
   React.useEffect(() => {
-    const observer = new MutationObserver(() => {
-      releaseRadixBodyScrollLockIfIdle();
-    });
+    let timer: number | undefined;
 
+    const schedule = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => releaseRadixBodyScrollLockIfIdle(), 150);
+    };
+
+    const observer = new MutationObserver(schedule);
     observer.observe(document.body, {
       attributes: true,
-      subtree: true,
-      attributeFilter: ["data-state", "data-scroll-locked", "style"],
+      attributeFilter: ["data-scroll-locked", "style"],
+    });
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-scroll-locked", "style"],
     });
 
-    releaseRadixBodyScrollLockIfIdle();
+    schedule();
 
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      window.clearTimeout(timer);
+    };
   }, []);
 
   return null;

@@ -11,9 +11,12 @@ import { reservationNeedsAttendeeJustification } from "@/lib/capacity-validation
 import type { InitialMapSelection } from "@/components/map-date/map-date-selector";
 import {
   buildCalendarPickUrl,
+  clearAllReservationDraftState,
   clearReservationDraft,
+  consumeCalendarPickPending,
   consumePickedReservationDate,
   loadReservationDraft,
+  markCalendarPickPending,
   saveReservationDraft,
   type ReservationWizardConfirmed,
 } from "@/lib/reservation-draft-storage";
@@ -139,10 +142,17 @@ export function ReservationFlow({
   }, [areaId, presetsByAreaId]);
 
   React.useEffect(() => {
+    const picked = consumePickedReservationDate();
+    const calendarPickPending = consumeCalendarPickPending();
+
+    if (!calendarPickPending && !picked) {
+      clearAllReservationDraftState();
+      return;
+    }
+
     const draft = loadReservationDraft();
     if (!draft || draft.kind !== "create") return;
 
-    const picked = consumePickedReservationDate();
     setEventName(draft.eventName);
     setEventDescription(draft.eventDescription);
     setEstimatedAttendees(draft.estimatedAttendees);
@@ -376,6 +386,7 @@ export function ReservationFlow({
         initialDate ??
         formatDateISO(new Date()),
     });
+    markCalendarPickPending();
   }
 
   const calendarPickHref = buildCalendarPickUrl(
@@ -566,6 +577,7 @@ export function ReservationFlow({
               variant="outline"
               className="flex-1"
               onClick={() => {
+                clearAllReservationDraftState();
                 setSuccessInfo(null);
                 setEventName("");
                 setEventDescription("");

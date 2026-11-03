@@ -1,8 +1,8 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
 import { createPortal } from "react-dom";
+import { hardNavigate } from "@/lib/hard-navigate";
 import { ChevronDown, ChevronUp, Loader2 } from "lucide-react";
 import type { Area } from "@/types/area";
 import type { FloorMap, Space } from "@/types/space";
@@ -526,6 +526,11 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
 
   const areaResolved = confirmed.area && Boolean(activeAreaId);
   const eventDetailsDone = confirmed.scheduleCollapsed;
+
+  function goToCalendarPick() {
+    onReservationDatePick({ wizardConfirmed: confirmed });
+    hardNavigate(calendarPickHref);
+  }
 
   function canConfirmRecurrenceStep(): boolean {
     if (recurrence.type === "MONTHLY_RELATIVE") {
@@ -1558,13 +1563,13 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
         <section className="space-y-3">
           <div className="space-y-2">
             <Label>Fecha</Label>
-            <Link
+            <a
               href={calendarPickHref}
-              prefetch
               className="block w-full touch-manipulation rounded-md border border-dashed border-border px-3 py-2 text-left hover:bg-muted/50 active:bg-muted/60"
-              onClick={() =>
-                onReservationDatePick({ wizardConfirmed: confirmed })
-              }
+              onClick={(event) => {
+                event.preventDefault();
+                goToCalendarPick();
+              }}
             >
               <p className="text-base font-semibold text-primary underline-offset-2">
                 {formatDateDisplay(new Date(`${reservationDate}T12:00:00`))}
@@ -1572,7 +1577,7 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
               <p className="mt-1 text-xs text-muted-foreground">
                 Toca la fecha para abrir el calendario y elegir otro día.
               </p>
-            </Link>
+            </a>
           </div>
           {renderRecurrenceBlock()}
           <ContinueButton
@@ -1599,16 +1604,16 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
       {eventDetailsDone && confirmed.date && (
         <section className="space-y-1">
           <Label>Fecha</Label>
-          <Link
+          <a
             href={calendarPickHref}
-            prefetch
             className="inline-block touch-manipulation rounded-md px-1 py-0.5 text-left text-base font-semibold text-primary hover:bg-muted/50 active:bg-muted/60"
-            onClick={() =>
-              onReservationDatePick({ wizardConfirmed: confirmed })
-            }
+            onClick={(event) => {
+              event.preventDefault();
+              goToCalendarPick();
+            }}
           >
             {formatDateDisplay(new Date(`${reservationDate}T12:00:00`))}
-          </Link>
+          </a>
           <p className="text-xs text-muted-foreground">
             Toca la fecha para cambiarla en el calendario.
           </p>

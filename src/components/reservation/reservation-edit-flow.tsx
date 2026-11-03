@@ -16,9 +16,12 @@ import { parseRecurrenceRule } from "@/lib/recurrence";
 import type { InitialMapSelection } from "@/components/map-date/map-date-selector";
 import {
   buildCalendarPickUrl,
+  clearAllReservationDraftState,
   clearReservationDraft,
+  consumeCalendarPickPending,
   consumePickedReservationDate,
   loadReservationDraft,
+  markCalendarPickPending,
   saveReservationDraft,
   type ReservationWizardConfirmed,
 } from "@/lib/reservation-draft-storage";
@@ -175,6 +178,14 @@ export function ReservationEditFlow({
   }, [userAreaScopeIds, isAdmin]);
 
   React.useEffect(() => {
+    const picked = consumePickedReservationDate();
+    const calendarPickPending = consumeCalendarPickPending();
+
+    if (!calendarPickPending && !picked) {
+      clearAllReservationDraftState();
+      return;
+    }
+
     const draft = loadReservationDraft();
     if (
       !draft ||
@@ -184,7 +195,6 @@ export function ReservationEditFlow({
       return;
     }
 
-    const picked = consumePickedReservationDate();
     setEventName(draft.eventName);
     setEventDescription(draft.eventDescription);
     setEstimatedAttendees(draft.estimatedAttendees);
@@ -379,6 +389,7 @@ export function ReservationEditFlow({
       wizardConfirmed: ctx.wizardConfirmed,
       calendarAnchorDate: activeSelection.date,
     });
+    markCalendarPickPending();
   }
 
   const calendarPickHref = buildCalendarPickUrl(

@@ -2,6 +2,7 @@ import type { MapDateSelection, RecurrenceType } from "@/types/reservation";
 
 const DRAFT_KEY = "mvqro_reservation_draft";
 const PICK_DATE_KEY = "mvqro_reservation_pick_date";
+const CALENDAR_PICK_PENDING_KEY = "mvqro_reservation_calendar_pick_pending";
 
 export type ReservationWizardConfirmed = {
   area: boolean;
@@ -54,6 +55,36 @@ export function loadReservationDraft(): ReservationDraft | null {
 export function clearReservationDraft(): void {
   if (typeof sessionStorage === "undefined") return;
   sessionStorage.removeItem(DRAFT_KEY);
+}
+
+export function markCalendarPickPending(): void {
+  if (typeof sessionStorage === "undefined") return;
+  sessionStorage.setItem(CALENDAR_PICK_PENDING_KEY, "1");
+}
+
+export function peekCalendarPickPending(): boolean {
+  if (typeof sessionStorage === "undefined") return false;
+  return sessionStorage.getItem(CALENDAR_PICK_PENDING_KEY) === "1";
+}
+
+export function consumeCalendarPickPending(): boolean {
+  if (typeof sessionStorage === "undefined") return false;
+  const pending = peekCalendarPickPending();
+  sessionStorage.removeItem(CALENDAR_PICK_PENDING_KEY);
+  return pending;
+}
+
+/** Borrador y flags de ida/vuelta al calendario (p. ej. al salir o cerrar sesión). */
+export function clearAllReservationDraftState(): void {
+  if (typeof sessionStorage === "undefined") return;
+  sessionStorage.removeItem(DRAFT_KEY);
+  sessionStorage.removeItem(PICK_DATE_KEY);
+  sessionStorage.removeItem(CALENDAR_PICK_PENDING_KEY);
+}
+
+export function isReservationFormPath(pathname: string): boolean {
+  if (pathname === "/reserva") return true;
+  return /^\/reservas\/[^/]+\/editar\/?$/.test(pathname);
 }
 
 export function setPickedReservationDate(isoDate: string): void {
