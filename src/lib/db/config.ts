@@ -18,7 +18,7 @@ function stripEnvQuotes(value: string): string {
 export function resolveDatabaseUrl(): string | null {
   const direct = process.env.DATABASE_URL?.trim();
   if (direct) {
-    return stripEnvQuotes(direct);
+    return enhanceSqlServerConnectionUrl(direct);
   }
 
   const user = process.env.AZURE_SQL_USER?.trim();
@@ -30,7 +30,30 @@ export function resolveDatabaseUrl(): string | null {
   const server = process.env.AZURE_SQL_SERVER?.trim() || DEFAULT_SERVER;
   const database = process.env.AZURE_SQL_DATABASE?.trim() || DEFAULT_DATABASE;
 
-  return `sqlserver://${server}:1433;database=${database};user=${encodeURIComponent(user)};password=${encodeURIComponent(password)};encrypt=true;trustServerCertificate=false;`;
+  return enhanceSqlServerConnectionUrl(
+    `sqlserver://${server}:1433;database=${database};user=${encodeURIComponent(user)};password=${encodeURIComponent(password)};encrypt=true;trustServerCertificate=false;`,
+  );
+}
+
+/** Parámetros para reactivación de Azure SQL (pausa serverless) y conexiones en Vercel. */
+export function enhanceSqlServerConnectionUrl(url: string): string {
+  let connection = stripEnvQuotes(url).trim();
+  if (!connection) return connection;
+
+  const params: Record<string, string> = {
+    connectTimeout: "60",
+    socketTimeout: "60",
+  };
+
+  for (const [key, value] of Object.entries(params)) {
+    const re = new RegExp(`(^|;)${key}=`, "i");
+    if (!re.test(connection)) {
+      const sep = connection.endsWith(";") ? "" : ";";
+      connection += `${sep}${key}=${value}`;
+    }
+  }
+
+  return connection;
 }
 
 /** Sincroniza `process.env.DATABASE_URL` para Prisma Client. */
