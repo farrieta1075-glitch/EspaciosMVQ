@@ -21,6 +21,15 @@ import { SpaceMapViewer } from "@/components/map-date/space-map-viewer";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { formatDateISO } from "@/lib/date-utils";
 import { preloadMapBackgrounds } from "@/lib/map-background-cache";
 import { readJsonResponse } from "@/lib/read-json-response";
@@ -134,6 +143,12 @@ export function MapDateSelector({
   const [availability, setAvailability] =
     React.useState<AvailabilityResponse | null>(null);
   const [loading, setLoading] = React.useState(false);
+  const [resourceConflictNames, setResourceConflictNames] = React.useState<
+    string[]
+  >([]);
+  const resourceNamesRef = React.useRef<Map<string, string>>(new Map());
+  const resourcesBlocked =
+    resourcesDisabled || selectedSpaceIds.length === 0;
 
   const currentMap = maps.find((map) => map.id === mapId) ?? maps[0];
   const mapSpaces = spaces.filter(
@@ -308,6 +323,56 @@ export function MapDateSelector({
     onSelectionChange,
   ]);
 
+  React.useEffect(() => {
+    for (const resource of availability?.resources ?? []) {
+      resourceNamesRef.current.set(resource.id, resource.name);
+    }
+  }, [availability?.resources]);
+
+  const prevSpaceIdsRef = React.useRef<string | null>(null);
+
+  React.useEffect(() => {
+    const spaceKey = selectedSpaceIds.join("|");
+    const spacesChanged =
+      prevSpaceIdsRef.current !== null && prevSpaceIdsRef.current !== spaceKey;
+    prevSpaceIdsRef.current = spaceKey;
+
+    if (selectedSpaceIds.length === 0) {
+      setSelectedResources((current) =>
+        Object.keys(current).length > 0 ? {} : current,
+      );
+      if (resourcesOpen) setResourcesOpen(false);
+      return;
+    }
+    if (!availability) return;
+
+    const availableIds = new Set(availability.resources.map((r) => r.id));
+    setSelectedResources((current) => {
+      const removedNames: string[] = [];
+      const next = { ...current };
+      for (const [resourceId, quantity] of Object.entries(current)) {
+        if (quantity > 0 && !availableIds.has(resourceId)) {
+          removedNames.push(
+            resourceNamesRef.current.get(resourceId) ?? resourceId,
+          );
+          delete next[resourceId];
+        }
+      }
+      if (removedNames.length > 0 && spacesChanged) {
+        setResourceConflictNames(removedNames);
+      }
+      return removedNames.length > 0 ? next : current;
+    });
+  }, [selectedSpaceIds, availability, resourcesOpen, setResourcesOpen]);
+
+  const handleResourcesOpenChange = React.useCallback(
+    (open: boolean) => {
+      if (open && resourcesBlocked) return;
+      setResourcesOpen(open);
+    },
+    [resourcesBlocked, setResourcesOpen],
+  );
+
   function handleSpaceToggle(spaceId: string) {
     setSelectedSpaceIds((current) =>
       current.includes(spaceId)
@@ -459,7 +524,7 @@ export function MapDateSelector({
       )}
 
       {isReservationLayout && showResourcePanel && !readOnly && (
-        <Sheet open={resourcesOpen} onOpenChange={setResourcesOpen}>
+        <Sheet open={resourcesOpen} onOpenChange={handleResourcesOpenChange}>
           <SheetContent
             side="bottom"
             hideClose
@@ -471,14 +536,53 @@ export function MapDateSelector({
               resources={availability?.resources ?? []}
               selectedResources={selectedResources}
               onQuantityChange={handleResourceQuantityChange}
-              readOnly={readOnly || resourcesDisabled}
+              readOnly={readOnly || resourcesBlocked}
               estimatedAttendees={estimatedAttendees}
-              onReservationConfirm={() => setResourcesOpen(false)}
-              onReservationCancel={() => setResourcesOpen(false)}
+              onReservationConfirm={() => handleResourcesOpenChange(false)}
+              onReservationCancel={() => handleResourcesOpenChange(false)}
             />
           </SheetContent>
         </Sheet>
       )}
+
+      <Dialog
+        open={resourceConflictNames.length > 0}
+        onOpenChange={(open) => {
+          if (!open) setResourceConflictNames([]);
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Recursos no disponibles para el espacio</DialogTitle>
+            <DialogDescription asChild>
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <p>
+                  Al cambiar el espacio seleccionado, algunos recursos ya no
+                  aplican por restricción de disponibilidad:
+                </p>
+                <ul className="list-inside list-disc">
+                  {resourceConflictNames.map((name) => (
+                    <li key={name}>{name}</li>
+                  ))}
+                </ul>
+                <p>
+                  Se eliminó la selección de esos recursos. Los demás se
+                  mantienen. Revisa que tu reserva incluya todo lo que
+                  necesitas.
+                </p>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              onClick={() => setResourceConflictNames([])}
+            >
+              Entendido
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

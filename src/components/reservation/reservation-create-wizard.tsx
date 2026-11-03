@@ -279,7 +279,6 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
     string | null
   >(null);
   const [showExceptionPicker, setShowExceptionPicker] = React.useState(false);
-  const [confirmKeepRecurrence, setConfirmKeepRecurrence] = React.useState(true);
   const [confirmDialogRecurrence, setConfirmDialogRecurrence] =
     React.useState<RecurrenceConfig>(recurrence);
   const [frozenRecurrence, setFrozenRecurrence] =
@@ -308,7 +307,6 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
           )
         : "");
     setConfirmDialogUntil(until);
-    setConfirmKeepRecurrence(recurrence.type !== "NONE");
     // Snapshot at dialog open only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [calendarDateChangeConfirm]);
@@ -328,7 +326,7 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
 
   const afterRecurrenceForPreview = React.useMemo(() => {
     if (!calendarDateChangeConfirm) return null;
-    if (!confirmKeepRecurrence) {
+    if (confirmDialogRecurrence.type === "NONE") {
       return buildRecurrenceForTypeAtDate(
         "NONE",
         calendarDateChangeConfirm.newDate,
@@ -349,7 +347,6 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
     return base;
   }, [
     calendarDateChangeConfirm,
-    confirmKeepRecurrence,
     confirmDialogRecurrence,
     confirmDialogUntil,
     recurrence,
@@ -1093,16 +1090,15 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
           if (!open) onCalendarDateChangeCancel?.();
         }}
       >
-        <DialogContent>
-          <DialogHeader>
+        <DialogContent className="flex max-h-[min(90dvh,720px)] w-[min(92vw,32rem)] flex-col overflow-hidden p-0">
+          <DialogHeader className="shrink-0 space-y-2 px-6 pt-6">
             <DialogTitle>Confirmar cambio de fecha</DialogTitle>
             <DialogDescription>
-              Revisa la nueva fecha y confirma si mantienes la recurrencia y las
-              excepciones configuradas.
+              Revisa la nueva fecha, el tipo de recurrencia y las excepciones.
             </DialogDescription>
           </DialogHeader>
           {calendarDateChangeConfirm ? (
-            <div className="space-y-3 text-sm">
+            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-6 pb-2 text-sm">
               <p>
                 <span className="text-muted-foreground">Nueva fecha: </span>
                 <span className="font-medium">
@@ -1124,64 +1120,39 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
                   )}
                 </p>
               )}
-              <label className="flex items-start gap-2">
-                <input
-                  type="checkbox"
-                  checked={confirmKeepRecurrence}
-                  onChange={(e) => {
-                    const checked = e.target.checked;
-                    setConfirmKeepRecurrence(checked);
-                    if (!checked) {
-                      setConfirmNewExceptDates(new Set());
-                      return;
-                    }
-                    if (confirmDialogRecurrence.type === "NONE") {
-                      setConfirmDialogRecurrence(
-                        buildRecurrenceForTypeAtDate(
-                          "WEEKLY",
-                          calendarDateChangeConfirm.newDate,
-                          recurrence,
-                        ),
+              <div className="space-y-2">
+                <div className="space-y-1">
+                  <Label htmlFor="cal-confirm-recurrence">Tipo de recurrencia</Label>
+                  <Select
+                    id="cal-confirm-recurrence"
+                    value={confirmDialogRecurrence.type}
+                    onChange={(e) => {
+                      const type = e.target.value as RecurrenceType;
+                      const next = buildRecurrenceForTypeAtDate(
+                        type,
+                        calendarDateChangeConfirm.newDate,
+                        confirmDialogRecurrence,
                       );
-                    }
-                  }}
-                  className="mt-0.5 rounded border-border"
-                />
-                <span>Usar recurrencia para la nueva fecha</span>
-              </label>
-              {confirmKeepRecurrence && calendarDateChangeConfirm && (
-                <div className="space-y-2">
-                  <div className="space-y-1">
-                    <Label htmlFor="cal-confirm-recurrence">Tipo de recurrencia</Label>
-                    <Select
-                      id="cal-confirm-recurrence"
-                      value={confirmDialogRecurrence.type}
-                      onChange={(e) => {
-                        const type = e.target.value as RecurrenceType;
-                        const next = buildRecurrenceForTypeAtDate(
-                          type,
-                          calendarDateChangeConfirm.newDate,
-                          confirmDialogRecurrence,
-                        );
-                        setConfirmDialogRecurrence(next);
-                        if (type !== "NONE" && type !== "CUSTOM") {
-                          setConfirmDialogUntil(next.until);
-                        }
-                        if (type === "NONE") {
-                          setConfirmKeepRecurrence(false);
-                          setConfirmNewExceptDates(new Set());
-                        }
-                      }}
-                    >
-                      {(Object.keys(RECURRENCE_TYPE_LABELS) as RecurrenceType[])
-                        .filter((type) => type !== "CUSTOM")
-                        .map((type) => (
-                          <option key={type} value={type}>
-                            {RECURRENCE_TYPE_LABELS[type]}
-                          </option>
-                        ))}
-                    </Select>
-                  </div>
+                      setConfirmDialogRecurrence(next);
+                      if (type !== "NONE" && type !== "CUSTOM") {
+                        setConfirmDialogUntil(next.until);
+                      }
+                      if (type === "NONE") {
+                        setConfirmNewExceptDates(new Set());
+                      }
+                    }}
+                  >
+                    {(Object.keys(RECURRENCE_TYPE_LABELS) as RecurrenceType[])
+                      .filter((type) => type !== "CUSTOM")
+                      .map((type) => (
+                        <option key={type} value={type}>
+                          {RECURRENCE_TYPE_LABELS[type]}
+                        </option>
+                      ))}
+                  </Select>
+                </div>
+                {confirmDialogRecurrence.type !== "NONE" && (
+                  <>
                   {frozenRecurrence && beforePreviewDates.length > 0 && (
                       <div className="space-y-1.5 rounded-md border border-border bg-muted/20 p-2.5 text-xs">
                         <p className="font-medium text-muted-foreground">
@@ -1219,8 +1190,7 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
                         </ul>
                       </div>
                     )}
-                  {confirmDialogRecurrence.type !== "NONE" &&
-                    afterPreviewDates.length > 0 && (
+                  {afterPreviewDates.length > 0 && (
                       <div className="space-y-2 rounded-md border border-border bg-muted/30 p-2.5 text-xs">
                         <p className="font-medium text-muted-foreground">
                           Nuevas fechas
@@ -1299,16 +1269,12 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
                         </ul>
                       </div>
                     )}
-                </div>
-              )}
-              {!confirmKeepRecurrence && (
-                <p className="rounded-md bg-muted/50 px-2 py-1.5 text-xs text-muted-foreground">
-                  Solo se reservará la nueva fecha (sin repetición).
-                </p>
-              )}
+                  </>
+                )}
+              </div>
             </div>
           ) : null}
-          <DialogFooter className="gap-2 sm:gap-0">
+          <DialogFooter className="shrink-0 gap-2 border-t border-border px-6 py-4 sm:gap-0">
             <Button
               type="button"
               variant="outline"
@@ -1322,7 +1288,7 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
                 if (!calendarDateChangeConfirm) return;
                 const exceptDates = Array.from(confirmNewExceptDates);
                 const usesRecurrence =
-                  confirmKeepRecurrence &&
+                  confirmDialogRecurrence.type !== "NONE" &&
                   (afterRecurrenceForPreview?.type ?? "NONE") !== "NONE";
                 onCalendarDateChangeConfirm?.({
                   newDate: calendarDateChangeConfirm.newDate,
@@ -1737,9 +1703,10 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
             onResourcesSheetOpenChange={onResourcesOpenChange}
             onSelectionChange={onSelectionChange}
             estimatedAttendees={estimatedNumber}
-            resourcesDisabled={Boolean(
-              needsJustification && !attendeeJustificationCode,
-            )}
+            resourcesDisabled={
+              (selection?.selectedSpaceIds.length ?? 0) === 0 ||
+              Boolean(needsJustification && !attendeeJustificationCode)
+            }
           />
 
           <Button
@@ -1747,13 +1714,19 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
             variant="outline"
             size="sm"
             className="h-9"
-            disabled={Boolean(
-              needsJustification && !attendeeJustificationCode,
-            )}
+            disabled={
+              (selection?.selectedSpaceIds.length ?? 0) === 0 ||
+              Boolean(needsJustification && !attendeeJustificationCode)
+            }
             onClick={() => onResourcesOpenChange(true)}
           >
             Recursos{resourceCount > 0 ? ` (${resourceCount})` : ""}
           </Button>
+          {(selection?.selectedSpaceIds.length ?? 0) === 0 && (
+            <p className="text-xs text-muted-foreground">
+              Selecciona al menos un espacio en el mapa para agregar recursos.
+            </p>
+          )}
 
           {needsJustification && (
             <section className="space-y-2 rounded-md border border-amber-500/40 p-3">
