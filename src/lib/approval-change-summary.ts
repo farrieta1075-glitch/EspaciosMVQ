@@ -19,7 +19,7 @@ export interface ApprovalChangeSummary {
   changes: ApprovalChangeLine[];
 }
 
-function formatDateTimeRange(startAt: string, endAt: string): string {
+export function formatDateTimeRange(startAt: string, endAt: string): string {
   const start = new Date(startAt);
   const end = new Date(endAt);
   if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {

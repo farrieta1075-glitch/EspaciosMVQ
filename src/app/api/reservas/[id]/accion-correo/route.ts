@@ -2,6 +2,7 @@ import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { renderApprovalActionResultPage } from "@/lib/email/approval-action-html";
 import { approvalResponderUrl } from "@/lib/email/approval-email-content";
+import { getPendingCreateBatchMembers } from "@/lib/approval-batch";
 import { decideReservationByToken } from "@/lib/reservation-service";
 import { getReservationById } from "@/lib/sheets/reservations";
 import { getApprovalResolution } from "@/lib/approval-resolution";
@@ -92,6 +93,8 @@ export async function GET(
   }
 
   const approve = action === "approve";
+  const batchBeforeDecision = await getPendingCreateBatchMembers(reservation);
+  const batchSize = batchBeforeDecision.length;
 
   try {
     const detail = await decideReservationByToken({
@@ -117,14 +120,19 @@ export async function GET(
     revalidatePath("/reservas");
     revalidatePath("/admin/aprobaciones");
 
+    const batchNote =
+      batchSize > 1
+        ? ` Se aplicó a las ${batchSize} fechas de la serie.`
+        : "";
+
     return htmlResponse(
       renderApprovalActionResultPage({
         ok: true,
         approved: approve,
         title: approve ? "Autorizada" : "Rechazada",
         message: approve
-          ? "La solicitud fue autorizada correctamente."
-          : "La solicitud fue rechazada.",
+          ? `La solicitud fue autorizada correctamente.${batchNote}`
+          : `La solicitud fue rechazada.${batchNote}`,
         eventName: detail.eventName,
       }),
     );

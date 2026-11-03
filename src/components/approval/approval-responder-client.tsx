@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { CheckCircle2, Loader2, XCircle } from "lucide-react";
 import type { ApprovalChangeSummary } from "@/lib/approval-change-summary";
+import { ApprovalBatchDatesList } from "@/components/approval/approval-batch-dates";
 import type { ReservationDetail } from "@/types/reservation";
 import { Button } from "@/components/ui/button";
 
@@ -13,6 +14,7 @@ type PreviewResponse = ReservationDetail & {
   canRespond: boolean;
   resolutionMessage?: string | null;
   resolutionOutcome?: "approved" | "rejected" | "handled" | null;
+  approvalBatchOccurrences?: ReservationDetail["approvalBatchOccurrences"];
 };
 
 function formatRange(startAt: string, endAt: string) {
@@ -148,9 +150,18 @@ export function ApprovalResponderClient() {
             <strong>Descripción:</strong> {preview.eventDescription}
           </p>
         ) : null}
-        <p>
-          <strong>Horario:</strong> {formatRange(preview.startAt, preview.endAt)}
-        </p>
+        {preview.approvalBatchOccurrences &&
+        preview.approvalBatchOccurrences.length > 1 ? (
+          <ApprovalBatchDatesList
+            occurrences={preview.approvalBatchOccurrences}
+            compact
+          />
+        ) : (
+          <p>
+            <strong>Horario:</strong>{" "}
+            {formatRange(preview.startAt, preview.endAt)}
+          </p>
+        )}
         <p>
           <strong>Espacios:</strong>{" "}
           {preview.spaceNames.length > 0

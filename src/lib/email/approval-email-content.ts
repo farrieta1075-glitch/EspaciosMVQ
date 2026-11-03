@@ -1,8 +1,10 @@
 import "server-only";
+import { getPendingCreateBatchMembers } from "@/lib/approval-batch";
 import {
   buildApprovalChangeSummary,
   formatChangeSummaryHtml,
   formatChangeSummaryText,
+  formatDateTimeRange,
 } from "@/lib/approval-change-summary";
 import { getReservationDetail } from "@/lib/reservation-service";
 import { getAllSpaces } from "@/lib/sheets/spaces";
@@ -48,10 +50,16 @@ export async function buildAdminApprovalEmailContent(input: {
   responderUrl: string;
 }> {
   const { reservation, areaName, occurrenceCount } = input;
-  const [detail, allSpaces] = await Promise.all([
+  const [detail, allSpaces, batch] = await Promise.all([
     getReservationDetail(reservation.id),
     getAllSpaces(),
+    getPendingCreateBatchMembers(reservation),
   ]);
+  const batchOccurrences = batch.map((item) => ({
+    startAt: item.startAt,
+    endAt: item.endAt,
+  }));
+  const seriesCount = batchOccurrences.length;
   const payload = parsePendingPayload(reservation.pendingPayload);
   const pendingSpaceNames = payload
     ? payload.spaceIds.map(
@@ -69,10 +77,19 @@ export async function buildAdminApprovalEmailContent(input: {
   });
 
   const label = actionLabel(reservation);
+  const effectiveCount = seriesCount > 1 ? seriesCount : occurrenceCount;
   const countNote =
-    occurrenceCount && occurrenceCount > 1
-      ? ` (${occurrenceCount} fechas en la serie)`
+    effectiveCount && effectiveCount > 1
+      ? ` (${effectiveCount} fechas en la serie)`
       : "";
+  const dateLines =
+    seriesCount > 1
+      ? batchOccurrences.map((item) =>
+          formatDateTimeRange(item.startAt, item.endAt),
+        )
+      : [
+          formatDateTimeRange(reservation.startAt, reservation.endAt),
+        ];
   const subject = `MVQro Espacios — ${areaName} solicita autorización (${label})${countNote}`;
   const responderUrl = approvalResponderUrl(reservation);
   const approveUrl = approvalEmailActionUrl(reservation, "approve");
@@ -84,8 +101,8 @@ export async function buildAdminApprovalEmailContent(input: {
     reservation.eventDescription
       ? `Descripción: ${reservation.eventDescription}`
       : "",
-    `Inicio: ${reservation.startAt}`,
-    `Fin: ${reservation.endAt}`,
+    seriesCount > 1 ? "Fechas y horarios:" : `Horario: ${dateLines[0]}`,
+    ...(seriesCount > 1 ? dateLines.map((line) => `  · ${line}`) : []),
     detail?.spaceNames?.length
       ? `Espacios: ${detail.spaceNames.join(", ")}`
       : "",
@@ -104,8 +121,13 @@ export async function buildAdminApprovalEmailContent(input: {
     <ul>
       <li><strong>Evento:</strong> ${reservation.eventName}</li>
       ${reservation.eventDescription ? `<li><strong>Descripción:</strong> ${reservation.eventDescription}</li>` : ""}
-      <li><strong>Inicio:</strong> ${reservation.startAt}</li>
-      <li><strong>Fin:</strong> ${reservation.endAt}</li>
+      ${
+        seriesCount > 1
+          ? `<li><strong>Fechas (${seriesCount}):</strong><ul>${dateLines
+              .map((line) => `<li>${line}</li>`)
+              .join("")}</ul></li>`
+          : `<li><strong>Horario:</strong> ${dateLines[0]}</li>`
+      }
       ${
         detail?.spaceNames?.length
           ? `<li><strong>Espacios:</strong> ${detail.spaceNames.join(", ")}</li>`

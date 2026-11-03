@@ -15,6 +15,7 @@ import {
 import { getAllSpaces } from "@/lib/sheets/spaces";
 import { getReservationById } from "@/lib/sheets/reservations";
 import { parsePendingPayload } from "@/types/reservation";
+import { getPendingCreateBatchMembers } from "@/lib/approval-batch";
 import { getApprovalResolution } from "@/lib/approval-resolution";
 import { reservationNeedsAdminAction } from "@/types/reservation";
 
@@ -174,6 +175,15 @@ export async function GET(
     areaName: detail.areaName,
   });
 
+  const batch = await getPendingCreateBatchMembers(reservation);
+  const approvalBatchOccurrences =
+    batch.length > 1
+      ? batch.map((item) => ({
+          startAt: item.startAt,
+          endAt: item.endAt,
+        }))
+      : undefined;
+
   return NextResponse.json({
     ...detail,
     changeSummary,
@@ -181,5 +191,7 @@ export async function GET(
     tokenAccepted: Boolean(token),
     resolutionMessage: resolution.handled ? resolution.message : null,
     resolutionOutcome: resolution.handled ? resolution.outcome : null,
+    approvalBatchIds: batch.length > 1 ? batch.map((item) => item.id) : undefined,
+    approvalBatchOccurrences,
   });
 }

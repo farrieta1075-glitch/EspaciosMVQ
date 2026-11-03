@@ -419,7 +419,48 @@ export async function listAllReservationDetails(): Promise<ReservationDetail[]> 
 
 export async function listPendingReservationDetails(): Promise<ReservationDetail[]> {
   const reservations = await getReservationsNeedingApproval();
-  return buildReservationDetailsBatch(reservations);
+  const details = await buildReservationDetailsBatch(reservations);
+  const seenCreateTokens = new Set<string>();
+  const grouped: ReservationDetail[] = [];
+
+  const sorted = [...details].sort(
+    (a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime(),
+  );
+
+  for (const detail of sorted) {
+    const token = detail.approvalToken.trim();
+    const isPendingCreate =
+      detail.status === "PENDING" && !detail.pendingAction && Boolean(token);
+
+    if (isPendingCreate && seenCreateTokens.has(token)) {
+      continue;
+    }
+
+    if (isPendingCreate) {
+      seenCreateTokens.add(token);
+      const batch = reservations.filter(
+        (item) =>
+          item.status === "PENDING" &&
+          !item.pendingAction &&
+          item.approvalToken === token,
+      );
+      grouped.push({
+        ...detail,
+        approvalBatchIds: batch.map((item) => item.id),
+        approvalBatchOccurrences: batch
+          .sort(
+            (a, b) =>
+              new Date(a.startAt).getTime() - new Date(b.startAt).getTime(),
+          )
+          .map((item) => ({ startAt: item.startAt, endAt: item.endAt })),
+      });
+      continue;
+    }
+
+    grouped.push(detail);
+  }
+
+  return grouped;
 }
 
 export async function listReservationDetails(
@@ -660,14 +701,33 @@ export async function approveReservation(
   const reservation = await getReservationById(id);
   if (!reservation) return null;
 
-  if (reservation.status === "PENDING") {
-    const updated: Reservation = {
-      ...reservation,
-      status: "CONFIRMED",
-      approvalToken: "",
-    };
-    await updateReservationRecord(updated);
-    await recordEventUsage(updated.eventName, updated.areaId);
+  if (reservation.status === "PENDING" && !reservation.pendingAction) {
+    const { getPendingCreateBatchMembers } = await import(
+      "@/lib/approval-batch"
+    );
+    const batch = await getPendingCreateBatchMembers(reservation);
+    for (const item of batch) {
+      await updateReservationRecord({
+        ...item,
+        status: "CONFIRMED",
+        approvalToken: "",
+      });
+    }
+    await recordEventUsage(reservation.eventName, reservation.areaId);
+    const areaUserIds = await getAreaUserIds(reservation.areaId);
+    const count = batch.length;
+    const message =
+      count > 1
+        ? `Tu reserva «${reservation.eventName}» fue confirmada (${count} fechas).`
+        : `Tu reserva «${reservation.eventName}» fue confirmada.`;
+    await notifyAreaUsers(
+      reservation.areaId,
+      reservation.id,
+      "APPROVED_CREATE",
+      message,
+      areaUserIds,
+    );
+    return getReservationDetail(id);
   } else if (reservation.pendingAction === "UPDATE") {
     await applyPendingUpdate(reservation);
   } else if (reservation.pendingAction === "CANCEL") {
@@ -716,17 +776,26 @@ export async function rejectReservation(
 
   const areaUserIds = await getAreaUserIds(reservation.areaId);
 
-  if (reservation.status === "PENDING") {
-    await updateReservationRecord({
-      ...reservation,
-      status: "CANCELLED",
-      approvalToken: "",
-    });
+  if (reservation.status === "PENDING" && !reservation.pendingAction) {
+    const { getPendingCreateBatchMembers } = await import(
+      "@/lib/approval-batch"
+    );
+    const batch = await getPendingCreateBatchMembers(reservation);
+    for (const item of batch) {
+      await updateReservationRecord({
+        ...item,
+        status: "CANCELLED",
+        approvalToken: "",
+      });
+    }
+    const count = batch.length;
     await notifyAreaUsers(
       reservation.areaId,
       reservation.id,
       "REJECTED_CREATE",
-      `Tu solicitud de reserva "${reservation.eventName}" fue rechazada.`,
+      count > 1
+        ? `Tu solicitud de reserva «${reservation.eventName}» fue rechazada (${count} fechas).`
+        : `Tu solicitud de reserva «${reservation.eventName}» fue rechazada.`,
       areaUserIds,
     );
   } else if (reservation.pendingAction === "UPDATE") {

@@ -144,11 +144,19 @@ export interface ReservationResourceDetail {
   quantity: number;
 }
 
+export interface ApprovalBatchOccurrence {
+  startAt: string;
+  endAt: string;
+}
+
 export interface ReservationDetail extends Reservation {
   resources: ReservationResourceDetail[];
   spaceNames: string[];
   areaName?: string | null;
   needsApproval?: boolean;
+  /** Misma solicitud recurrente (una sola autorización). */
+  approvalBatchIds?: string[];
+  approvalBatchOccurrences?: ApprovalBatchOccurrence[];
 }
 
 export interface UpdateReservationInput {

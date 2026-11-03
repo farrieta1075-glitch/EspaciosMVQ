@@ -6,6 +6,8 @@ import { Loader2 } from "lucide-react";
 import type { ReservationDetail } from "@/types/reservation";
 import { areaCardStyle, getAreaColor } from "@/lib/area-colors";
 import type { Area } from "@/types/area";
+import { ApprovalBatchDatesList } from "@/components/approval/approval-batch-dates";
+import { formatDateTimeRange } from "@/lib/approval-change-summary";
 import { reservationStatusLabel } from "@/lib/calendar-utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -86,12 +88,14 @@ export function AdminApprovalsClient({
                   <div>
                     <CardTitle>{reservation.eventName}</CardTitle>
                     <CardDescription>
-                      {reservation.areaName ?? area?.name ?? "Sin área"} ·{" "}
-                      {new Date(reservation.startAt).toLocaleString("es-MX")} –{" "}
-                      {new Date(reservation.endAt).toLocaleTimeString("es-MX", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                      {reservation.areaName ?? area?.name ?? "Sin área"}
+                      {reservation.approvalBatchOccurrences &&
+                      reservation.approvalBatchOccurrences.length > 1
+                        ? ` · Serie de ${reservation.approvalBatchOccurrences.length} fechas`
+                        : ` · ${formatDateTimeRange(
+                            reservation.startAt,
+                            reservation.endAt,
+                          )}`}
                     </CardDescription>
                   </div>
                   {statusLabel && <Badge variant="outline">{statusLabel}</Badge>}
@@ -101,6 +105,11 @@ export function AdminApprovalsClient({
                 {reservation.eventDescription && (
                   <p className="text-sm">{reservation.eventDescription}</p>
                 )}
+                {reservation.approvalBatchOccurrences ? (
+                  <ApprovalBatchDatesList
+                    occurrences={reservation.approvalBatchOccurrences}
+                  />
+                ) : null}
                 <p className="text-sm">
                   <span className="text-muted-foreground">Espacios: </span>
                   {reservation.spaceNames.join(", ")}
