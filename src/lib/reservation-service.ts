@@ -313,6 +313,19 @@ export async function createReservation(
     });
   }
 
+  if (input.createdByAdmin && createdIds[0]) {
+    const { createNotification } = await import("@/lib/sheets/notifications");
+    const countLabel =
+      createdIds.length > 1 ? ` (${createdIds.length} fechas)` : "";
+    await createNotification({
+      userId: input.userId,
+      areaId: input.areaId,
+      reservationId: createdIds[0],
+      type: "RESERVATION_CONFIRMED",
+      message: `Tu reserva «${eventName}» fue confirmada${countLabel}.`,
+    });
+  }
+
   if (input.createdByAdmin) {
     await recordEventUsage(eventName, input.areaId);
   }
@@ -666,7 +679,7 @@ export async function approveReservation(
 
   const message =
     reservation.status === "PENDING"
-      ? `Tu reserva "${reservation.eventName}" fue autorizada.`
+      ? `Tu reserva "${reservation.eventName}" fue confirmada.`
       : reservation.pendingAction === "UPDATE"
         ? `El cambio solicitado para "${reservation.eventName}" fue autorizado.`
         : `La cancelación de "${reservation.eventName}" fue autorizada.`;

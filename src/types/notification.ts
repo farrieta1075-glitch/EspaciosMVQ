@@ -5,6 +5,8 @@ export type NotificationType =
   | "APPROVED_CREATE"
   | "APPROVED_UPDATE"
   | "APPROVED_CANCEL"
+  | "APPROVAL_NEEDED"
+  | "RESERVATION_CONFIRMED"
   | "EVENT_REMINDER";
 
 export interface AppNotification {

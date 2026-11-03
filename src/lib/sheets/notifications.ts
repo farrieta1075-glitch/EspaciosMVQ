@@ -84,19 +84,28 @@ function parseNotificationRow(row: Record<string, string>): AppNotification | nu
   };
 }
 
-async function dispatchWebPush(userId: string, message: string, tag: string) {
-  void import("@/lib/push/send-web-push")
-    .then(({ sendWebPushToUser }) =>
-      sendWebPushToUser(userId, {
-        title: "MVQro Espacios",
-        body: message,
-        url: "/reservas",
-        tag,
-      }),
-    )
-    .catch((error) => {
-      console.warn("[notifications] Web push no enviado:", error);
+async function dispatchWebPush(
+  userId: string,
+  message: string,
+  tag: string,
+  url = "/reservas",
+): Promise<void> {
+  try {
+    const { sendWebPushToUser } = await import("@/lib/push/send-web-push");
+    const result = await sendWebPushToUser(userId, {
+      title: "MVQro Espacios",
+      body: message,
+      url,
+      tag,
     });
+    if (result.sent === 0 && result.failed === 0) {
+      console.info(
+        `[notifications] Sin suscripción push activa para usuario ${userId}`,
+      );
+    }
+  } catch (error) {
+    console.warn("[notifications] Web push no enviado:", error);
+  }
 }
 
 export async function getNotificationsForUser(
@@ -164,12 +173,12 @@ export async function createNotification(input: {
       message: notification.message,
       createdAt: notification.createdAt,
     });
-    dispatchWebPush(input.userId, input.message, saved.id);
+    await dispatchWebPush(input.userId, input.message, saved.id);
     return saved;
   }
 
   await appendSheetRow(SHEET_TABS.NOTIFICACIONES, notificationToRow(notification));
-  dispatchWebPush(input.userId, input.message, notification.id);
+  await dispatchWebPush(input.userId, input.message, notification.id);
   return notification;
 }
 

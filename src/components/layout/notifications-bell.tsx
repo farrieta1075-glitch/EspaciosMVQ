@@ -1,8 +1,14 @@
 "use client";
 
 import * as React from "react";
+import { useSession } from "next-auth/react";
 import { Bell, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { isWebPushConfigured } from "@/lib/push/client-config";
+import {
+  canUseWebPush,
+  requestWebPushPermissionAndSubscribe,
+} from "@/lib/push/subscribe-web-push";
 import { useHeaderSheet } from "@/components/layout/header-sheet-context";
 import {
   Sheet,
@@ -14,11 +20,21 @@ import {
 import type { AppNotification } from "@/types/notification";
 
 export function NotificationsBell() {
+  const { data: session } = useSession();
   const { activeSheet, setSheetOpen } = useHeaderSheet();
   const [notifications, setNotifications] = React.useState<AppNotification[]>([]);
   const [unreadCount, setUnreadCount] = React.useState(0);
   const [deletingId, setDeletingId] = React.useState<string | null>(null);
+  const [pushPermission, setPushPermission] =
+    React.useState<NotificationPermission>("default");
+  const [pushBusy, setPushBusy] = React.useState(false);
   const open = activeSheet === "notifications";
+
+  React.useEffect(() => {
+    if (typeof Notification !== "undefined") {
+      setPushPermission(Notification.permission);
+    }
+  }, [open]);
 
   async function loadNotifications() {
     const response = await fetch("/api/notificaciones");
@@ -84,6 +100,33 @@ export function NotificationsBell() {
         </SheetHeader>
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
           <div className="space-y-3">
+            {isWebPushConfigured() &&
+            canUseWebPush() &&
+            pushPermission === "default" &&
+            session?.user?.id ? (
+              <div className="rounded-lg border border-primary/25 bg-primary/5 p-3 text-sm">
+                <p className="font-medium">Avisos fuera de la app</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Activa notificaciones del sistema para ver solicitudes y
+                  recordatorios aunque no tengas la app abierta.
+                </p>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="mt-2 touch-manipulation"
+                  disabled={pushBusy}
+                  onClick={() => {
+                    if (!session.user?.id) return;
+                    setPushBusy(true);
+                    void requestWebPushPermissionAndSubscribe(session.user.id)
+                      .then((next) => setPushPermission(next))
+                      .finally(() => setPushBusy(false));
+                  }}
+                >
+                  {pushBusy ? "Activando…" : "Activar notificaciones"}
+                </Button>
+              </div>
+            ) : null}
             {unreadCount > 0 && (
               <Button size="sm" variant="outline" onClick={markAllRead}>
                 Marcar todas como leídas

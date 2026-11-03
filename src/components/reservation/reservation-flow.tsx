@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
 import { CheckCircle2 } from "lucide-react";
 import type { Area } from "@/types/area";
 import type { FloorMap, Space } from "@/types/space";
@@ -18,7 +17,11 @@ import {
   saveReservationDraft,
   type ReservationWizardConfirmed,
 } from "@/lib/reservation-draft-storage";
-import { releaseRadixBodyScrollLockIfIdle } from "@/lib/radix-body-lock";
+import { hardNavigate } from "@/lib/hard-navigate";
+import {
+  releaseRadixBodyScrollLock,
+  releaseRadixBodyScrollLockIfIdle,
+} from "@/lib/radix-body-lock";
 import { applyRecurrenceToNewStartDate } from "@/lib/calendar-date-change-preview";
 import { addMinutesToTimeHHmm, formatDateISO } from "@/lib/date-utils";
 import {
@@ -66,7 +69,6 @@ export function ReservationFlow({
   initialMapId,
   initialSpaceId,
 }: ReservationFlowProps) {
-  const router = useRouter();
   const [selection, setSelection] = React.useState<MapDateSelection | null>(
     null,
   );
@@ -119,6 +121,7 @@ export function ReservationFlow({
     React.useState<ReservationWizardConfirmed | null>(null);
   const [calendarDateChangeConfirm, setCalendarDateChangeConfirm] =
     React.useState<{ anchorDate: string; newDate: string } | null>(null);
+  const [wizardResetKey, setWizardResetKey] = React.useState(0);
 
   React.useEffect(() => {
     const scopeQuery = userAreaScopeIds.join(",");
@@ -383,6 +386,43 @@ export function ReservationFlow({
   const resourceCount =
     selection?.selectedResources.filter((item) => item.quantity > 0).length ?? 0;
 
+  function resetCreateFlowForNewReservation() {
+    clearAllReservationDraftState();
+    releaseRadixBodyScrollLock();
+    setSuccessInfo(null);
+    setError(null);
+    setSimilarPrompt(null);
+    setEventName("");
+    setEventDescription("");
+    setEstimatedAttendees("");
+    setAttendeeJustificationCode("");
+    setAttendeeJustificationNote("");
+    setRecurrence({
+      type: "NONE",
+      until: "",
+      exceptDates: [],
+      customDates: [],
+    });
+    setSendEventReminder(true);
+    setSelection(null);
+    setRestoredSelection(undefined);
+    setRestoredWizardConfirmed(null);
+    setCalendarDateChangeConfirm(null);
+    setEventDetailsDone(false);
+    setResourcesOpen(false);
+    setAreaId(userAreaId ?? userAreaScopeIds[0] ?? areas[0]?.id ?? "");
+    setReservationAreaId(userAreaScopeIds[0] ?? userAreaId ?? "");
+    setMapSelectorKey((value) => value + 1);
+    setWizardResetKey((value) => value + 1);
+  }
+
+  function goToReservationsList() {
+    clearAllReservationDraftState();
+    releaseRadixBodyScrollLock();
+    setSuccessInfo(null);
+    hardNavigate("/reservas");
+  }
+
   function handleReservationDatePick(ctx: {
     wizardConfirmed: ReservationWizardConfirmed;
     wizardDraftStart?: string;
@@ -497,6 +537,7 @@ export function ReservationFlow({
         )}
       </header>
       <ReservationCreateWizard
+        key={`create-wizard-${wizardResetKey}`}
         maps={maps}
         spaces={spaces}
         areas={areas}
@@ -610,30 +651,17 @@ export function ReservationFlow({
           </DialogHeader>
           <div className="mt-4 flex flex-col gap-2 sm:flex-row">
             <Button
-              className="flex-1"
-              onClick={() => router.push("/reservas")}
+              type="button"
+              className="flex-1 touch-manipulation"
+              onClick={goToReservationsList}
             >
               Ver mis reservas
             </Button>
             <Button
+              type="button"
               variant="outline"
-              className="flex-1"
-              onClick={() => {
-                clearAllReservationDraftState();
-                setSuccessInfo(null);
-                setEventName("");
-                setEventDescription("");
-                setEstimatedAttendees("");
-                setAttendeeJustificationCode("");
-                setAttendeeJustificationNote("");
-                setRecurrence({
-                  type: "NONE",
-                  until: "",
-                  exceptDates: [],
-                  customDates: [],
-                });
-                setSendEventReminder(true);
-              }}
+              className="flex-1 touch-manipulation"
+              onClick={resetCreateFlowForNewReservation}
             >
               Crear otra reserva
             </Button>

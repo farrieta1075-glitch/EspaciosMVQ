@@ -5,6 +5,7 @@ self.addEventListener("push", (event) => {
     title: "MVQro Espacios",
     body: "",
     url: "/reservas",
+    tag: "mvqro-notification",
   };
 
   try {
@@ -23,21 +24,26 @@ self.addEventListener("push", (event) => {
       icon: "/logo.svg",
       badge: "/logo.svg",
       tag: payload.tag || "mvqro-notification",
-      data: { url: payload.url || "/" },
+      data: { url: payload.url || "/reservas" },
     }),
   );
 });
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const targetUrl = event.notification.data?.url || "/";
+  const rawUrl = event.notification.data?.url || "/reservas";
+  const targetUrl = new URL(rawUrl, self.location.origin).href;
 
   event.waitUntil(
     self.clients
       .matchAll({ type: "window", includeUncontrolled: true })
-      .then((clientList) => {
+      .then(async (clientList) => {
         for (const client of clientList) {
-          if (client.url.startsWith(self.location.origin) && "focus" in client) {
+          if (!client.url.startsWith(self.location.origin)) continue;
+          if ("navigate" in client) {
+            await client.navigate(targetUrl);
+          }
+          if ("focus" in client) {
             return client.focus();
           }
         }

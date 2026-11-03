@@ -13,6 +13,9 @@ function ensureVapid(): boolean {
     process.env.WEB_PUSH_VAPID_SUBJECT?.trim() || "mailto:soporte@mvqro.local";
 
   if (!publicKey || !privateKey) {
+    console.warn(
+      "[web-push] Faltan NEXT_PUBLIC_VAPID_PUBLIC_KEY o VAPID_PRIVATE_KEY en el servidor.",
+    );
     return false;
   }
 
