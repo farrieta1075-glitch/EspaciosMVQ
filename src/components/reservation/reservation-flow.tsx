@@ -17,6 +17,7 @@ import {
   saveReservationDraft,
   type ReservationWizardConfirmed,
 } from "@/lib/reservation-draft-storage";
+import { applyRecurrenceToNewStartDate } from "@/lib/calendar-date-change-preview";
 import { formatDateISO } from "@/lib/date-utils";
 import {
   readJsonResponse,
@@ -167,17 +168,16 @@ export function ReservationFlow({
       picked ??
       formatDateISO(new Date());
 
-    if (picked) {
-      setCalendarDateChangeConfirm({ anchorDate, newDate: picked });
-    }
+    const dateConfirmedInWizard = Boolean(draft.wizardConfirmed?.date);
 
     if (draft.selection) {
+      const resolvedDate = picked ?? draft.selection.date;
       setSelection({
         ...draft.selection,
-        date: picked ? anchorDate : draft.selection.date,
+        date: resolvedDate,
       });
       setRestoredSelection({
-        date: picked ? anchorDate : draft.selection.date,
+        date: resolvedDate,
         startTime: draft.selection.startTime,
         endTime: draft.selection.endTime,
         mapId: draft.selection.mapId,
@@ -190,11 +190,26 @@ export function ReservationFlow({
         ),
       });
     } else if (picked) {
-      setRestoredSelection({ date: anchorDate });
+      setRestoredSelection({ date: picked });
+    }
+
+    if (picked) {
+      if (dateConfirmedInWizard) {
+        setCalendarDateChangeConfirm({ anchorDate, newDate: picked });
+      } else {
+        setRecurrence((current) =>
+          current.type === "NONE"
+            ? current
+            : applyRecurrenceToNewStartDate(picked, current, anchorDate),
+        );
+        setMapSelectorKey((value) => value + 1);
+      }
     }
 
     clearReservationDraft();
-    setMapSelectorKey((value) => value + 1);
+    if (!picked) {
+      setMapSelectorKey((value) => value + 1);
+    }
   }, []);
 
   const handleSelectionChange = React.useCallback(

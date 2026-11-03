@@ -77,7 +77,16 @@ export function indexFromOrdinal(ordinal: MonthlyRelativeOrdinal): number {
   }
 }
 
+export function isDateInLastSevenDaysOfMonth(dateIso: string): boolean {
+  const [y, m, d] = dateIso.split("-").map(Number);
+  if (!y || !m || !d) return false;
+  const daysInMonth = new Date(y, m, 0).getDate();
+  return d > daysInMonth - 7;
+}
+
+/** Meses con 5 ocurrencias del weekday: en los últimos 7 días, el 4.º puede ser 4.º o último. */
 export function needsFourthVsLastPrompt(dateIso: string): boolean {
+  if (!isDateInLastSevenDaysOfMonth(dateIso)) return false;
   const date = new Date(`${dateIso}T12:00:00`);
   const weekday = date.getDay();
   const total = countWeekdayInMonth(dateIso, weekday);

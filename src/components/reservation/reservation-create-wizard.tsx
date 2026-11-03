@@ -743,6 +743,10 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
   }
 
   React.useEffect(() => {
+    setRelativeDisambiguation(null);
+  }, [reservationDate]);
+
+  React.useEffect(() => {
     if (recurrence.type === "MONTHLY_RELATIVE") {
       applyMonthlyRelativeFromDate(reservationDate);
     }
@@ -1545,9 +1549,9 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
         !relativeDisambiguation && (
           <section className="space-y-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
             <p>
-              En este mes hay 5{" "}
+              La fecha cae en los últimos 7 días del mes y hay 5{" "}
               {weekdayNameEs(new Date(`${reservationDate}T12:00:00`).getDay())}
-              s. ¿La repetición será el{" "}
+              s en el mes. ¿La repetición será el{" "}
               <strong>cuarto</strong> o el <strong>último</strong> de cada mes?
             </p>
             <div className="flex flex-wrap gap-2">
