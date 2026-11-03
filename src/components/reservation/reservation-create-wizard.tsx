@@ -58,8 +58,11 @@ import {
 } from "@/lib/event-preset-utils";
 import {
   applyRecurrenceToNewStartDate,
-  buildCalendarDateChangePreview,
   buildRecurrenceForTypeAtDate,
+  cloneRecurrenceConfig,
+  describeRecurrencePattern,
+  getRecurrencePreviewDates,
+  suggestExceptDatesAfterChange,
 } from "@/lib/calendar-date-change-preview";
 import { cn } from "@/lib/utils";
 
@@ -277,14 +280,51 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
   >(null);
   const [showExceptionPicker, setShowExceptionPicker] = React.useState(false);
   const [confirmKeepRecurrence, setConfirmKeepRecurrence] = React.useState(true);
-  const [confirmKeepExceptions, setConfirmKeepExceptions] = React.useState(true);
-  const [confirmExceptionKeeps, setConfirmExceptionKeeps] = React.useState<
-    Record<string, boolean>
-  >({});
   const [confirmDialogRecurrence, setConfirmDialogRecurrence] =
     React.useState<RecurrenceConfig>(recurrence);
+  const [frozenRecurrence, setFrozenRecurrence] =
+    React.useState<RecurrenceConfig | null>(null);
+  const [confirmDialogUntil, setConfirmDialogUntil] = React.useState("");
+  const [confirmNewExceptDates, setConfirmNewExceptDates] = React.useState<
+    Set<string>
+  >(() => new Set());
 
   const MANUAL_EVENT_NAME_PREFIX = "__custom__:";
+
+  React.useEffect(() => {
+    if (!calendarDateChangeConfirm) {
+      setFrozenRecurrence(null);
+      return;
+    }
+    const frozen = cloneRecurrenceConfig(recurrence);
+    setFrozenRecurrence(frozen);
+    setConfirmDialogRecurrence(cloneRecurrenceConfig(recurrence));
+    const until =
+      recurrence.until?.trim() ||
+      (recurrence.type !== "NONE" && recurrence.type !== "CUSTOM"
+        ? defaultRecurrenceUntil(
+            calendarDateChangeConfirm.newDate,
+            recurrence.type,
+          )
+        : "");
+    setConfirmDialogUntil(until);
+    setConfirmKeepRecurrence(recurrence.type !== "NONE");
+    // Snapshot at dialog open only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [calendarDateChangeConfirm]);
+
+  const beforePreviewDates = React.useMemo(() => {
+    if (!calendarDateChangeConfirm || !frozenRecurrence) return [];
+    return getRecurrencePreviewDates(
+      calendarDateChangeConfirm.anchorDate,
+      frozenRecurrence,
+    );
+  }, [calendarDateChangeConfirm, frozenRecurrence]);
+
+  const frozenExceptSet = React.useMemo(
+    () => new Set(frozenRecurrence?.exceptDates ?? []),
+    [frozenRecurrence],
+  );
 
   const afterRecurrenceForPreview = React.useMemo(() => {
     if (!calendarDateChangeConfirm) return null;
@@ -295,48 +335,61 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
         recurrence,
       );
     }
-    return applyRecurrenceToNewStartDate(
+    const base = applyRecurrenceToNewStartDate(
       calendarDateChangeConfirm.newDate,
-      confirmDialogRecurrence,
+      {
+        ...confirmDialogRecurrence,
+        until: confirmDialogUntil,
+      },
       calendarDateChangeConfirm.anchorDate,
     );
+    if (base.type !== "NONE" && base.type !== "CUSTOM") {
+      return { ...base, until: confirmDialogUntil || base.until };
+    }
+    return base;
   }, [
     calendarDateChangeConfirm,
     confirmKeepRecurrence,
     confirmDialogRecurrence,
+    confirmDialogUntil,
     recurrence,
   ]);
 
-  const calendarDateChangePreview = React.useMemo(() => {
-    if (!calendarDateChangeConfirm || !afterRecurrenceForPreview) return null;
-    return buildCalendarDateChangePreview(
-      calendarDateChangeConfirm.anchorDate,
+  const afterPreviewDates = React.useMemo(() => {
+    if (!calendarDateChangeConfirm || !afterRecurrenceForPreview) return [];
+    if (afterRecurrenceForPreview.type === "NONE") return [];
+    return getRecurrencePreviewDates(
       calendarDateChangeConfirm.newDate,
-      recurrence,
       afterRecurrenceForPreview,
     );
-  }, [calendarDateChangeConfirm, recurrence, afterRecurrenceForPreview]);
+  }, [calendarDateChangeConfirm, afterRecurrenceForPreview]);
+
+  const exceptSuggestKey = calendarDateChangeConfirm
+    ? `${calendarDateChangeConfirm.newDate}|${confirmDialogRecurrence.type}|${confirmDialogUntil}`
+    : "";
 
   React.useEffect(() => {
-    if (!calendarDateChangeConfirm) return;
-    setConfirmDialogRecurrence({ ...recurrence });
-    setConfirmKeepRecurrence(recurrence.type !== "NONE");
-  }, [calendarDateChangeConfirm, recurrence]);
-
-  React.useEffect(() => {
-    if (!calendarDateChangeConfirm) return;
-    const mapped = calendarDateChangePreview?.mappedExceptions ?? [];
-    setConfirmKeepExceptions(mapped.length > 0);
-    const keeps: Record<string, boolean> = {};
-    for (const row of mapped) {
-      keeps[row.from] = true;
+    if (
+      !calendarDateChangeConfirm ||
+      !frozenRecurrence ||
+      !afterRecurrenceForPreview ||
+      afterRecurrenceForPreview.type === "NONE"
+    ) {
+      setConfirmNewExceptDates(new Set());
+      return;
     }
-    setConfirmExceptionKeeps(keeps);
+    const suggested = suggestExceptDatesAfterChange(
+      calendarDateChangeConfirm.anchorDate,
+      calendarDateChangeConfirm.newDate,
+      frozenRecurrence,
+      afterRecurrenceForPreview,
+    );
+    setConfirmNewExceptDates(new Set(suggested));
   }, [
+    exceptSuggestKey,
     calendarDateChangeConfirm,
-    calendarDateChangePreview?.mappedExceptions,
-    confirmDialogRecurrence.type,
-    confirmKeepRecurrence,
+    frozenRecurrence,
+    afterRecurrenceForPreview,
   ]);
 
   const presetFormHandlers = React.useMemo(
@@ -1079,7 +1132,7 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
                     const checked = e.target.checked;
                     setConfirmKeepRecurrence(checked);
                     if (!checked) {
-                      setConfirmKeepExceptions(false);
+                      setConfirmNewExceptDates(new Set());
                       return;
                     }
                     if (confirmDialogRecurrence.type === "NONE") {
@@ -1105,16 +1158,18 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
                       value={confirmDialogRecurrence.type}
                       onChange={(e) => {
                         const type = e.target.value as RecurrenceType;
-                        setConfirmDialogRecurrence(
-                          buildRecurrenceForTypeAtDate(
-                            type,
-                            calendarDateChangeConfirm.newDate,
-                            confirmDialogRecurrence,
-                          ),
+                        const next = buildRecurrenceForTypeAtDate(
+                          type,
+                          calendarDateChangeConfirm.newDate,
+                          confirmDialogRecurrence,
                         );
+                        setConfirmDialogRecurrence(next);
+                        if (type !== "NONE" && type !== "CUSTOM") {
+                          setConfirmDialogUntil(next.until);
+                        }
                         if (type === "NONE") {
                           setConfirmKeepRecurrence(false);
-                          setConfirmKeepExceptions(false);
+                          setConfirmNewExceptDates(new Set());
                         }
                       }}
                     >
@@ -1127,62 +1182,121 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
                         ))}
                     </Select>
                   </div>
-                  {calendarDateChangePreview &&
-                    confirmDialogRecurrence.type !== "NONE" && (
-                      <div className="space-y-2 rounded-md border border-border bg-muted/30 p-2.5 text-xs">
-                        <p>
-                          <span className="text-muted-foreground">Antes: </span>
-                          {calendarDateChangePreview.beforePattern}
+                  {frozenRecurrence && beforePreviewDates.length > 0 && (
+                      <div className="space-y-1.5 rounded-md border border-border bg-muted/20 p-2.5 text-xs">
+                        <p className="font-medium text-muted-foreground">
+                          Fechas registradas (sin cambios)
                         </p>
-                        {calendarDateChangePreview.patternChanged ? (
-                          <p>
-                            <span className="text-muted-foreground">
-                              Después:{" "}
-                            </span>
-                            <strong className="text-foreground">
-                              {calendarDateChangePreview.afterPattern}
-                            </strong>
-                          </p>
-                        ) : (
-                          <p className="text-muted-foreground">
-                            La regla se mantiene; cambia la fecha de inicio del
-                            ciclo.
-                          </p>
+                        <p className="text-muted-foreground">
+                          {describeRecurrencePattern(
+                            calendarDateChangeConfirm.anchorDate,
+                            frozenRecurrence,
+                          )}
+                        </p>
+                        <ul className="mt-1 space-y-1">
+                          {beforePreviewDates.map((iso) => {
+                            const isExcept = frozenExceptSet.has(iso);
+                            return (
+                              <li
+                                key={`before-${iso}`}
+                                className={
+                                  isExcept
+                                    ? "text-muted-foreground line-through"
+                                    : ""
+                                }
+                              >
+                                {formatDateDisplay(
+                                  new Date(`${iso}T12:00:00`),
+                                )}
+                                {isExcept && (
+                                  <span className="ml-1.5 text-[10px] font-medium uppercase tracking-wide text-amber-700 no-underline dark:text-amber-400">
+                                    Excepción
+                                  </span>
+                                )}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    )}
+                  {confirmDialogRecurrence.type !== "NONE" &&
+                    afterPreviewDates.length > 0 && (
+                      <div className="space-y-2 rounded-md border border-border bg-muted/30 p-2.5 text-xs">
+                        <p className="font-medium text-muted-foreground">
+                          Nuevas fechas
+                        </p>
+                        {confirmDialogRecurrence.type !== "CUSTOM" && (
+                          <div className="space-y-1">
+                            <Label htmlFor="cal-confirm-until">
+                              Repetir hasta
+                            </Label>
+                            <Input
+                              id="cal-confirm-until"
+                              type="date"
+                              className="h-9"
+                              min={calendarDateChangeConfirm.newDate}
+                              value={confirmDialogUntil}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                setConfirmDialogUntil(value);
+                                setConfirmDialogRecurrence((current) => ({
+                                  ...current,
+                                  until: value,
+                                }));
+                              }}
+                            />
+                          </div>
                         )}
-                        <div className="grid gap-3 sm:grid-cols-2">
-                          <div>
-                            <p className="font-medium text-muted-foreground">
-                              Próximas fechas (actual)
-                            </p>
-                            <ul className="mt-1 list-inside list-disc space-y-0.5">
-                              {calendarDateChangePreview.beforeSampleDates.map(
-                                (iso) => (
-                                  <li key={`before-${iso}`}>
+                        <p className="text-muted-foreground">
+                          {afterRecurrenceForPreview &&
+                            describeRecurrencePattern(
+                              calendarDateChangeConfirm.newDate,
+                              afterRecurrenceForPreview,
+                            )}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">
+                          Marca excepción en las fechas que no tendrán reserva.
+                        </p>
+                        <ul className="mt-1 space-y-1.5">
+                          {afterPreviewDates.map((iso) => {
+                            const isExcept = confirmNewExceptDates.has(iso);
+                            return (
+                              <li key={`after-${iso}`}>
+                                <label className="flex cursor-pointer items-center gap-2">
+                                  <input
+                                    type="checkbox"
+                                    checked={isExcept}
+                                    onChange={(e) => {
+                                      setConfirmNewExceptDates((current) => {
+                                        const next = new Set(current);
+                                        if (e.target.checked) next.add(iso);
+                                        else next.delete(iso);
+                                        return next;
+                                      });
+                                    }}
+                                    className="rounded border-border"
+                                  />
+                                  <span
+                                    className={
+                                      isExcept
+                                        ? "text-muted-foreground line-through"
+                                        : ""
+                                    }
+                                  >
                                     {formatDateDisplay(
                                       new Date(`${iso}T12:00:00`),
                                     )}
-                                  </li>
-                                ),
-                              )}
-                            </ul>
-                          </div>
-                          <div>
-                            <p className="font-medium text-muted-foreground">
-                              Próximas fechas (nuevo)
-                            </p>
-                            <ul className="mt-1 list-inside list-disc space-y-0.5">
-                              {calendarDateChangePreview.afterSampleDates.map(
-                                (iso) => (
-                                  <li key={`after-${iso}`}>
-                                    {formatDateDisplay(
-                                      new Date(`${iso}T12:00:00`),
-                                    )}
-                                  </li>
-                                ),
-                              )}
-                            </ul>
-                          </div>
-                        </div>
+                                  </span>
+                                  {isExcept && (
+                                    <span className="text-[10px] font-medium uppercase tracking-wide text-amber-700 dark:text-amber-400">
+                                      Excepción
+                                    </span>
+                                  )}
+                                </label>
+                              </li>
+                            );
+                          })}
+                        </ul>
                       </div>
                     )}
                 </div>
@@ -1192,63 +1306,6 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
                   Solo se reservará la nueva fecha (sin repetición).
                 </p>
               )}
-              {confirmKeepRecurrence &&
-                confirmDialogRecurrence.type !== "NONE" &&
-                (calendarDateChangePreview?.mappedExceptions.length ?? 0) >
-                  0 && (
-                  <div className="space-y-2">
-                    <label className="flex items-start gap-2">
-                      <input
-                        type="checkbox"
-                        checked={confirmKeepExceptions}
-                        onChange={(e) =>
-                          setConfirmKeepExceptions(e.target.checked)
-                        }
-                        className="mt-0.5 rounded border-border"
-                      />
-                      <span>
-                        Mantener excepciones (días sin reserva), ajustadas al
-                        nuevo patrón
-                      </span>
-                    </label>
-                    {confirmKeepExceptions && calendarDateChangePreview && (
-                      <ul className="space-y-1.5 rounded-md border border-border bg-muted/20 p-2 text-xs">
-                        {calendarDateChangePreview.mappedExceptions.map(
-                          (row) => (
-                            <li key={row.from}>
-                              <label className="flex items-start gap-2">
-                                <input
-                                  type="checkbox"
-                                  checked={
-                                    confirmExceptionKeeps[row.from] ?? false
-                                  }
-                                  onChange={(e) =>
-                                    setConfirmExceptionKeeps((current) => ({
-                                      ...current,
-                                      [row.from]: e.target.checked,
-                                    }))
-                                  }
-                                  className="mt-0.5 rounded border-border"
-                                />
-                                <span>
-                                  {formatDateDisplay(
-                                    new Date(`${row.from}T12:00:00`),
-                                  )}
-                                  {" → "}
-                                  <strong>
-                                    {formatDateDisplay(
-                                      new Date(`${row.to}T12:00:00`),
-                                    )}
-                                  </strong>
-                                </span>
-                              </label>
-                            </li>
-                          ),
-                        )}
-                      </ul>
-                    )}
-                  </div>
-                )}
             </div>
           ) : null}
           <DialogFooter className="gap-2 sm:gap-0">
@@ -1263,10 +1320,7 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
               type="button"
               onClick={() => {
                 if (!calendarDateChangeConfirm) return;
-                const mappedExceptDates =
-                  calendarDateChangePreview?.mappedExceptions
-                    .filter((row) => confirmExceptionKeeps[row.from])
-                    .map((row) => row.to) ?? [];
+                const exceptDates = Array.from(confirmNewExceptDates);
                 const usesRecurrence =
                   confirmKeepRecurrence &&
                   (afterRecurrenceForPreview?.type ?? "NONE") !== "NONE";
@@ -1274,16 +1328,14 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
                   newDate: calendarDateChangeConfirm.newDate,
                   anchorDate: calendarDateChangeConfirm.anchorDate,
                   keepRecurrence: usesRecurrence,
-                  keepExceptions:
-                    usesRecurrence &&
-                    confirmKeepExceptions &&
-                    mappedExceptDates.length > 0,
-                  exceptDates:
-                    usesRecurrence && confirmKeepExceptions
-                      ? mappedExceptDates
-                      : [],
+                  keepExceptions: usesRecurrence && exceptDates.length > 0,
+                  exceptDates: usesRecurrence ? exceptDates : [],
                   recurrence: usesRecurrence
-                    ? afterRecurrenceForPreview ?? undefined
+                    ? {
+                        ...(afterRecurrenceForPreview as RecurrenceConfig),
+                        until: confirmDialogUntil,
+                        exceptDates,
+                      }
                     : undefined,
                 });
               }}

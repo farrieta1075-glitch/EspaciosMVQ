@@ -180,7 +180,7 @@ export interface CalendarDateChangePreview {
   mappedExceptions: MappedException[];
 }
 
-function sampleRecurrenceDates(
+export function getRecurrencePreviewDates(
   anchorDate: string,
   recurrence: RecurrenceConfig,
 ): string[] {
@@ -191,6 +191,34 @@ function sampleRecurrenceDates(
     recurrence.type === "CUSTOM" ? "" : recurrence.until || anchorDate;
   const all = listRecurrenceDates(anchorDate, recurrence.type, until, recurrence);
   return all.slice(0, PREVIEW_OCCURRENCE_COUNT);
+}
+
+export function suggestExceptDatesAfterChange(
+  anchorDate: string,
+  newDate: string,
+  beforeRecurrence: RecurrenceConfig,
+  afterRecurrence: RecurrenceConfig,
+): string[] {
+  const preview = buildCalendarDateChangePreview(
+    anchorDate,
+    newDate,
+    beforeRecurrence,
+    afterRecurrence,
+  );
+  return preview.mappedExceptions.map((row) => row.to);
+}
+
+export function cloneRecurrenceConfig(
+  recurrence: RecurrenceConfig,
+): RecurrenceConfig {
+  return {
+    ...recurrence,
+    exceptDates: [...(recurrence.exceptDates ?? [])],
+    customDates: [...(recurrence.customDates ?? [])],
+    monthlyRelative: recurrence.monthlyRelative
+      ? { ...recurrence.monthlyRelative }
+      : undefined,
+  };
 }
 
 export function buildCalendarDateChangePreview(
@@ -208,8 +236,11 @@ export function buildCalendarDateChangePreview(
   const afterPattern = describeRecurrencePattern(newDate, afterRecurrence);
   const patternChanged = beforePattern !== afterPattern;
 
-  const beforeSampleDates = sampleRecurrenceDates(anchorDate, beforeRecurrence);
-  const afterSampleDates = sampleRecurrenceDates(newDate, afterRecurrence);
+  const beforeSampleDates = getRecurrencePreviewDates(
+    anchorDate,
+    beforeRecurrence,
+  );
+  const afterSampleDates = getRecurrencePreviewDates(newDate, afterRecurrence);
 
   const exceptDates = recurrence.exceptDates ?? [];
   const mappedExceptions: MappedException[] = [];
