@@ -22,7 +22,7 @@ import {
 } from "@/lib/date-utils";
 import { canSelectCalendarDay } from "@/lib/calendar-date-selection";
 import { hardNavigate } from "@/lib/hard-navigate";
-import { setPickedReservationDate } from "@/lib/reservation-draft-storage";
+import { notePickedReservationDateFromCalendar } from "@/lib/reservation-draft-storage";
 import type { SessionUser, UserRole } from "@/types/user";
 
 type CalendarViewMode = "week" | "month";
@@ -188,7 +188,7 @@ export function CalendarClient({
     if (!isDateSelectable(date)) return;
     setSheetDate(date);
     if (pickMode && returnTo) {
-      setPickedReservationDate(formatDateISO(date));
+      notePickedReservationDateFromCalendar(formatDateISO(date));
       hardNavigate(returnTo);
       return;
     }

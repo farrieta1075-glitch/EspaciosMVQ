@@ -12,17 +12,15 @@ import type { InitialMapSelection } from "@/components/map-date/map-date-selecto
 import {
   buildCalendarPickUrl,
   clearAllReservationDraftState,
-  clearReservationDraft,
-  consumeCalendarPickPending,
-  consumePickedReservationDate,
-  loadReservationDraft,
+  finalizeReservationDraftRestore,
   markCalendarPickPending,
+  peekCreateFlowRestoreSnapshot,
   saveReservationDraft,
   type ReservationWizardConfirmed,
 } from "@/lib/reservation-draft-storage";
 import { releaseRadixBodyScrollLockIfIdle } from "@/lib/radix-body-lock";
 import { applyRecurrenceToNewStartDate } from "@/lib/calendar-date-change-preview";
-import { formatDateISO } from "@/lib/date-utils";
+import { addMinutesToTimeHHmm, formatDateISO } from "@/lib/date-utils";
 import {
   readJsonResponse,
   shouldRetryMutationRequest,
@@ -141,17 +139,28 @@ export function ReservationFlow({
     }
   }, [areaId, presetsByAreaId]);
 
-  React.useEffect(() => {
-    const picked = consumePickedReservationDate();
-    const calendarPickPending = consumeCalendarPickPending();
+  const [restoreSnapshot] = React.useState(() =>
+    peekCreateFlowRestoreSnapshot(),
+  );
 
-    if (!calendarPickPending && !picked) {
+  React.useEffect(() => {
+    const snapshot = restoreSnapshot;
+    if (!snapshot) {
       clearAllReservationDraftState();
       return;
     }
 
-    const draft = loadReservationDraft();
-    if (!draft || draft.kind !== "create") return;
+    const picked = snapshot.pickedDate;
+    const draft = snapshot.draft;
+
+    if (!draft) {
+      if (picked) {
+        setRestoredSelection({ date: picked });
+        setMapSelectorKey((value) => value + 1);
+      }
+      finalizeReservationDraftRestore();
+      return;
+    }
 
     setEventName(draft.eventName);
     setEventDescription(draft.eventDescription);
@@ -181,23 +190,37 @@ export function ReservationFlow({
 
     const dateConfirmedInWizard = Boolean(draft.wizardConfirmed?.date);
 
-    if (draft.selection) {
-      const resolvedDate = picked ?? draft.selection.date;
+    const resolvedDate = picked ?? draft.selection?.date ?? anchorDate;
+    const startTime =
+      draft.selection?.startTime ?? draft.wizardDraftStart ?? "08:00";
+    const endTime =
+      draft.selection?.endTime ??
+      draft.wizardDraftEnd ??
+      addMinutesToTimeHHmm(startTime, 60);
+    const mapId =
+      draft.selection?.mapId ?? initialMapId ?? maps[0]?.id ?? "";
+    const selectedSpaceIds = draft.selection?.selectedSpaceIds ?? [];
+    const selectedResources =
+      draft.selection?.selectedResources ??
+      ([] as MapDateSelection["selectedResources"]);
+
+    if (draft.selection || draft.wizardDraftStart || picked) {
       setSelection({
-        ...draft.selection,
         date: resolvedDate,
+        startTime,
+        endTime,
+        mapId,
+        selectedSpaceIds,
+        selectedResources,
       });
       setRestoredSelection({
         date: resolvedDate,
-        startTime: draft.selection.startTime,
-        endTime: draft.selection.endTime,
-        mapId: draft.selection.mapId,
-        selectedSpaceIds: draft.selection.selectedSpaceIds,
+        startTime,
+        endTime,
+        mapId,
+        selectedSpaceIds,
         selectedResources: Object.fromEntries(
-          draft.selection.selectedResources.map((item) => [
-            item.resourceId,
-            item.quantity,
-          ]),
+          selectedResources.map((item) => [item.resourceId, item.quantity]),
         ),
       });
     } else if (picked) {
@@ -215,13 +238,12 @@ export function ReservationFlow({
         );
         setMapSelectorKey((value) => value + 1);
       }
-    }
-
-    clearReservationDraft();
-    if (!picked) {
+    } else {
       setMapSelectorKey((value) => value + 1);
     }
-  }, []);
+
+    finalizeReservationDraftRestore();
+  }, [restoreSnapshot, initialMapId, maps]);
 
   const handleSelectionChange = React.useCallback(
     (value: MapDateSelection) => {
@@ -363,7 +385,29 @@ export function ReservationFlow({
 
   function handleReservationDatePick(ctx: {
     wizardConfirmed: ReservationWizardConfirmed;
+    wizardDraftStart?: string;
+    wizardDraftEnd?: string;
   }) {
+    const anchorDate =
+      selection?.date ??
+      restoredSelection?.date ??
+      initialDate ??
+      formatDateISO(new Date());
+    const draftStart = ctx.wizardDraftStart;
+    const draftEnd = ctx.wizardDraftEnd;
+    const resolvedSelection: MapDateSelection | null =
+      selection ??
+      (draftStart && draftEnd
+        ? {
+            date: anchorDate,
+            startTime: draftStart,
+            endTime: draftEnd,
+            mapId: initialMapId ?? maps[0]?.id ?? "",
+            selectedSpaceIds: [],
+            selectedResources: [],
+          }
+        : null);
+
     saveReservationDraft({
       kind: "create",
       eventName,
@@ -378,13 +422,11 @@ export function ReservationFlow({
       sendEventReminder,
       areaId,
       reservationAreaId,
-      selection,
+      selection: resolvedSelection,
       wizardConfirmed: ctx.wizardConfirmed,
-      calendarAnchorDate:
-        selection?.date ??
-        restoredSelection?.date ??
-        initialDate ??
-        formatDateISO(new Date()),
+      wizardDraftStart: draftStart,
+      wizardDraftEnd: draftEnd,
+      calendarAnchorDate: anchorDate,
     });
     markCalendarPickPending();
   }

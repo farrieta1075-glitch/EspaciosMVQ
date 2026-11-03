@@ -32,9 +32,23 @@ export interface ReservationDraft {
   reservationAreaId?: string;
   selection: MapDateSelection | null;
   wizardConfirmed?: ReservationWizardConfirmed;
+  /** Horario en el asistente antes de confirmar el paso de tiempo. */
+  wizardDraftStart?: string;
+  wizardDraftEnd?: string;
   /** Fecha mostrada al abrir el calendario (para confirmar al volver). */
   calendarAnchorDate?: string;
 }
+
+export type CreateFlowRestoreSnapshot = {
+  draft: ReservationDraft | null;
+  pickedDate: string | null;
+};
+
+export type EditFlowRestoreSnapshot = {
+  reservationId: string;
+  draft: ReservationDraft | null;
+  pickedDate: string | null;
+};
 
 export function saveReservationDraft(draft: ReservationDraft): void {
   if (typeof sessionStorage === "undefined") return;
@@ -87,9 +101,20 @@ export function isReservationFormPath(pathname: string): boolean {
   return /^\/reservas\/[^/]+\/editar\/?$/.test(pathname);
 }
 
+export function peekPickedReservationDate(): string | null {
+  if (typeof sessionStorage === "undefined") return null;
+  return sessionStorage.getItem(PICK_DATE_KEY);
+}
+
 export function setPickedReservationDate(isoDate: string): void {
   if (typeof sessionStorage === "undefined") return;
   sessionStorage.setItem(PICK_DATE_KEY, isoDate);
+}
+
+/** Al elegir fecha en calendario (modo pick): conserva borrador y marca vuelta. */
+export function notePickedReservationDateFromCalendar(isoDate: string): void {
+  setPickedReservationDate(isoDate);
+  markCalendarPickPending();
 }
 
 export function consumePickedReservationDate(): string | null {
@@ -97,6 +122,42 @@ export function consumePickedReservationDate(): string | null {
   const value = sessionStorage.getItem(PICK_DATE_KEY);
   if (value) sessionStorage.removeItem(PICK_DATE_KEY);
   return value;
+}
+
+export function peekCreateFlowRestoreSnapshot(): CreateFlowRestoreSnapshot | null {
+  const pickedDate = peekPickedReservationDate();
+  const pending = peekCalendarPickPending();
+  if (!pending && !pickedDate) return null;
+
+  const draft = loadReservationDraft();
+  if (!draft || draft.kind !== "create") {
+    return { draft: null, pickedDate };
+  }
+  return { draft, pickedDate };
+}
+
+export function peekEditFlowRestoreSnapshot(
+  reservationId: string,
+): EditFlowRestoreSnapshot | null {
+  const pickedDate = peekPickedReservationDate();
+  const pending = peekCalendarPickPending();
+  if (!pending && !pickedDate) return null;
+
+  const draft = loadReservationDraft();
+  if (
+    !draft ||
+    draft.kind !== "edit" ||
+    draft.editReservationId !== reservationId
+  ) {
+    return { reservationId, draft: null, pickedDate };
+  }
+  return { reservationId, draft, pickedDate };
+}
+
+export function finalizeReservationDraftRestore(): void {
+  consumePickedReservationDate();
+  consumeCalendarPickPending();
+  clearReservationDraft();
 }
 
 export function buildCalendarPickUrl(returnTo: string, currentDate: string): string {

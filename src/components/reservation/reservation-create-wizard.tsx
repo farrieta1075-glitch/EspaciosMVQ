@@ -166,6 +166,8 @@ interface ReservationCreateWizardProps {
   calendarPickHref: string;
   onReservationDatePick: (ctx: {
     wizardConfirmed: ReservationWizardConfirmed;
+    wizardDraftStart?: string;
+    wizardDraftEnd?: string;
   }) => void;
   resourcesOpen: boolean;
   onResourcesOpenChange: (open: boolean) => void;
@@ -453,6 +455,18 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
   }, [initialWizardConfirmed]);
 
   React.useEffect(() => {
+    const start = selection?.startTime ?? restoredSelection?.startTime;
+    const end = selection?.endTime ?? restoredSelection?.endTime;
+    if (start) setDraftStart(start);
+    if (end) setDraftEnd(end);
+  }, [
+    selection?.startTime,
+    selection?.endTime,
+    restoredSelection?.startTime,
+    restoredSelection?.endTime,
+  ]);
+
+  React.useEffect(() => {
     if (!showAreaPicker && flatSelectable[0]) {
       if (isAdmin) onAreaIdChange(flatSelectable[0]);
       else onReservationAreaIdChange(flatSelectable[0]);
@@ -528,7 +542,11 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
   const eventDetailsDone = confirmed.scheduleCollapsed;
 
   function goToCalendarPick() {
-    onReservationDatePick({ wizardConfirmed: confirmed });
+    onReservationDatePick({
+      wizardConfirmed: confirmed,
+      wizardDraftStart: draftStart,
+      wizardDraftEnd: draftEnd,
+    });
     hardNavigate(calendarPickHref);
   }
 

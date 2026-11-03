@@ -17,11 +17,9 @@ import type { InitialMapSelection } from "@/components/map-date/map-date-selecto
 import {
   buildCalendarPickUrl,
   clearAllReservationDraftState,
-  clearReservationDraft,
-  consumeCalendarPickPending,
-  consumePickedReservationDate,
-  loadReservationDraft,
+  finalizeReservationDraftRestore,
   markCalendarPickPending,
+  peekEditFlowRestoreSnapshot,
   saveReservationDraft,
   type ReservationWizardConfirmed,
 } from "@/lib/reservation-draft-storage";
@@ -177,21 +175,32 @@ export function ReservationEditFlow({
       });
   }, [userAreaScopeIds, isAdmin]);
 
-  React.useEffect(() => {
-    const picked = consumePickedReservationDate();
-    const calendarPickPending = consumeCalendarPickPending();
+  const [restoreSnapshot] = React.useState(() =>
+    peekEditFlowRestoreSnapshot(reservation.id),
+  );
 
-    if (!calendarPickPending && !picked) {
+  React.useEffect(() => {
+    const snapshot = restoreSnapshot;
+    if (!snapshot) {
       clearAllReservationDraftState();
       return;
     }
 
-    const draft = loadReservationDraft();
-    if (
-      !draft ||
-      draft.kind !== "edit" ||
-      draft.editReservationId !== reservation.id
-    ) {
+    const picked = snapshot.pickedDate;
+    const draft = snapshot.draft;
+
+    if (!draft) {
+      if (picked) {
+        setRestoredSelection((current) =>
+          current ? { ...current, date: picked } : { date: picked },
+        );
+        setCalendarDateChangeConfirm({
+          anchorDate: initialDate,
+          newDate: picked,
+        });
+        setMapSelectorKey((value) => value + 1);
+      }
+      finalizeReservationDraftRestore();
       return;
     }
 
@@ -214,35 +223,44 @@ export function ReservationEditFlow({
       picked ??
       initialDate;
 
-    if (draft.selection) {
-      const resolvedDate = picked ?? draft.selection.date;
-      setSelection({ ...draft.selection, date: resolvedDate });
-      setRestoredSelection({
-        date: resolvedDate,
-        startTime: draft.selection.startTime,
-        endTime: draft.selection.endTime,
-        mapId: draft.selection.mapId,
-        selectedSpaceIds: draft.selection.selectedSpaceIds,
-        selectedResources: Object.fromEntries(
-          draft.selection.selectedResources.map((item) => [
-            item.resourceId,
-            item.quantity,
-          ]),
-        ),
-      });
-    } else if (picked) {
-      setRestoredSelection((current) =>
-        current ? { ...current, date: picked } : { date: picked },
-      );
-    }
+    const resolvedDate = picked ?? draft.selection?.date ?? anchorDate;
+    const startTime =
+      draft.selection?.startTime ??
+      draft.wizardDraftStart ??
+      initialStartTime;
+    const endTime =
+      draft.selection?.endTime ?? draft.wizardDraftEnd ?? initialEndTime;
+    const mapId = draft.selection?.mapId ?? defaultMapId;
+    const selectedSpaceIds =
+      draft.selection?.selectedSpaceIds ?? reservation.spaceIds;
+    const selectedResources = draft.selection?.selectedResources ?? [];
+
+    setSelection({
+      date: resolvedDate,
+      startTime,
+      endTime,
+      mapId,
+      selectedSpaceIds,
+      selectedResources,
+    });
+    setRestoredSelection({
+      date: resolvedDate,
+      startTime,
+      endTime,
+      mapId,
+      selectedSpaceIds,
+      selectedResources: Object.fromEntries(
+        selectedResources.map((item) => [item.resourceId, item.quantity]),
+      ),
+    });
 
     if (picked) {
       setCalendarDateChangeConfirm({ anchorDate, newDate: picked });
     }
 
-    clearReservationDraft();
+    finalizeReservationDraftRestore();
     setMapSelectorKey((value) => value + 1);
-  }, [initialDate, reservation.id]);
+  }, [restoreSnapshot, initialDate, reservation.id, reservation.spaceIds, defaultMapId, initialStartTime, initialEndTime]);
 
   const handleSelectionChange = React.useCallback(
     (value: MapDateSelection) => {
@@ -362,7 +380,18 @@ export function ReservationEditFlow({
 
   function handleReservationDatePick(ctx: {
     wizardConfirmed: ReservationWizardConfirmed;
+    wizardDraftStart?: string;
+    wizardDraftEnd?: string;
   }) {
+    const baseSelection = selection ?? {
+      date: activeSelection.date,
+      startTime: ctx.wizardDraftStart ?? activeSelection.startTime,
+      endTime: ctx.wizardDraftEnd ?? activeSelection.endTime,
+      mapId: activeSelection.mapId,
+      selectedSpaceIds: activeSelection.selectedSpaceIds,
+      selectedResources: activeSelection.selectedResources,
+    };
+
     saveReservationDraft({
       kind: "edit",
       editReservationId: reservation.id,
@@ -378,15 +407,10 @@ export function ReservationEditFlow({
       sendEventReminder,
       areaId,
       reservationAreaId,
-      selection: selection ?? {
-        date: activeSelection.date,
-        startTime: activeSelection.startTime,
-        endTime: activeSelection.endTime,
-        mapId: activeSelection.mapId,
-        selectedSpaceIds: activeSelection.selectedSpaceIds,
-        selectedResources: activeSelection.selectedResources,
-      },
+      selection: baseSelection,
       wizardConfirmed: ctx.wizardConfirmed,
+      wizardDraftStart: ctx.wizardDraftStart,
+      wizardDraftEnd: ctx.wizardDraftEnd,
       calendarAnchorDate: activeSelection.date,
     });
     markCalendarPickPending();
