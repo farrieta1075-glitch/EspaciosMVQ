@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { ChevronDown, ChevronUp, Loader2 } from "lucide-react";
 import type { Area } from "@/types/area";
 import type { FloorMap, Space } from "@/types/space";
@@ -133,7 +134,8 @@ interface ReservationCreateWizardProps {
   initialWizardConfirmed?: ReservationWizardConfirmed | null;
   eventPresetGroups: EventPresetGroup[];
   presetsByAreaId: Record<string, AreaEventPreset[]>;
-  onEventDetailsConfirmed?: (eventName: string) => void;
+  eventDetailsHeaderEl?: HTMLElement | null;
+  onEventDetailsDoneChange?: (done: boolean) => void;
   calendarDateChangeConfirm?: { anchorDate: string; newDate: string } | null;
   onCalendarDateChangeConfirm?: (options: {
     newDate: string;
@@ -216,7 +218,8 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
     onAreaIdChange,
     reservationAreaId,
     onReservationAreaIdChange,
-    onEventDetailsConfirmed,
+    eventDetailsHeaderEl,
+    onEventDetailsDoneChange,
     calendarDateChangeConfirm,
     onCalendarDateChangeConfirm,
     onCalendarDateChangeCancel,
@@ -383,10 +386,8 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
   }
 
   React.useEffect(() => {
-    if (eventDetailsDone && eventName.trim()) {
-      onEventDetailsConfirmed?.(eventName.trim());
-    }
-  }, [eventDetailsDone, eventName, onEventDetailsConfirmed]);
+    onEventDetailsDoneChange?.(eventDetailsDone);
+  }, [eventDetailsDone, onEventDetailsDoneChange]);
 
   const activeAreaRecord =
     areas.find((a) => a.id === activeAreaId) ??
@@ -424,7 +425,11 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
   }
 
   function requestAreaChange(id: string) {
-    if (!id || id === activeAreaId) return;
+    if (!id) return;
+    if (id === activeAreaId) {
+      applyAreaChange(id);
+      return;
+    }
 
     const targetPresets = presetsForAreaId(id);
 
@@ -855,8 +860,65 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
   const showAreaEditor =
     showAreaPicker && (!confirmed.area || editingSection === "area");
 
+  const eventDetailsHeaderPanel =
+    eventDetailsDone && areaResolved ? (
+      <div className="rounded-lg border border-border px-2 py-0.5">
+        <button
+          type="button"
+          className="flex w-full items-center justify-between rounded-md py-1.5 text-left text-xl font-semibold tracking-tight hover:bg-muted/60 sm:text-2xl"
+          onClick={() => setEventDetailsExpanded((v) => !v)}
+        >
+          Datos del evento
+          {eventDetailsExpanded ? (
+            <ChevronUp className="h-5 w-5 shrink-0" />
+          ) : (
+            <ChevronDown className="h-5 w-5 shrink-0" />
+          )}
+        </button>
+        {eventDetailsExpanded && (
+          <div className="space-y-2 border-t border-border pb-2 pt-3">
+            <div className="space-y-1">
+              <Label htmlFor="wiz-eventName-exp">Nombre del evento</Label>
+              {renderEventNameField("wiz-eventName-exp")}
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="wiz-eventDesc-exp">Descripción</Label>
+              <textarea
+                id="wiz-eventDesc-exp"
+                className="flex min-h-[56px] w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+                value={eventDescription}
+                onChange={(e) => {
+                  setAppliedPresetName(null);
+                  onEventDescriptionChange(e.target.value);
+                }}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="wiz-attendees-exp">Asistentes estimados</Label>
+              <Input
+                id="wiz-attendees-exp"
+                type="number"
+                min={1}
+                className="h-9"
+                value={estimatedAttendees}
+                onChange={(e) => {
+                  setAppliedPresetName(null);
+                  onEstimatedAttendeesChange(e.target.value);
+                }}
+              />
+            </div>
+            {renderEventReminderField()}
+          </div>
+        )}
+      </div>
+    ) : null;
+
   return (
-    <div className="flex flex-col gap-3 pb-2">
+    <>
+      {eventDetailsHeaderEl &&
+        eventDetailsHeaderPanel &&
+        createPortal(eventDetailsHeaderPanel, eventDetailsHeaderEl)}
+      <div className="flex flex-col gap-3 pb-2">
       <Dialog open={areaChangeDialogOpen} onOpenChange={setAreaChangeDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -1164,64 +1226,6 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
         </section>
       )}
 
-      {areaResolved && eventDetailsDone && (
-        <section className="rounded-lg border border-border px-2 py-0.5">
-          <button
-            type="button"
-            className="flex w-full items-center justify-between rounded-md py-1 text-left text-sm font-medium hover:bg-muted/60"
-            onClick={() => setEventDetailsExpanded((v) => !v)}
-          >
-            Datos del evento
-            {eventDetailsExpanded ? (
-              <ChevronUp className="h-3.5 w-3.5 shrink-0" />
-            ) : (
-              <ChevronDown className="h-3.5 w-3.5 shrink-0" />
-            )}
-          </button>
-          {eventDetailsExpanded && (
-            <div className="space-y-2 border-t border-border pb-1 pt-2">
-              <div className="space-y-1">
-                <Label htmlFor="wiz-eventName-exp" className="text-xs">
-                  Nombre del evento
-                </Label>
-                {renderEventNameField("wiz-eventName-exp")}
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="wiz-eventDesc-exp" className="text-xs">
-                  Descripción
-                </Label>
-                <textarea
-                  id="wiz-eventDesc-exp"
-                  className="flex min-h-[56px] w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm"
-                  value={eventDescription}
-                  onChange={(e) => {
-                  setAppliedPresetName(null);
-                  onEventDescriptionChange(e.target.value);
-                }}
-                />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="wiz-attendees-exp" className="text-xs">
-                  Asistentes estimados
-                </Label>
-                <Input
-                  id="wiz-attendees-exp"
-                  type="number"
-                  min={1}
-                  className="h-9"
-                  value={estimatedAttendees}
-                  onChange={(e) => {
-                    setAppliedPresetName(null);
-                    onEstimatedAttendeesChange(e.target.value);
-                  }}
-                />
-              </div>
-              {renderEventReminderField()}
-            </div>
-          )}
-        </section>
-      )}
-
       {eventDetailsDone && !confirmed.date && (
         <section className="space-y-3">
           <div className="space-y-2">
@@ -1509,6 +1513,7 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
           </Button>
         </>
       )}
-    </div>
+      </div>
+    </>
   );
 }

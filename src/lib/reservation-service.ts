@@ -146,6 +146,9 @@ async function validateAvailability(
       const resource = allResources.find((r) => r.id === item.resourceId);
       if (!resource) continue;
       const used = reservedQty.get(item.resourceId) ?? 0;
+      if (resource.totalQty === 0 && resource.scalesWithAttendees) {
+        continue;
+      }
       if (used + item.quantity > resource.totalQty) {
         return `No hay suficiente stock de "${resource.name}" para ${start.toLocaleDateString("es-MX")}.`;
       }

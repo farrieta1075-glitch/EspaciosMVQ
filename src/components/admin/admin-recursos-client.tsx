@@ -237,7 +237,7 @@ export function AdminRecursosClient({
               <div>
                 <h3 className="font-medium">{resource.name}</h3>
                 <p className="text-sm text-muted-foreground">
-                  Cantidad disponible: {resource.totalQty}
+                  Cantidad total: {resource.totalQty}
                 </p>
               </div>
               <div className="flex shrink-0 gap-1">

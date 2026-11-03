@@ -95,7 +95,9 @@ export function ReservationFlow({
   const [presetsByAreaId, setPresetsByAreaId] = React.useState<
     Record<string, import("@/types/area-event-preset").AreaEventPreset[]>
   >({});
-  const [pageTitle, setPageTitle] = React.useState("Nueva reserva");
+  const [eventDetailsHeaderEl, setEventDetailsHeaderEl] =
+    React.useState<HTMLElement | null>(null);
+  const [eventDetailsDone, setEventDetailsDone] = React.useState(false);
   const [presetSourceAreaId, setPresetSourceAreaId] = React.useState("");
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -421,10 +423,12 @@ export function ReservationFlow({
 
   return (
     <div className="flex flex-col gap-2 pb-2">
-      <header>
-        <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
-          {pageTitle}
-        </h1>
+      <header ref={setEventDetailsHeaderEl} className="min-h-[2.5rem]">
+        {!eventDetailsDone && (
+          <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
+            Nueva reserva
+          </h1>
+        )}
       </header>
       <ReservationCreateWizard
         maps={maps}
@@ -470,9 +474,8 @@ export function ReservationFlow({
         onAreaIdChange={setAreaId}
         reservationAreaId={reservationAreaId}
         onReservationAreaIdChange={setReservationAreaId}
-        onEventDetailsConfirmed={(name) =>
-          setPageTitle(`Nueva Reserva (${name.trim()})`)
-        }
+        eventDetailsHeaderEl={eventDetailsHeaderEl}
+        onEventDetailsDoneChange={setEventDetailsDone}
         calendarDateChangeConfirm={calendarDateChangeConfirm}
         onCalendarDateChangeConfirm={handleCalendarDateChangeConfirm}
         onCalendarDateChangeCancel={handleCalendarDateChangeCancel}

@@ -101,7 +101,11 @@ export async function getAvailability(
     })
     .map((resource) => {
       const reserved = reservedQtyByResource.get(resource.id) ?? 0;
-      const availableQty = Math.max(resource.totalQty - reserved, 0);
+      const scalesByAttendeesOnly =
+        resource.totalQty === 0 && resource.scalesWithAttendees;
+      const availableQty = scalesByAttendeesOnly
+        ? Number.MAX_SAFE_INTEGER
+        : Math.max(resource.totalQty - reserved, 0);
       return {
         id: resource.id,
         name: resource.name,

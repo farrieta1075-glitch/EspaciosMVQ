@@ -28,23 +28,55 @@ import { cn } from "@/lib/utils";
 
 type ResourceFilter = "ALL" | ResourceType;
 
+function resourceQuantityMax(
+  resource: ResourceAvailability,
+  selectedQty: number,
+  estimatedAttendees: number,
+  modePeople: boolean,
+): number {
+  const scales = Boolean(resource.scalesWithAttendees);
+  if (scales && resource.totalQty === 0) {
+    return Math.max(estimatedAttendees, selectedQty, 1);
+  }
+  const stockMax = Math.max(resource.availableQty, selectedQty);
+  if (scales && modePeople && estimatedAttendees > 0) {
+    return Math.max(Math.min(stockMax, estimatedAttendees), selectedQty);
+  }
+  return stockMax;
+}
+
 function ResourceQuantityControls({
   resource,
   selectedQty,
-  maxQty,
   readOnly,
   estimatedAttendees,
   onQuantityChange,
 }: {
   resource: ResourceAvailability;
   selectedQty: number;
-  maxQty: number;
   readOnly: boolean;
   estimatedAttendees: number;
   onQuantityChange: (resourceId: string, quantity: number) => void;
 }) {
   const scales = Boolean(resource.scalesWithAttendees);
-  const [modePeople, setModePeople] = React.useState(scales);
+  const attendeesOnly = scales && resource.totalQty === 0;
+  const unitsOnly = !scales;
+  const bothModes = scales && resource.totalQty > 0;
+  const [modePeople, setModePeople] = React.useState(
+    attendeesOnly || scales,
+  );
+
+  React.useEffect(() => {
+    if (attendeesOnly) setModePeople(true);
+    if (unitsOnly) setModePeople(false);
+  }, [attendeesOnly, unitsOnly]);
+
+  const maxQty = resourceQuantityMax(
+    resource,
+    selectedQty,
+    estimatedAttendees,
+    modePeople,
+  );
 
   if (readOnly) {
     return <span className="text-sm">{selectedQty}</span>;
@@ -57,9 +89,12 @@ function ResourceQuantityControls({
     );
   }
 
+  const showPeopleMode = attendeesOnly || bothModes;
+  const showUnitsMode = unitsOnly || bothModes;
+
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      {scales && (
+      {showPeopleMode && (
         <Button
           type="button"
           size="icon"
@@ -74,16 +109,18 @@ function ResourceQuantityControls({
           <Users className="h-4 w-4" />
         </Button>
       )}
-      <Button
-        type="button"
-        size="icon"
-        variant={!scales || !modePeople ? "default" : "outline"}
-        className="h-8 w-8"
-        title="Contar unidades"
-        onClick={() => setModePeople(false)}
-      >
-        <Package className="h-4 w-4" />
-      </Button>
+      {showUnitsMode && (
+        <Button
+          type="button"
+          size="icon"
+          variant={!modePeople ? "default" : "outline"}
+          className="h-8 w-8"
+          title="Contar unidades"
+          onClick={() => setModePeople(false)}
+        >
+          <Package className="h-4 w-4" />
+        </Button>
+      )}
       <Button
         type="button"
         size="icon"
@@ -216,17 +253,24 @@ export function ResourcePanel({
                         resource.type}
                     </Badge>
                     <Badge variant="outline" className="text-[10px]">
-                      Disp. {resource.availableQty}/{resource.totalQty}
+                      Cantidad total: {resource.totalQty}
                     </Badge>
+                    {resource.totalQty > 0 && (
+                      <Badge variant="outline" className="text-[10px]">
+                        Disp. {resource.availableQty}
+                      </Badge>
+                    )}
+                    {resource.totalQty === 0 &&
+                      resource.scalesWithAttendees && (
+                        <Badge variant="outline" className="text-[10px]">
+                          Por asistentes
+                        </Badge>
+                      )}
                   </div>
                 </div>
                 <ResourceQuantityControls
                   resource={resource}
                   selectedQty={selectedResources[resource.id] ?? 0}
-                  maxQty={Math.max(
-                    resource.availableQty,
-                    selectedResources[resource.id] ?? 0,
-                  )}
                   readOnly={readOnly}
                   estimatedAttendees={estimatedAttendees}
                   onQuantityChange={onQuantityChange}
