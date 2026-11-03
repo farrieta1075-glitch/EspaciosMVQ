@@ -239,11 +239,12 @@ export function PushDeviceActions({
             <Button
               type="button"
               size="sm"
-              className="touch-manipulation"
+              variant="ghost"
+              className="touch-manipulation text-muted-foreground"
               disabled={busy || currentDeviceRegistered !== true}
               onClick={() => void sendTest()}
             >
-              Enviar prueba
+              Probar aviso
             </Button>
           </>
         ) : null}

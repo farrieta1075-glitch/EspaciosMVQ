@@ -28,7 +28,6 @@ async function notifyAdminsInAppAndPush(
   const message = `Solicitud pendiente: «${reservation.eventName}» en ${areaName}${occLabel}.`;
 
   for (const admin of admins) {
-    if (!admin.receiveApprovalEmails) continue;
     await createNotification({
       userId: admin.id,
       areaId: reservation.areaId,

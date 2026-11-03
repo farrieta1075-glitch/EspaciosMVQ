@@ -24,11 +24,7 @@ import {
   type ReservationWizardConfirmed,
 } from "@/lib/reservation-draft-storage";
 import { releaseRadixBodyScrollLockIfIdle } from "@/lib/radix-body-lock";
-import {
-  readJsonResponse,
-  shouldRetryMutationRequest,
-  sleep,
-} from "@/lib/read-json-response";
+import { readJsonResponse } from "@/lib/read-json-response";
 import { ReservationCreateWizard } from "@/components/reservation/reservation-create-wizard";
 import { Button } from "@/components/ui/button";
 import {
@@ -146,6 +142,7 @@ export function ReservationEditFlow({
     similarity: number;
   } | null>(null);
   const [successOpen, setSuccessOpen] = React.useState(false);
+  const submitInFlightRef = React.useRef(false);
   const [successPending, setSuccessPending] = React.useState(false);
   const [mapSelectorKey, setMapSelectorKey] = React.useState(0);
   const [restoredSelection, setRestoredSelection] = React.useState<
@@ -299,8 +296,9 @@ export function ReservationEditFlow({
     (isAdmin ? Boolean(areaId) : true);
 
   async function submitUpdate(confirmSimilarName = false) {
-    if (!canSubmit) return;
+    if (!canSubmit || submitInFlightRef.current) return;
 
+    submitInFlightRef.current = true;
     setLoading(true);
     setError(null);
 
@@ -325,31 +323,17 @@ export function ReservationEditFlow({
     };
 
     try {
-      let response!: Response;
-      let data!: {
+      const response = await fetch(`/api/reservas/${reservation.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await readJsonResponse<{
         error?: string;
         similarName?: string;
         similarity?: number;
         pending?: boolean;
-      };
-
-      for (let attempt = 0; attempt < 2; attempt++) {
-        try {
-          response = await fetch(`/api/reservas/${reservation.id}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          });
-          data = await readJsonResponse(response);
-          break;
-        } catch (err) {
-          if (attempt === 0 && shouldRetryMutationRequest(response, err)) {
-            await sleep(2000);
-            continue;
-          }
-          throw err;
-        }
-      }
+      }>(response);
 
       if (response.status === 409 && data.error === "similar_name") {
         setSimilarPrompt({
@@ -370,6 +354,7 @@ export function ReservationEditFlow({
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al guardar");
     } finally {
+      submitInFlightRef.current = false;
       setLoading(false);
     }
   }

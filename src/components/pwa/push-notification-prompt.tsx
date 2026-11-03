@@ -38,12 +38,8 @@ export function PushNotificationPrompt() {
   const standalone = isStandaloneDisplayMode();
   const pushReady = canUseWebPush();
 
-  if (permission === "granted" && session.user?.id) {
-    return (
-      <div className="mb-4">
-        <PushDeviceActions userId={session.user.id} />
-      </div>
-    );
+  if (permission === "granted") {
+    return null;
   }
 
   function dismiss() {

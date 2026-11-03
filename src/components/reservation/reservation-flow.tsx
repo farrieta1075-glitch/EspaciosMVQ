@@ -24,11 +24,7 @@ import {
 } from "@/lib/radix-body-lock";
 import { applyRecurrenceToNewStartDate } from "@/lib/calendar-date-change-preview";
 import { addMinutesToTimeHHmm, formatDateISO } from "@/lib/date-utils";
-import {
-  readJsonResponse,
-  shouldRetryMutationRequest,
-  sleep,
-} from "@/lib/read-json-response";
+import { readJsonResponse } from "@/lib/read-json-response";
 import { ReservationCreateWizard } from "@/components/reservation/reservation-create-wizard";
 import { Button } from "@/components/ui/button";
 import {
@@ -122,6 +118,7 @@ export function ReservationFlow({
   const [calendarDateChangeConfirm, setCalendarDateChangeConfirm] =
     React.useState<{ anchorDate: string; newDate: string } | null>(null);
   const [wizardResetKey, setWizardResetKey] = React.useState(0);
+  const submitInFlightRef = React.useRef(false);
 
   React.useEffect(() => {
     const scopeQuery = userAreaScopeIds.join(",");
@@ -283,8 +280,9 @@ export function ReservationFlow({
         ));
 
   async function submitReservation(confirmSimilarName = false) {
-    if (!selection || !canSubmit) return;
+    if (!selection || !canSubmit || submitInFlightRef.current) return;
 
+    submitInFlightRef.current = true;
     setLoading(true);
     setError(null);
 
@@ -321,33 +319,19 @@ export function ReservationFlow({
     };
 
     try {
-      let response!: Response;
-      let data!: {
+      const response = await fetch("/api/reservas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await readJsonResponse<{
         error?: string;
         similarName?: string;
         similarity?: number;
         pending?: boolean;
         count?: number;
         ids?: string[];
-      };
-
-      for (let attempt = 0; attempt < 2; attempt++) {
-        try {
-          response = await fetch("/api/reservas", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          });
-          data = await readJsonResponse(response);
-          break;
-        } catch (err) {
-          if (attempt === 0 && shouldRetryMutationRequest(response, err)) {
-            await sleep(2000);
-            continue;
-          }
-          throw err;
-        }
-      }
+      }>(response);
 
       if (response.status === 409 && data.error === "similar_name") {
         setSimilarPrompt({
@@ -379,6 +363,7 @@ export function ReservationFlow({
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al reservar");
     } finally {
+      submitInFlightRef.current = false;
       setLoading(false);
     }
   }

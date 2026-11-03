@@ -84,16 +84,30 @@ function parseNotificationRow(row: Record<string, string>): AppNotification | nu
   };
 }
 
+function pushTargetForNotificationType(type: NotificationType): {
+  url: string;
+  title: string;
+} {
+  if (type === "APPROVAL_NEEDED") {
+    return {
+      url: "/admin/aprobaciones",
+      title: "Autorización pendiente",
+    };
+  }
+  return { url: "/reservas", title: "MVQro Espacios" };
+}
+
 async function dispatchWebPush(
   userId: string,
   message: string,
   tag: string,
-  url = "/reservas",
+  type: NotificationType,
 ): Promise<void> {
+  const { url, title } = pushTargetForNotificationType(type);
   try {
     const { sendWebPushToUser } = await import("@/lib/push/send-web-push");
     const result = await sendWebPushToUser(userId, {
-      title: "MVQro Espacios",
+      title,
       body: message,
       url,
       tag,
@@ -173,12 +187,12 @@ export async function createNotification(input: {
       message: notification.message,
       createdAt: notification.createdAt,
     });
-    await dispatchWebPush(input.userId, input.message, saved.id);
+    await dispatchWebPush(input.userId, input.message, saved.id, input.type);
     return saved;
   }
 
   await appendSheetRow(SHEET_TABS.NOTIFICACIONES, notificationToRow(notification));
-  await dispatchWebPush(input.userId, input.message, notification.id);
+  await dispatchWebPush(input.userId, input.message, notification.id, input.type);
   return notification;
 }
 

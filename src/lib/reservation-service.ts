@@ -241,6 +241,19 @@ export async function createReservation(
     );
   }
 
+  const { findExistingReservationBatchDuplicate } = await import(
+    "@/lib/reservation-dedupe"
+  );
+  const duplicateBatch = await findExistingReservationBatchDuplicate({
+    userId: input.userId,
+    eventName,
+    spaceIds: input.spaceIds,
+    occurrences,
+  });
+  if (duplicateBatch) {
+    return duplicateBatch;
+  }
+
   const availabilityError = await validateAvailability(
     input.spaceIds,
     input.resources,
