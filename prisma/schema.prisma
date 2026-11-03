@@ -162,3 +162,19 @@ model PushSubscription {
   @@index([deviceId])
   @@map("PushSubscriptions")
 }
+
+model UserActivityLog {
+  id        String   @id @db.NVarChar(64)
+  userId    String   @db.NVarChar(64)
+  userLabel String   @default("") @db.NVarChar(256)
+  areaId    String   @default("") @db.NVarChar(64)
+  action    String   @db.NVarChar(64)
+  summary   String   @default("") @db.NVarChar(512)
+  path      String   @default("") @db.NVarChar(512)
+  meta      String   @default("") @db.NVarChar(Max)
+  createdAt DateTime
+
+  @@index([userId, createdAt])
+  @@index([createdAt])
+  @@map("UserActivityLogs")
+}

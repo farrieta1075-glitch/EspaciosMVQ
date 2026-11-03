@@ -13,7 +13,7 @@
       }
       body {
         margin: 0;
-        font-family: "Segoe UI", system-ui, sans-serif;
+        font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
         color: #2c241c;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
@@ -21,227 +21,488 @@
       .page {
         width: 210mm;
         height: 297mm;
-        padding: 10mm 12mm 8mm;
+        padding: 0;
         page-break-after: always;
         display: flex;
         flex-direction: column;
-        background: #faf8f5;
+        background: linear-gradient(180deg, #f5f0ea 0%, #faf8f5 12%, #faf8f5 100%);
         overflow: hidden;
       }
       .page:last-child {
         page-break-after: auto;
       }
-      header {
+      .top-bar {
+        background: linear-gradient(135deg, #6b5a4d 0%, #4a3f36 100%);
+        color: #faf8f5;
+        padding: 7mm 14mm 6mm;
         display: flex;
-        align-items: center;
+        align-items: flex-end;
         justify-content: space-between;
-        gap: 6mm;
-        margin-bottom: 5mm;
-        padding-bottom: 4mm;
-        border-bottom: 3px solid #6b5a4d;
+        gap: 8mm;
+        flex-shrink: 0;
       }
-      header h1 {
-        margin: 0;
-        font-size: 20pt;
+      .top-bar .brand {
+        font-size: 22pt;
         font-weight: 800;
-        color: #6b5a4d;
-        line-height: 1.1;
+        letter-spacing: -0.02em;
+        line-height: 1.05;
+        margin: 0;
       }
-      header .platform {
+      .top-bar .brand span {
+        display: block;
+        font-size: 10pt;
+        font-weight: 600;
+        opacity: 0.88;
+        margin-top: 1.5mm;
+        letter-spacing: 0.02em;
+      }
+      .top-bar .platform-badge {
         text-align: right;
-        font-size: 11pt;
-        font-weight: 700;
-        color: #4a3f36;
-        line-height: 1.35;
+        background: rgba(255, 255, 255, 0.12);
+        border: 1px solid rgba(255, 255, 255, 0.28);
+        border-radius: 10px;
+        padding: 3mm 5mm;
+        min-width: 38mm;
+      }
+      .top-bar .platform-badge .os {
+        font-size: 13pt;
+        font-weight: 800;
+        margin: 0;
+      }
+      .top-bar .platform-badge .browser {
+        font-size: 9.5pt;
+        font-weight: 600;
+        opacity: 0.9;
+        margin: 1mm 0 0;
+      }
+      .intro {
+        padding: 4mm 14mm 3mm;
+        font-size: 9pt;
+        color: #5c4f44;
+        line-height: 1.4;
+        flex-shrink: 0;
       }
       .steps {
         flex: 1;
         display: grid;
         grid-template-columns: repeat(5, 1fr);
-        gap: 3mm;
-        align-items: stretch;
+        gap: 3.5mm;
+        padding: 0 10mm;
         min-height: 0;
+        align-items: stretch;
       }
       .step {
         display: flex;
         flex-direction: column;
-        align-items: center;
         background: #fff;
-        border-radius: 10px;
-        border: 1px solid #e0d6cb;
-        padding: 2.5mm 2mm 2mm;
-        box-shadow: 0 2px 8px rgba(44, 36, 28, 0.06);
+        border-radius: 12px;
+        border: 1px solid #e4dacf;
+        box-shadow: 0 4px 14px rgba(44, 36, 28, 0.07);
+        overflow: hidden;
+        min-height: 0;
+      }
+      .step-head {
+        display: flex;
+        align-items: center;
+        gap: 2mm;
+        padding: 2.5mm 3mm;
+        background: #f0ebe4;
+        border-bottom: 1px solid #e4dacf;
+        flex-shrink: 0;
       }
       .step-num {
-        width: 9mm;
-        height: 9mm;
+        width: 8mm;
+        height: 8mm;
         border-radius: 50%;
         background: #6b5a4d;
-        color: #faf8f5;
-        font-size: 13pt;
+        color: #fff;
+        font-size: 11pt;
         font-weight: 800;
         display: flex;
         align-items: center;
         justify-content: center;
         flex-shrink: 0;
-        margin-bottom: 1.5mm;
       }
-      .step svg {
-        width: 100%;
-        height: auto;
-        max-height: 58mm;
+      .step-head .step-title-short {
+        font-size: 7.5pt;
+        font-weight: 700;
+        color: #4a3f36;
+        line-height: 1.2;
+        margin: 0;
+      }
+      .phone-wrap {
         flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 3mm 2mm 2mm;
+        background: linear-gradient(180deg, #faf8f5 0%, #fff 100%);
+        min-height: 0;
       }
-      footer {
-        margin-top: 4mm;
-        font-size: 8.5pt;
-        color: #7a6b5c;
+      .phone-wrap svg {
+        height: 100%;
+        width: auto;
+        max-width: 100%;
+        filter: drop-shadow(0 6px 16px rgba(28, 28, 30, 0.22));
+      }
+      .step-caption {
+        padding: 3mm 3mm 3.5mm;
         text-align: center;
-        line-height: 1.35;
+        border-top: 1px solid #efe8df;
+        flex-shrink: 0;
+        background: #fff;
       }
-      footer strong {
+      .step-caption h3 {
+        margin: 0 0 1.5mm;
+        font-size: 8.5pt;
+        font-weight: 800;
         color: #6b5a4d;
+        line-height: 1.25;
+      }
+      .step-caption p {
+        margin: 0;
+        font-size: 7pt;
+        line-height: 1.38;
+        color: #555;
+      }
+      .bottom-tip {
+        flex-shrink: 0;
+        margin: 4mm 10mm 8mm;
+        padding: 3.5mm 5mm;
+        background: #6b5a4d;
+        color: #faf8f5;
+        border-radius: 10px;
+        font-size: 8pt;
+        line-height: 1.45;
+        display: flex;
+        align-items: flex-start;
+        gap: 3mm;
+      }
+      .bottom-tip strong {
+        font-weight: 800;
+      }
+      .bottom-tip .icon {
+        width: 7mm;
+        height: 7mm;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.2);
+        font-size: 9pt;
+        font-weight: 800;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
       }
     </style>
   </head>
   <body>
-    <!-- Hoja 1: iOS -->
+    <!-- ========== iOS ========== -->
     <section class="page">
-      <header>
-        <h1>Instalar MVQro Espacios</h1>
-        <div class="platform">
-          iPhone · iOS<br />
-          <span style="font-weight: 600; font-size: 9.5pt">Safari</span>
+      <div class="top-bar">
+        <h1 class="brand">
+          MVQro Espacios
+          <span>Guía de instalación en celular</span>
+        </h1>
+        <div class="platform-badge">
+          <p class="os">iPhone · iOS</p>
+          <p class="browser">Navegador: Safari</p>
         </div>
-      </header>
+      </div>
+      <p class="intro">
+        Sigue los 5 pasos en orden. En iPhone la instalación solo funciona con
+        <strong>Safari</strong> (no con Chrome ni otros navegadores).
+      </p>
+
       <div class="steps">
+        <!-- Paso 1 iOS -->
         <article class="step">
-          <div class="step-num">1</div>
-          <svg viewBox="0 0 120 200" xmlns="http://www.w3.org/2000/svg">
-            <rect x="4" y="4" width="112" height="192" rx="14" fill="#1c1c1e" />
-            <rect x="10" y="18" width="100" height="170" rx="10" fill="#fff" />
-            <rect x="18" y="28" width="84" height="14" rx="4" fill="#e8e8ed" />
-            <text x="60" y="38" text-anchor="middle" font-size="6" fill="#666" font-family="Segoe UI,sans-serif">MVQro Espacios</text>
-            <text x="60" y="95" text-anchor="middle" font-size="9" fill="#6b5a4d" font-weight="700" font-family="Segoe UI,sans-serif">Abre Safari</text>
-            <text x="60" y="108" text-anchor="middle" font-size="6.5" fill="#444" font-family="Segoe UI,sans-serif">y entra al enlace</text>
-          </svg>
+          <div class="step-head">
+            <div class="step-num">1</div>
+            <p class="step-title-short">Abrir enlace</p>
+          </div>
+          <div class="phone-wrap">
+            <svg viewBox="0 0 160 280" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <rect x="6" y="6" width="148" height="268" rx="22" fill="#1c1c1e" />
+              <rect x="14" y="28" width="132" height="238" rx="16" fill="#fff" />
+              <rect x="58" y="14" width="44" height="5" rx="2.5" fill="#3a3a3c" />
+              <rect x="22" y="40" width="116" height="22" rx="6" fill="#f2f2f7" />
+              <rect x="28" y="46" width="8" height="8" rx="2" fill="#007aff" opacity="0.3" />
+              <rect x="40" y="48" width="72" height="6" rx="2" fill="#c7c7cc" />
+              <rect x="22" y="68" width="116" height="168" rx="8" fill="#faf8f5" />
+              <rect x="32" y="88" width="96" height="8" rx="2" fill="#6b5a4d" opacity="0.25" />
+              <rect x="32" y="102" width="72" height="6" rx="2" fill="#d4c9bc" />
+              <rect x="32" y="114" width="80" height="6" rx="2" fill="#e8dfd4" />
+              <rect x="22" y="244" width="116" height="14" rx="4" fill="#f2f2f7" />
+              <circle cx="38" cy="251" r="3" fill="#007aff" />
+              <rect x="48" y="248" width="40" height="6" rx="2" fill="#d1d1d6" />
+            </svg>
+          </div>
+          <div class="step-caption">
+            <h3>Abre el enlace en Safari</h3>
+            <p>Entra a la dirección web de MVQro Espacios que te compartió tu administrador. Espera a que cargue el inicio de sesión.</p>
+          </div>
         </article>
+
+        <!-- Paso 2 iOS -->
         <article class="step">
-          <div class="step-num">2</div>
-          <svg viewBox="0 0 120 200" xmlns="http://www.w3.org/2000/svg">
-            <rect x="4" y="4" width="112" height="192" rx="14" fill="#1c1c1e" />
-            <rect x="10" y="18" width="100" height="170" rx="10" fill="#fff" />
-            <rect x="18" y="150" width="84" height="28" rx="8" fill="#f2f2f7" />
-            <rect x="72" y="156" width="22" height="16" rx="4" fill="#007aff" stroke="#ff3b30" stroke-width="2" />
-            <text x="60" y="88" text-anchor="middle" font-size="8" fill="#007aff" font-weight="700" font-family="Segoe UI,sans-serif">Compartir</text>
-            <text x="60" y="102" text-anchor="middle" font-size="6" fill="#666" font-family="Segoe UI,sans-serif">↑ abajo en Safari</text>
-          </svg>
+          <div class="step-head">
+            <div class="step-num">2</div>
+            <p class="step-title-short">Compartir</p>
+          </div>
+          <div class="phone-wrap">
+            <svg viewBox="0 0 160 280" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <rect x="6" y="6" width="148" height="268" rx="22" fill="#1c1c1e" />
+              <rect x="14" y="28" width="132" height="238" rx="16" fill="#fff" />
+              <rect x="22" y="40" width="116" height="180" rx="8" fill="#faf8f5" />
+              <rect x="22" y="228" width="116" height="36" rx="10" fill="#f2f2f7" stroke="#d1d1d6" />
+              <rect x="34" y="236" width="28" height="20" rx="4" fill="#e5e5ea" />
+              <rect x="68" y="236" width="28" height="20" rx="4" fill="#e5e5ea" />
+              <rect x="102" y="234" width="28" height="24" rx="6" fill="#007aff" stroke="#ff453a" stroke-width="2.5" />
+              <path d="M108 242 h16 M116 234 v16" stroke="#fff" stroke-width="2" stroke-linecap="round" />
+              <polygon points="98,228 118,218 118,238" fill="#ff453a" />
+            </svg>
+          </div>
+          <div class="step-caption">
+            <h3>Toca el botón Compartir</h3>
+            <p>En la barra inferior de Safari, pulsa el icono <strong>Compartir</strong> (cuadrado con flecha hacia arriba).</p>
+          </div>
         </article>
+
+        <!-- Paso 3 iOS -->
         <article class="step">
-          <div class="step-num">3</div>
-          <svg viewBox="0 0 120 200" xmlns="http://www.w3.org/2000/svg">
-            <rect x="4" y="4" width="112" height="192" rx="14" fill="#1c1c1e" />
-            <rect x="10" y="40" width="100" height="140" rx="10" fill="#f2f2f7" />
-            <rect x="18" y="95" width="84" height="22" rx="6" fill="#fff" stroke="#007aff" stroke-width="2" />
-            <rect x="24" y="100" width="12" height="12" rx="3" fill="#6b5a4d" />
-            <text x="52" y="110" font-size="7" fill="#000" font-weight="600" font-family="Segoe UI,sans-serif">Añadir a inicio</text>
-            <text x="60" y="78" text-anchor="middle" font-size="7" fill="#007aff" font-weight="700" font-family="Segoe UI,sans-serif">Añadir a inicio</text>
-          </svg>
+          <div class="step-head">
+            <div class="step-num">3</div>
+            <p class="step-title-short">Añadir</p>
+          </div>
+          <div class="phone-wrap">
+            <svg viewBox="0 0 160 280" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <rect x="6" y="6" width="148" height="268" rx="22" fill="#1c1c1e" />
+              <rect x="14" y="50" width="132" height="216" rx="16" fill="#f2f2f7" />
+              <rect x="22" y="58" width="116" height="6" rx="3" fill="#d1d1d6" />
+              <rect x="26" y="118" width="108" height="32" rx="8" fill="#fff" stroke="#007aff" stroke-width="2.5" />
+              <rect x="34" y="126" width="18" height="18" rx="4" fill="#6b5a4d" />
+              <rect x="58" y="130" width="64" height="8" rx="2" fill="#3a3a3c" />
+              <rect x="26" y="72" width="108" height="28" rx="8" fill="#fff" />
+              <rect x="26" y="156" width="108" height="28" rx="8" fill="#fff" />
+              <polygon points="80,108 92,98 92,118" fill="#007aff" opacity="0.9" />
+            </svg>
+          </div>
+          <div class="step-caption">
+            <h3>«Añadir a pantalla de inicio»</h3>
+            <p>En la hoja que se abre, desliza si hace falta y elige <strong>Añadir a pantalla de inicio</strong> (icono con signo +).</p>
+          </div>
         </article>
+
+        <!-- Paso 4 iOS -->
         <article class="step">
-          <div class="step-num">4</div>
-          <svg viewBox="0 0 120 200" xmlns="http://www.w3.org/2000/svg">
-            <rect x="4" y="4" width="112" height="192" rx="14" fill="#1c1c1e" />
-            <rect x="10" y="18" width="100" height="170" rx="10" fill="#fff" />
-            <text x="88" y="32" font-size="8" fill="#007aff" font-weight="700" font-family="Segoe UI,sans-serif">Añadir</text>
-            <rect x="22" y="70" width="36" height="36" rx="8" fill="#6b5a4d" />
-            <text x="60" y="130" text-anchor="middle" font-size="8" fill="#007aff" font-weight="700" font-family="Segoe UI,sans-serif">Añadir</text>
-          </svg>
+          <div class="step-head">
+            <div class="step-num">4</div>
+            <p class="step-title-short">Confirmar</p>
+          </div>
+          <div class="phone-wrap">
+            <svg viewBox="0 0 160 280" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <rect x="6" y="6" width="148" height="268" rx="22" fill="#1c1c1e" />
+              <rect x="14" y="28" width="132" height="238" rx="16" fill="#fff" />
+              <rect x="22" y="40" width="50" height="8" rx="2" fill="#e5e5ea" />
+              <rect x="108" y="36" width="30" height="14" rx="7" fill="#007aff" />
+              <rect x="114" y="41" width="18" height="4" rx="1" fill="#fff" />
+              <rect x="28" y="72" width="48" height="48" rx="12" fill="#6b5a4d" />
+              <rect x="84" y="78" width="48" height="8" rx="2" fill="#c7c7cc" />
+              <rect x="84" y="92" width="36" height="6" rx="2" fill="#e5e5ea" />
+              <rect x="22" y="140" width="116" height="100" rx="8" fill="#faf8f5" />
+            </svg>
+          </div>
+          <div class="step-caption">
+            <h3>Confirma con «Añadir»</h3>
+            <p>Revisa el nombre <strong>MVQro Espacios</strong> y pulsa <strong>Añadir</strong> arriba a la derecha para crear el icono.</p>
+          </div>
         </article>
+
+        <!-- Paso 5 iOS -->
         <article class="step">
-          <div class="step-num">5</div>
-          <svg viewBox="0 0 120 200" xmlns="http://www.w3.org/2000/svg">
-            <rect x="4" y="4" width="112" height="192" rx="14" fill="#1c1c1e" />
-            <rect x="10" y="18" width="100" height="170" rx="10" fill="#364fc7" />
-            <rect x="44" y="55" width="32" height="32" rx="8" fill="#6b5a4d" stroke="#fff" stroke-width="2" />
-            <text x="60" y="110" text-anchor="middle" font-size="7" fill="#fff" font-family="Segoe UI,sans-serif">Icono en</text>
-            <text x="60" y="122" text-anchor="middle" font-size="7" fill="#fff" font-weight="700" font-family="Segoe UI,sans-serif">pantalla de inicio</text>
-          </svg>
+          <div class="step-head">
+            <div class="step-num">5</div>
+            <p class="step-title-short">Icono</p>
+          </div>
+          <div class="phone-wrap">
+            <svg viewBox="0 0 160 280" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <defs>
+                <linearGradient id="iosWall" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#5c7cfa" />
+                  <stop offset="100%" stop-color="#364fc7" />
+                </linearGradient>
+              </defs>
+              <rect x="6" y="6" width="148" height="268" rx="22" fill="#1c1c1e" />
+              <rect x="14" y="28" width="132" height="238" rx="16" fill="url(#iosWall)" />
+              <rect x="36" y="72" width="44" height="44" rx="11" fill="#6b5a4d" stroke="#fff" stroke-width="2" />
+              <rect x="92" y="72" width="44" height="44" rx="11" fill="#fff" opacity="0.2" />
+              <rect x="36" y="124" width="44" height="44" rx="11" fill="#fff" opacity="0.15" />
+              <rect x="92" y="124" width="44" height="44" rx="11" fill="#fff" opacity="0.15" />
+              <rect x="36" y="72" width="44" height="44" rx="11" stroke="#ffd43b" stroke-width="2.5" fill="none" />
+            </svg>
+          </div>
+          <div class="step-caption">
+            <h3>Abre desde el icono</h3>
+            <p>Ve a la pantalla de inicio y entra siempre por el icono de MVQro Espacios. Activa notificaciones cuando la app lo pida.</p>
+          </div>
         </article>
       </div>
-      <footer>
-        <strong>iPhone:</strong> usa Safari (no Chrome). Para notificaciones, abre siempre desde el icono, no desde Safari.
-      </footer>
+
+      <div class="bottom-tip">
+        <span class="icon">i</span>
+        <div>
+          <strong>Notificaciones en iPhone:</strong> no abras la web desde Safari para el día a día; usa el icono instalado. Si no llegan avisos, entra a la app y usa «Sincronizar dispositivo» en tu perfil.
+        </div>
+      </div>
     </section>
 
-    <!-- Hoja 2: Android -->
+    <!-- ========== Android ========== -->
     <section class="page">
-      <header>
-        <h1>Instalar MVQro Espacios</h1>
-        <div class="platform">
-          Android<br />
-          <span style="font-weight: 600; font-size: 9.5pt">Chrome</span>
+      <div class="top-bar">
+        <h1 class="brand">
+          MVQro Espacios
+          <span>Guía de instalación en celular</span>
+        </h1>
+        <div class="platform-badge">
+          <p class="os">Android</p>
+          <p class="browser">Navegador: Chrome</p>
         </div>
-      </header>
+      </div>
+      <p class="intro">
+        Sigue los 5 pasos en orden. Recomendamos <strong>Google Chrome</strong>. Algunos teléfonos muestran «Añadir a pantalla de inicio» en lugar de «Instalar aplicación».
+      </p>
+
       <div class="steps">
+        <!-- Paso 1 Android -->
         <article class="step">
-          <div class="step-num">1</div>
-          <svg viewBox="0 0 120 200" xmlns="http://www.w3.org/2000/svg">
-            <rect x="4" y="4" width="112" height="192" rx="12" fill="#1a1a1a" />
-            <rect x="10" y="16" width="100" height="172" rx="9" fill="#fff" />
-            <rect x="18" y="24" width="70" height="12" rx="4" fill="#e8eaed" />
-            <text x="60" y="95" text-anchor="middle" font-size="9" fill="#6b5a4d" font-weight="700" font-family="Segoe UI,sans-serif">Chrome</text>
-            <text x="60" y="108" text-anchor="middle" font-size="6.5" fill="#444" font-family="Segoe UI,sans-serif">enlace MVQro</text>
-          </svg>
+          <div class="step-head">
+            <div class="step-num">1</div>
+            <p class="step-title-short">Abrir enlace</p>
+          </div>
+          <div class="phone-wrap">
+            <svg viewBox="0 0 160 280" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <rect x="6" y="6" width="148" height="268" rx="18" fill="#1a1a1a" />
+              <rect x="14" y="22" width="132" height="252" rx="14" fill="#fff" />
+              <rect x="22" y="30" width="96" height="20" rx="10" fill="#f1f3f4" />
+              <rect x="30" y="38" width="56" height="5" rx="2" fill="#80868b" />
+              <circle cx="108" cy="40" r="2" fill="#5f6368" />
+              <circle cx="114" cy="40" r="2" fill="#5f6368" />
+              <rect x="22" y="58" width="116" height="190" rx="8" fill="#faf8f5" />
+              <rect x="36" y="120" width="88" height="10" rx="3" fill="#6b5a4d" opacity="0.35" />
+              <rect x="48" y="138" width="64" height="6" rx="2" fill="#dadce0" />
+            </svg>
+          </div>
+          <div class="step-caption">
+            <h3>Abre el enlace en Chrome</h3>
+            <p>Entra a la dirección web de MVQro Espacios. Inicia sesión si aún no lo has hecho.</p>
+          </div>
         </article>
+
+        <!-- Paso 2 Android -->
         <article class="step">
-          <div class="step-num">2</div>
-          <svg viewBox="0 0 120 200" xmlns="http://www.w3.org/2000/svg">
-            <rect x="4" y="4" width="112" height="192" rx="12" fill="#1a1a1a" />
-            <rect x="10" y="16" width="100" height="172" rx="9" fill="#fff" />
-            <rect x="82" y="22" width="22" height="22" rx="11" fill="#e8f0fe" stroke="#1a73e8" stroke-width="2" />
-            <circle cx="88" cy="33" r="1.5" fill="#1a73e8" />
-            <circle cx="94" cy="33" r="1.5" fill="#1a73e8" />
-            <circle cx="100" cy="33" r="1.5" fill="#1a73e8" />
-            <text x="60" y="95" text-anchor="middle" font-size="14" fill="#1a73e8" font-weight="700" font-family="Segoe UI,sans-serif">⋮</text>
-            <text x="60" y="110" text-anchor="middle" font-size="6" fill="#666" font-family="Segoe UI,sans-serif">Menú arriba</text>
-          </svg>
+          <div class="step-head">
+            <div class="step-num">2</div>
+            <p class="step-title-short">Menú</p>
+          </div>
+          <div class="phone-wrap">
+            <svg viewBox="0 0 160 280" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <rect x="6" y="6" width="148" height="268" rx="18" fill="#1a1a1a" />
+              <rect x="14" y="22" width="132" height="252" rx="14" fill="#fff" />
+              <rect x="22" y="30" width="80" height="18" rx="9" fill="#f1f3f4" />
+              <rect x="108" y="28" width="28" height="28" rx="14" fill="#e8f0fe" stroke="#1a73e8" stroke-width="2.5" />
+              <circle cx="114" cy="42" r="2" fill="#1a73e8" />
+              <circle cx="120" cy="42" r="2" fill="#1a73e8" />
+              <circle cx="126" cy="42" r="2" fill="#1a73e8" />
+              <polygon points="138,28 148,42 138,56" fill="#ea4335" />
+              <rect x="22" y="58" width="116" height="200" rx="8" fill="#faf8f5" />
+            </svg>
+          </div>
+          <div class="step-caption">
+            <h3>Menú de tres puntos</h3>
+            <p>Arriba a la derecha, toca el menú <strong>⋮</strong> (tres puntos verticales).</p>
+          </div>
         </article>
+
+        <!-- Paso 3 Android -->
         <article class="step">
-          <div class="step-num">3</div>
-          <svg viewBox="0 0 120 200" xmlns="http://www.w3.org/2000/svg">
-            <rect x="4" y="4" width="112" height="192" rx="12" fill="#1a1a1a" />
-            <rect x="28" y="35" width="64" height="100" rx="8" fill="#fff" stroke="#dadce0" />
-            <rect x="34" y="78" width="52" height="18" rx="4" fill="#e8f0fe" stroke="#1a73e8" stroke-width="2" />
-            <text x="60" y="90" text-anchor="middle" font-size="5.5" fill="#1a73e8" font-weight="700" font-family="Segoe UI,sans-serif">Instalar app</text>
-            <text x="60" y="155" text-anchor="middle" font-size="5.5" fill="#888" font-family="Segoe UI,sans-serif">o «Añadir a inicio»</text>
-          </svg>
+          <div class="step-head">
+            <div class="step-num">3</div>
+            <p class="step-title-short">Instalar</p>
+          </div>
+          <div class="phone-wrap">
+            <svg viewBox="0 0 160 280" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <rect x="6" y="6" width="148" height="268" rx="18" fill="#1a1a1a" />
+              <rect x="14" y="22" width="132" height="252" rx="14" fill="#fff" opacity="0.4" />
+              <rect x="44" y="48" width="72" height="160" rx="10" fill="#fff" stroke="#dadce0" stroke-width="1.5" />
+              <rect x="52" y="58" width="56" height="6" rx="2" fill="#e8eaed" />
+              <rect x="52" y="72" width="56" height="6" rx="2" fill="#e8eaed" />
+              <rect x="50" y="108" width="60" height="26" rx="6" fill="#e8f0fe" stroke="#1a73e8" stroke-width="2.5" />
+              <rect x="58" y="118" width="44" height="6" rx="2" fill="#1a73e8" />
+              <rect x="52" y="142" width="56" height="6" rx="2" fill="#e8eaed" />
+              <rect x="52" y="156" width="56" height="6" rx="2" fill="#e8eaed" />
+            </svg>
+          </div>
+          <div class="step-caption">
+            <h3>Instalar aplicación</h3>
+            <p>Elige <strong>Instalar aplicación</strong> o <strong>Añadir a pantalla de inicio</strong>, según lo que muestre tu teléfono.</p>
+          </div>
         </article>
+
+        <!-- Paso 4 Android -->
         <article class="step">
-          <div class="step-num">4</div>
-          <svg viewBox="0 0 120 200" xmlns="http://www.w3.org/2000/svg">
-            <rect x="4" y="4" width="112" height="192" rx="12" fill="#1a1a1a" />
-            <rect x="18" y="70" width="84" height="55" rx="8" fill="#fff" stroke="#dadce0" />
-            <text x="60" y="88" text-anchor="middle" font-size="7" font-weight="700" font-family="Segoe UI,sans-serif">¿Instalar?</text>
-            <rect x="62" y="98" width="32" height="16" rx="8" fill="#1a73e8" />
-            <text x="78" y="109" text-anchor="middle" fill="#fff" font-size="6" font-weight="700" font-family="Segoe UI,sans-serif">Instalar</text>
-            <text x="60" y="145" text-anchor="middle" font-size="8" fill="#1a73e8" font-weight="700" font-family="Segoe UI,sans-serif">Instalar</text>
-          </svg>
+          <div class="step-head">
+            <div class="step-num">4</div>
+            <p class="step-title-short">Confirmar</p>
+          </div>
+          <div class="phone-wrap">
+            <svg viewBox="0 0 160 280" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <rect x="6" y="6" width="148" height="268" rx="18" fill="#1a1a1a" />
+              <rect x="14" y="22" width="132" height="252" rx="14" fill="#fff" />
+              <rect x="28" y="100" width="104" height="72" rx="12" fill="#fff" stroke="#dadce0" stroke-width="2" />
+              <rect x="44" y="112" width="72" height="8" rx="2" fill="#3c4043" />
+              <rect x="44" y="126" width="48" height="6" rx="2" fill="#9aa0a6" />
+              <rect x="88" y="148" width="36" height="16" rx="8" fill="#1a73e8" />
+              <rect x="96" y="153" width="20" height="6" rx="2" fill="#fff" />
+              <rect x="44" y="148" width="28" height="16" rx="8" fill="#f1f3f4" />
+            </svg>
+          </div>
+          <div class="step-caption">
+            <h3>Confirma «Instalar»</h3>
+            <p>En el cuadro de confirmación, pulsa <strong>Instalar</strong> (o <strong>Añadir</strong>) para terminar.</p>
+          </div>
         </article>
+
+        <!-- Paso 5 Android -->
         <article class="step">
-          <div class="step-num">5</div>
-          <svg viewBox="0 0 120 200" xmlns="http://www.w3.org/2000/svg">
-            <rect x="4" y="4" width="112" height="192" rx="12" fill="#1a1a1a" />
-            <rect x="10" y="16" width="100" height="172" rx="9" fill="#202124" />
-            <rect x="38" y="55" width="36" height="36" rx="8" fill="#6b5a4d" stroke="#8ab4f8" stroke-width="2" />
-            <text x="60" y="115" text-anchor="middle" font-size="7" fill="#e8eaed" font-family="Segoe UI,sans-serif">Abre desde</text>
-            <text x="60" y="127" text-anchor="middle" font-size="7" fill="#fff" font-weight="700" font-family="Segoe UI,sans-serif">icono / cajón</text>
-          </svg>
+          <div class="step-head">
+            <div class="step-num">5</div>
+            <p class="step-title-short">Icono</p>
+          </div>
+          <div class="phone-wrap">
+            <svg viewBox="0 0 160 280" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <rect x="6" y="6" width="148" height="268" rx="18" fill="#1a1a1a" />
+              <rect x="14" y="22" width="132" height="252" rx="14" fill="#202124" />
+              <rect x="28" y="48" width="48" height="48" rx="12" fill="#6b5a4d" stroke="#8ab4f8" stroke-width="2.5" />
+              <rect x="84" y="48" width="48" height="48" rx="12" fill="#3c4043" />
+              <rect x="28" y="104" width="48" height="48" rx="12" fill="#3c4043" />
+              <rect x="84" y="104" width="48" height="48" rx="12" fill="#3c4043" />
+              <rect x="22" y="200" width="116" height="4" rx="2" fill="#5f6368" />
+              <circle cx="80" cy="202" r="6" fill="#e8eaed" stroke="#8ab4f8" stroke-width="2" />
+            </svg>
+          </div>
+          <div class="step-caption">
+            <h3>Abre la app instalada</h3>
+            <p>Busca el icono en el cajón de apps o en la pantalla de inicio. Entra por ahí y activa las notificaciones en la app.</p>
+          </div>
         </article>
       </div>
-      <footer>
-        <strong>Android:</strong> activa notificaciones dentro de la app. Inicia sesión con tu usuario.
-      </footer>
+
+      <div class="bottom-tip">
+        <span class="icon">i</span>
+        <div>
+          <strong>Notificaciones en Android:</strong> acepta el permiso cuando la app lo solicite. Si eres administrador y no recibes avisos, abre la app instalada (no la pestaña de Chrome) y sincroniza el dispositivo desde tu perfil.
+        </div>
+      </div>
     </section>
   </body>
 </html>

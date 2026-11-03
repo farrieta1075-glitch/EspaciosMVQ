@@ -76,6 +76,11 @@ function buildNavItems(user: SessionUser | null): NavItem[] {
       label: "Dashboard",
       show: isAdmin(user),
     },
+    {
+      href: "/admin/logs",
+      label: "Logs",
+      show: isAdmin(user),
+    },
   ].filter((item) => item.show);
 }
 

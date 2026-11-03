@@ -183,6 +183,21 @@ export async function POST(request: Request) {
     revalidatePath("/reservas");
     revalidatePath("/admin/aprobaciones");
 
+    if (!admin) {
+      const { recordGeneralUserActivity } = await import("@/lib/activity-log");
+      await recordGeneralUserActivity({
+        user,
+        action: "CREATE_RESERVATION",
+        summary: `Creó solicitud «${parsed.data.eventName.trim()}»`,
+        path: "/reserva",
+        meta: {
+          reservationIds: result.ids,
+          pending: result.pending,
+          count: result.count,
+        },
+      });
+    }
+
     return NextResponse.json(result, { status: 201 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Error al reservar";

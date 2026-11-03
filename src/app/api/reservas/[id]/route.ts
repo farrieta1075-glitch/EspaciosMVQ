@@ -105,6 +105,16 @@ export async function PATCH(
     });
 
     const detail = await getReservationDetail(id);
+    if (!admin) {
+      const { recordGeneralUserActivity } = await import("@/lib/activity-log");
+      await recordGeneralUserActivity({
+        user: session.user,
+        action: "UPDATE_RESERVATION",
+        summary: `Modificó reserva «${parsed.data.eventName.trim()}»`,
+        path: `/reservas/${id}/editar`,
+        meta: { reservationId: id, pending: result.pending },
+      });
+    }
     return NextResponse.json({ ...detail, pending: result.pending });
   } catch (error) {
     const message =
@@ -152,6 +162,17 @@ export async function DELETE(
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
-  const result = await cancelReservation(id, isAdmin(session.user));
+  const admin = isAdmin(session.user);
+  const result = await cancelReservation(id, admin);
+  if (!admin) {
+    const { recordGeneralUserActivity } = await import("@/lib/activity-log");
+    await recordGeneralUserActivity({
+      user: session.user,
+      action: "CANCEL_RESERVATION",
+      summary: `Canceló o solicitó cancelación «${existing.eventName}»`,
+      path: "/reservas",
+      meta: { reservationId: id, pending: result.pending },
+    });
+  }
   return NextResponse.json({ ok: true, pending: result.pending });
 }

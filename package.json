@@ -19,6 +19,8 @@
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:push:azure": "node scripts/db-push-azure.mjs",
+    "db:cleanup-test-reservations": "node --env-file=.env.local scripts/cleanup-test-reservations.mjs --confirm",
+    "db:cleanup-test-reservations:dry-run": "node --env-file=.env.local scripts/cleanup-test-reservations.mjs --dry-run",
     "migrate:catalog-to-sql": "node --env-file=.env.local scripts/migrate-catalog-sheets-to-sql.mjs",
     "db:migrate": "prisma migrate deploy"
   },

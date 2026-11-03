@@ -47,6 +47,26 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
     }),
   ],
+  events: {
+    async signIn({ user }) {
+      if (!user?.id) return;
+      const role = (user as { role?: string }).role;
+      if (role !== "GENERAL") return;
+      const { recordGeneralUserActivity } = await import("@/lib/activity-log");
+      await recordGeneralUserActivity({
+        user: {
+          id: user.id,
+          role: "GENERAL",
+          areaId: (user as { areaId?: string | null }).areaId ?? null,
+          email: user.email,
+          name: user.name,
+        },
+        action: "LOGIN",
+        summary: "Inicio de sesión",
+        path: "/login",
+      });
+    },
+  },
   callbacks: {
     ...authConfig.callbacks,
     async signIn() {
