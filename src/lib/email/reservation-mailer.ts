@@ -10,30 +10,57 @@ import {
   listActiveAdminUsers,
 } from "@/lib/email/admin-recipients";
 import { buildAdminApprovalEmailContent } from "@/lib/email/approval-email-content";
-import { createNotification } from "@/lib/sheets/notifications";
+import {
+  createNotification,
+  hasApprovalNotificationForBatch,
+} from "@/lib/sheets/notifications";
+import { getPendingCreateBatchMembers } from "@/lib/approval-batch";
 
 async function notifyAdminsInAppAndPush(
   reservation: Reservation,
   options?: { occurrenceCount?: number },
 ): Promise<void> {
+  const batch = await getPendingCreateBatchMembers(reservation);
+  const batchId =
+    reservation.approvalBatchId?.trim() ||
+    batch[0]?.approvalBatchId?.trim() ||
+    reservation.id;
+  const alreadyNotified = await hasApprovalNotificationForBatch({
+    reservationIds: batch.map((item) => item.id),
+    approvalBatchId: batchId,
+  });
+  if (alreadyNotified) {
+    console.info(
+      `[notifications] Aviso de autorización ya enviado para lote ${batchId}`,
+    );
+    return;
+  }
+
   const [admins, area] = await Promise.all([
     listActiveAdminUsers(),
     getAreaById(reservation.areaId),
   ]);
+  if (admins.length === 0) {
+    console.warn(
+      "[notifications] No hay administradores activos para notificar (revisa usuarios ADMIN en SQL).",
+    );
+    return;
+  }
+
   const areaName = area?.name ?? reservation.areaId;
-  const occLabel =
-    options?.occurrenceCount && options.occurrenceCount > 1
-      ? ` (${options.occurrenceCount} fechas)`
-      : "";
-  const message = `Solicitud pendiente: «${reservation.eventName}» en ${areaName}${occLabel}.`;
+  const count = options?.occurrenceCount ?? batch.length;
+  const occLabel = count > 1 ? ` (${count} fechas)` : "";
+  const message = `[batch:${batchId}] Solicitud pendiente: «${reservation.eventName}» en ${areaName}${occLabel}.`;
+  const pushTag = `approval-${batchId}`;
 
   for (const admin of admins) {
     await createNotification({
       userId: admin.id,
       areaId: reservation.areaId,
-      reservationId: reservation.id,
+      reservationId: batch[0]?.id ?? reservation.id,
       type: "APPROVAL_NEEDED",
       message,
+      pushTag,
     });
   }
 }
@@ -44,8 +71,20 @@ export async function notifyAdminsReservationApprovalNeeded(
 ): Promise<void> {
   if (!reservationNeedsAdminAction(reservation)) return;
 
+  const batch = await getPendingCreateBatchMembers(reservation);
+  const batchId =
+    reservation.approvalBatchId?.trim() ||
+    batch[0]?.approvalBatchId?.trim() ||
+    reservation.id;
+  const alreadyNotified = await hasApprovalNotificationForBatch({
+    reservationIds: batch.map((item) => item.id),
+    approvalBatchId: batchId,
+  });
+
   try {
-    await notifyAdminsInAppAndPush(reservation, options);
+    if (!alreadyNotified) {
+      await notifyAdminsInAppAndPush(reservation, options);
+    }
   } catch (error) {
     console.error(
       "[notifications] No se pudo avisar in-app/push a administradores:",
@@ -54,7 +93,9 @@ export async function notifyAdminsReservationApprovalNeeded(
   }
 
   try {
-    await sendAdminApprovalEmails(reservation, options);
+    if (!alreadyNotified) {
+      await sendAdminApprovalEmails(reservation, options);
+    }
   } catch (error) {
     console.error(
       "[email] No se pudo enviar aviso a administradores:",

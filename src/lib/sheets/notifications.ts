@@ -153,6 +153,30 @@ export async function getEventReminderReservationIds(): Promise<Set<string>> {
   return reminderSent;
 }
 
+export async function hasApprovalNotificationForBatch(input: {
+  reservationIds: string[];
+  approvalBatchId?: string;
+}): Promise<boolean> {
+  const ids = [...new Set(input.reservationIds.filter(Boolean))];
+  const batchId = input.approvalBatchId?.trim();
+  if (ids.length === 0 && !batchId) return false;
+
+  if (isSqlDatabaseEnabled()) {
+    const { hasApprovalNotificationForBatchSql } = await import(
+      "@/lib/db/notifications"
+    );
+    return hasApprovalNotificationForBatchSql(input);
+  }
+
+  const { rows } = await getSheetRows(SHEET_TABS.NOTIFICACIONES);
+  for (const row of rows) {
+    if (row.type !== "APPROVAL_NEEDED") continue;
+    if (ids.includes(row.reservationId?.trim() ?? "")) return true;
+    if (batchId && row.message?.includes(`[batch:${batchId}]`)) return true;
+  }
+  return false;
+}
+
 export async function getUnreadNotificationCount(userId: string): Promise<number> {
   const notifications = await getNotificationsForUser(userId);
   return notifications.filter((item) => !item.read).length;
@@ -164,6 +188,7 @@ export async function createNotification(input: {
   reservationId: string;
   type: NotificationType;
   message: string;
+  pushTag?: string;
 }): Promise<AppNotification> {
   const { createId } = await import("@/lib/id");
   const notification: AppNotification = {
@@ -187,12 +212,22 @@ export async function createNotification(input: {
       message: notification.message,
       createdAt: notification.createdAt,
     });
-    await dispatchWebPush(input.userId, input.message, saved.id, input.type);
+    await dispatchWebPush(
+      input.userId,
+      input.message,
+      input.pushTag ?? saved.id,
+      input.type,
+    );
     return saved;
   }
 
   await appendSheetRow(SHEET_TABS.NOTIFICACIONES, notificationToRow(notification));
-  await dispatchWebPush(input.userId, input.message, notification.id, input.type);
+  await dispatchWebPush(
+    input.userId,
+    input.message,
+    input.pushTag ?? notification.id,
+    input.type,
+  );
   return notification;
 }
 

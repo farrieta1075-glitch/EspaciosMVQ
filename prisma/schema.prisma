@@ -99,6 +99,7 @@ model Reservation {
   pendingAction               String  @default("") @db.NVarChar(32)
   pendingPayload              String  @default("") @db.NVarChar(Max)
   approvalToken               String  @default("") @db.NVarChar(128)
+  approvalBatchId             String  @default("") @db.NVarChar(64)
   estimatedAttendees          Int     @default(0)
   attendeeJustificationCode   String  @default("") @db.NVarChar(64)
   attendeeJustificationNote   String  @default("") @db.NVarChar(Max)
@@ -109,6 +110,7 @@ model Reservation {
   @@index([areaId])
   @@index([userId])
   @@index([status])
+  @@index([approvalBatchId])
   @@map("Reservations")
 }
 

@@ -25,6 +25,10 @@ import {
 import { applyRecurrenceToNewStartDate } from "@/lib/calendar-date-change-preview";
 import { addMinutesToTimeHHmm, formatDateISO } from "@/lib/date-utils";
 import { readJsonResponse } from "@/lib/read-json-response";
+import {
+  clearReservationCreateBatchId,
+  getOrCreateReservationCreateBatchId,
+} from "@/lib/reservation-create-batch-id";
 import { ReservationCreateWizard } from "@/components/reservation/reservation-create-wizard";
 import { Button } from "@/components/ui/button";
 import {
@@ -316,6 +320,7 @@ export function ReservationFlow({
         needsJustification && attendeeJustificationCode === "OTHER"
           ? attendeeJustificationNote.trim()
           : "",
+      approvalBatchId: getOrCreateReservationCreateBatchId(),
     };
 
     try {
@@ -356,6 +361,7 @@ export function ReservationFlow({
       }
 
       setSimilarPrompt(null);
+      clearReservationCreateBatchId();
       setSuccessInfo({
         count: data.count ?? data.ids.length,
         pending: Boolean(data.pending),
@@ -372,6 +378,7 @@ export function ReservationFlow({
     selection?.selectedResources.filter((item) => item.quantity > 0).length ?? 0;
 
   function resetCreateFlowForNewReservation() {
+    clearReservationCreateBatchId();
     clearAllReservationDraftState();
     releaseRadixBodyScrollLock();
     setSuccessInfo(null);

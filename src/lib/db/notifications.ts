@@ -48,6 +48,32 @@ export async function getEventReminderReservationIdsSql(): Promise<Set<string>> 
   );
 }
 
+export async function hasApprovalNotificationForBatchSql(input: {
+  reservationIds: string[];
+  approvalBatchId?: string;
+}): Promise<boolean> {
+  const ids = [...new Set(input.reservationIds.filter(Boolean))];
+  const batchId = input.approvalBatchId?.trim();
+  if (ids.length === 0 && !batchId) return false;
+
+  const prisma = getPrisma();
+  const orFilters: Array<Record<string, unknown>> = [];
+  if (ids.length > 0) {
+    orFilters.push({ reservationId: { in: ids } });
+  }
+  if (batchId) {
+    orFilters.push({ message: { contains: `[batch:${batchId}]` } });
+  }
+
+  const count = await prisma.notification.count({
+    where: {
+      type: "APPROVAL_NEEDED",
+      OR: orFilters,
+    },
+  });
+  return count > 0;
+}
+
 export async function createNotificationSql(input: {
   id: string;
   userId: string;

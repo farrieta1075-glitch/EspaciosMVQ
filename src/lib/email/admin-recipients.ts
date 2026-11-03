@@ -1,9 +1,7 @@
 import "server-only";
 import { z } from "zod";
-import { getSheetRowsCanonical } from "@/lib/sheets/repository";
-import { SHEET_TABS } from "@/lib/sheets/tabs";
+import { getActiveUsers } from "@/lib/sheets/users";
 import type { AppUser } from "@/types/user";
-import { mapRowToUser } from "@/lib/sheets/users";
 
 const emailSchema = z.string().email();
 
@@ -21,25 +19,8 @@ function extraRecipientsFromEnv(): string[] {
 }
 
 export async function listActiveAdminUsers(): Promise<AppUser[]> {
-  const { rows } = await getSheetRowsCanonical(SHEET_TABS.USUARIOS);
-  const admins: AppUser[] = [];
-
-  for (const row of rows) {
-    if (!row.id?.trim()) continue;
-    try {
-      const user = mapRowToUser(row);
-      if (user.role === "ADMIN" && user.active) {
-        admins.push(user);
-      }
-    } catch (error) {
-      console.warn(
-        `[email] Fila de usuario ignorada (${row.id ?? "?"}):`,
-        error instanceof Error ? error.message : error,
-      );
-    }
-  }
-
-  return admins;
+  const users = await getActiveUsers();
+  return users.filter((user) => user.role === "ADMIN");
 }
 
 export async function getAdminNotificationEmails(): Promise<{

@@ -76,6 +76,7 @@ const createSchema = z.object({
   attendeeJustificationCode: z.string().optional().default(""),
   attendeeJustificationNote: z.string().optional().default(""),
   sendEventReminder: z.boolean().optional().default(true),
+  approvalBatchId: z.string().min(8).max(128).optional(),
 });
 
 export async function POST(request: Request) {
@@ -175,6 +176,7 @@ export async function POST(request: Request) {
       attendeeJustificationCode: parsed.data.attendeeJustificationCode,
       attendeeJustificationNote: parsed.data.attendeeJustificationNote,
       sendEventReminder: parsed.data.sendEventReminder,
+      approvalBatchId: parsed.data.approvalBatchId,
     });
 
     revalidatePath("/calendario");

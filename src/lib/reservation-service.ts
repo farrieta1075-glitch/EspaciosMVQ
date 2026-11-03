@@ -267,6 +267,26 @@ export async function createReservation(
   const status = input.createdByAdmin ? "CONFIRMED" : "PENDING";
   const eventDescription = input.eventDescription?.trim() ?? "";
   const approvalToken = input.createdByAdmin ? "" : createApprovalToken();
+  let approvalBatchId = "";
+  if (!input.createdByAdmin) {
+    approvalBatchId = input.approvalBatchId?.trim() ?? "";
+    if (!approvalBatchId) {
+      approvalBatchId = createId("rbatch");
+    } else {
+      const { findPendingReservationsByApprovalBatchId } = await import(
+        "@/lib/approval-batch"
+      );
+      const existingBatch =
+        await findPendingReservationsByApprovalBatchId(approvalBatchId);
+      if (existingBatch.length > 0) {
+        return {
+          ids: existingBatch.map((item) => item.id),
+          count: existingBatch.length,
+          pending: true,
+        };
+      }
+    }
+  }
   let pendingNotifySample: Reservation | null = null;
 
   for (const occurrence of occurrences) {
@@ -285,6 +305,7 @@ export async function createReservation(
       pendingAction: "",
       pendingPayload: "",
       approvalToken,
+      approvalBatchId,
       estimatedAttendees: input.estimatedAttendees ?? 0,
       attendeeJustificationCode: input.attendeeJustificationCode?.trim() ?? "",
       attendeeJustificationNote: input.attendeeJustificationNote?.trim() ?? "",
@@ -418,46 +439,57 @@ export async function listAllReservationDetails(): Promise<ReservationDetail[]> 
 }
 
 export async function listPendingReservationDetails(): Promise<ReservationDetail[]> {
+  const { pendingCreateGroupKey } = await import("@/lib/approval-batch");
   const reservations = await getReservationsNeedingApproval();
   const details = await buildReservationDetailsBatch(reservations);
-  const seenCreateTokens = new Set<string>();
+  const detailById = new Map(details.map((item) => [item.id, item]));
   const grouped: ReservationDetail[] = [];
+  const seenGroupKeys = new Set<string>();
 
-  const sorted = [...details].sort(
+  const sorted = [...reservations].sort(
     (a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime(),
   );
 
-  for (const detail of sorted) {
-    const token = detail.approvalToken.trim();
-    const isPendingCreate =
-      detail.status === "PENDING" && !detail.pendingAction && Boolean(token);
-
-    if (isPendingCreate && seenCreateTokens.has(token)) {
+  for (const reservation of sorted) {
+    if (reservation.pendingAction) {
+      const detail = detailById.get(reservation.id);
+      if (detail) grouped.push(detail);
       continue;
     }
 
-    if (isPendingCreate) {
-      seenCreateTokens.add(token);
-      const batch = reservations.filter(
+    const groupKey = pendingCreateGroupKey(reservation);
+    if (groupKey.startsWith("single:")) {
+      const detail = detailById.get(reservation.id);
+      if (detail) grouped.push(detail);
+      continue;
+    }
+
+    if (seenGroupKeys.has(groupKey)) continue;
+    seenGroupKeys.add(groupKey);
+
+    const batch = reservations
+      .filter(
         (item) =>
           item.status === "PENDING" &&
           !item.pendingAction &&
-          item.approvalToken === token,
+          pendingCreateGroupKey(item) === groupKey,
+      )
+      .sort(
+        (a, b) =>
+          new Date(a.startAt).getTime() - new Date(b.startAt).getTime(),
       );
-      grouped.push({
-        ...detail,
-        approvalBatchIds: batch.map((item) => item.id),
-        approvalBatchOccurrences: batch
-          .sort(
-            (a, b) =>
-              new Date(a.startAt).getTime() - new Date(b.startAt).getTime(),
-          )
-          .map((item) => ({ startAt: item.startAt, endAt: item.endAt })),
-      });
-      continue;
-    }
+    const anchor = batch[0] ?? reservation;
+    const detail = detailById.get(anchor.id);
+    if (!detail) continue;
 
-    grouped.push(detail);
+    grouped.push({
+      ...detail,
+      approvalBatchIds: batch.map((item) => item.id),
+      approvalBatchOccurrences: batch.map((item) => ({
+        startAt: item.startAt,
+        endAt: item.endAt,
+      })),
+    });
   }
 
   return grouped;

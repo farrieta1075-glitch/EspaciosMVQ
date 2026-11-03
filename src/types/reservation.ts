@@ -16,6 +16,8 @@ export interface Reservation {
   pendingAction: PendingAction;
   pendingPayload: string;
   approvalToken: string;
+  /** Identificador común de todas las fechas de una misma solicitud. */
+  approvalBatchId: string;
   estimatedAttendees: number;
   attendeeJustificationCode: string;
   attendeeJustificationNote: string;
@@ -124,6 +126,8 @@ export interface CreateReservationInput {
   attendeeJustificationCode?: string;
   attendeeJustificationNote?: string;
   sendEventReminder?: boolean;
+  /** Opcional: el cliente lo reenvía en reintentos para no duplicar la serie. */
+  approvalBatchId?: string;
 }
 
 export interface EventSuggestion {

@@ -78,6 +78,7 @@ export const SHEET_HEADERS: Record<SheetTab, string[]> = {
     "pendingAction",
     "pendingPayload",
     "approvalToken",
+    "approvalBatchId",
     "estimatedAttendees",
     "attendeeJustificationCode",
     "attendeeJustificationNote",
