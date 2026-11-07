@@ -1,8 +1,5 @@
 import "server-only";
 
-const DEFAULT_SERVER = "mvqro-sql.database.windows.net";
-const DEFAULT_DATABASE = "mvqroeventos-sql-db";
-
 function stripEnvQuotes(value: string): string {
   const trimmed = value.trim();
   if (
@@ -14,46 +11,14 @@ function stripEnvQuotes(value: string): string {
   return trimmed;
 }
 
-/** Construye la URL de Prisma desde DATABASE_URL o AZURE_SQL_* (Vercel). */
+/** URL de PostgreSQL para Prisma (`DATABASE_URL` o `POSTGRES_URL`). */
 export function resolveDatabaseUrl(): string | null {
-  const direct = process.env.DATABASE_URL?.trim();
+  const direct =
+    process.env.DATABASE_URL?.trim() || process.env.POSTGRES_URL?.trim();
   if (direct) {
-    return enhanceSqlServerConnectionUrl(direct);
+    return stripEnvQuotes(direct);
   }
-
-  const user = process.env.AZURE_SQL_USER?.trim();
-  const password = process.env.AZURE_SQL_PASSWORD?.trim();
-  if (!user || !password) {
-    return null;
-  }
-
-  const server = process.env.AZURE_SQL_SERVER?.trim() || DEFAULT_SERVER;
-  const database = process.env.AZURE_SQL_DATABASE?.trim() || DEFAULT_DATABASE;
-
-  return enhanceSqlServerConnectionUrl(
-    `sqlserver://${server}:1433;database=${database};user=${encodeURIComponent(user)};password=${encodeURIComponent(password)};encrypt=true;trustServerCertificate=false;`,
-  );
-}
-
-/** Parámetros para reactivación de Azure SQL (pausa serverless) y conexiones en Vercel. */
-export function enhanceSqlServerConnectionUrl(url: string): string {
-  let connection = stripEnvQuotes(url).trim();
-  if (!connection) return connection;
-
-  const params: Record<string, string> = {
-    connectTimeout: "60",
-    socketTimeout: "60",
-  };
-
-  for (const [key, value] of Object.entries(params)) {
-    const re = new RegExp(`(^|;)${key}=`, "i");
-    if (!re.test(connection)) {
-      const sep = connection.endsWith(";") ? "" : ";";
-      connection += `${sep}${key}=${value}`;
-    }
-  }
-
-  return connection;
+  return null;
 }
 
 /** Sincroniza `process.env.DATABASE_URL` para Prisma Client. */
@@ -64,7 +29,7 @@ export function ensureDatabaseUrlEnv(): void {
   }
 }
 
-/** Azure SQL vía Prisma cuando hay URL resuelta. */
+/** Datos en PostgreSQL cuando hay `DATABASE_URL`. */
 export function isSqlDatabaseEnabled(): boolean {
   return Boolean(resolveDatabaseUrl());
 }
@@ -73,7 +38,6 @@ export function isCatalogOnSql(): boolean {
   return isSqlDatabaseEnabled();
 }
 
-/** Datos operativos en Azure cuando hay DATABASE_URL (sin fallback a Sheets). */
 export function isAppDataOnSql(): boolean {
   return isSqlDatabaseEnabled();
 }
@@ -92,7 +56,6 @@ export const SQL_BACKED_FEATURES = [
   "eventHistory",
 ] as const;
 
-/** Solo aplica si no hay SQL; con Azure activo la app no usa Sheets para datos. */
 export const SHEETS_BACKED_FEATURES = [
   "reservations",
   "reservationResources",
