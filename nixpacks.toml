@@ -1,0 +1,3 @@
+# Dokploy / Railpack / Nixpacks — Node 20 (el proveedor por defecto suele usar Node 18)
+[phases.setup]
+nixPkgs = ["nodejs_20", "openssl"]
