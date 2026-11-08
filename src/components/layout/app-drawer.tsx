@@ -104,10 +104,14 @@ export function AppDrawer({ user }: AppDrawerProps) {
     releaseRadixBodyScrollLock();
 
     try {
-      await signOut({ redirectTo: "/login" });
+      // Sin redirect de Auth.js: evita que AUTH_URL=localhost en el servidor mande fuera del dominio actual.
+      await signOut({ redirect: false });
     } catch {
-      window.location.href = `/api/auth/signout?callbackUrl=${encodeURIComponent("/login")}`;
+      // Respaldo: misma origen, ruta relativa.
+      window.location.assign("/login");
+      return;
     }
+    window.location.assign("/login");
   }
 
   return (
