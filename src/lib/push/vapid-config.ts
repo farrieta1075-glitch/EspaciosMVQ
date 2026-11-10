@@ -11,12 +11,51 @@ export type VapidSubjectSource =
   | "APP_URL"
   | "default";
 
-/** Acepta correo sin prefijo mailto: o URL http → https para Apple. */
+const EXPLICIT_VAPID_SUBJECT_ENV_KEYS = [
+  "WEB_PUSH_VAPID_SUBJECT",
+  "VAPID_SUBJECT",
+] as const;
+
+export function sanitizeEnvString(value: string): string {
+  let v = value.replace(/^\uFEFF/, "").trim();
+  if (
+    (v.startsWith('"') && v.endsWith('"')) ||
+    (v.startsWith("'") && v.endsWith("'"))
+  ) {
+    v = v.slice(1, -1).trim();
+  }
+  return v;
+}
+
+export function readExplicitVapidSubjectRawFromEnv(): string {
+  for (const key of EXPLICIT_VAPID_SUBJECT_ENV_KEYS) {
+    const raw = process.env[key];
+    if (raw?.trim()) {
+      return sanitizeEnvString(raw);
+    }
+  }
+  return "";
+}
+
+/** Acepta correo sin prefijo mailto:, comillas o «Nombre <correo>». */
 export function normalizeVapidSubject(raw: string): string {
-  const trimmed = raw.trim();
+  const trimmed = sanitizeEnvString(raw);
   if (!trimmed) return trimmed;
 
-  if (trimmed.startsWith("mailto:") || trimmed.startsWith("https://")) {
+  const fromHeader = extractEmailFromFromHeader(trimmed);
+  if (fromHeader) {
+    return `mailto:${fromHeader}`;
+  }
+
+  const mailtoMatch = trimmed.match(/^mailto:\s*(.+)$/i);
+  if (mailtoMatch) {
+    const email = sanitizeEnvString(mailtoMatch[1]);
+    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return `mailto:${email}`;
+    }
+  }
+
+  if (trimmed.toLowerCase().startsWith("https://")) {
     return trimmed;
   }
 
@@ -24,7 +63,7 @@ export function normalizeVapidSubject(raw: string): string {
     return `mailto:${trimmed}`;
   }
 
-  if (trimmed.startsWith("http://")) {
+  if (trimmed.toLowerCase().startsWith("http://")) {
     try {
       const url = new URL(trimmed);
       if (url.hostname) return `https://${url.host}`;
@@ -58,7 +97,7 @@ export function resolveVapidSubjectFromEnv(): {
   subject: string;
   source: VapidSubjectSource;
 } {
-  const explicit = process.env.WEB_PUSH_VAPID_SUBJECT?.trim();
+  const explicit = readExplicitVapidSubjectRawFromEnv();
   if (explicit) {
     return {
       subject: normalizeVapidSubject(explicit),
@@ -66,7 +105,7 @@ export function resolveVapidSubjectFromEnv(): {
     };
   }
 
-  const smtpUser = process.env.EMAIL_SMTP_USER?.trim();
+  const smtpUser = sanitizeEnvString(process.env.EMAIL_SMTP_USER ?? "");
   if (smtpUser && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(smtpUser)) {
     return { subject: `mailto:${smtpUser}`, source: "EMAIL_SMTP_USER" };
   }
@@ -144,8 +183,8 @@ export function vapidKeysMatchInEnv(): boolean {
 /** Apple suele rechazar subjects placeholder (.local) o mailto mal formado. */
 export function isVapidSubjectAcceptableForApple(subject: string): boolean {
   const trimmed = subject.trim();
-  if (trimmed.startsWith("mailto:")) {
-    const email = trimmed.slice("mailto:".length).trim();
+  if (/^mailto:/i.test(trimmed)) {
+    const email = sanitizeEnvString(trimmed.replace(/^mailto:\s*/i, ""));
     if (!email || email.includes(".local")) return false;
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   }
@@ -166,6 +205,36 @@ export function vapidPublicKeyFingerprint(publicKey?: string): string {
   return `${key.slice(0, 6)}…${key.slice(-6)}`;
 }
 
+export function maskVapidSubjectPreview(subject: string): string {
+  if (/^mailto:/i.test(subject)) {
+    const email = sanitizeEnvString(subject.replace(/^mailto:\s*/i, ""));
+    const at = email.indexOf("@");
+    if (at <= 0) return "mailto:(mal formado)";
+    return `mailto:${email.slice(0, Math.min(2, at))}…@${email.slice(at + 1)}`;
+  }
+  try {
+    return new URL(subject).origin;
+  } catch {
+    return "(inválido)";
+  }
+}
+
+export type VapidEnvProbe = {
+  explicitSubjectDefined: boolean;
+  explicitSubjectRawLength: number;
+  subjectPreview: string;
+};
+
+export function getVapidEnvProbe(): VapidEnvProbe {
+  const raw = readExplicitVapidSubjectRawFromEnv();
+  const { subject } = resolveVapidSubjectFromEnv();
+  return {
+    explicitSubjectDefined: raw.length > 0,
+    explicitSubjectRawLength: raw.length,
+    subjectPreview: maskVapidSubjectPreview(subject),
+  };
+}
+
 export type VapidServerDiagnostics = {
   configured: boolean;
   keysMatch: boolean;
@@ -174,6 +243,7 @@ export type VapidServerDiagnostics = {
   subjectAcceptable: boolean;
   usingDefaultSubject: boolean;
   publicKeyFingerprint: string;
+  envProbe: VapidEnvProbe;
   issues: string[];
 };
 
@@ -196,13 +266,26 @@ export function getVapidServerDiagnostics(): VapidServerDiagnostics {
       "La clave privada no corresponde a la pública: genera un par con npm run generate:vapid, define ambas en Dokploy y haz Rebuild.",
     );
   }
+  const envProbe = getVapidEnvProbe();
+
   if (!subjectAcceptable) {
-    issues.push(
-      "Define WEB_PUSH_VAPID_SUBJECT en Dokploy (mailto:correo real o https://tu-dominio). Sin comillas. Luego Reload del servicio.",
-    );
-    if (source !== "WEB_PUSH_VAPID_SUBJECT") {
+    if (envProbe.explicitSubjectDefined) {
       issues.push(
-        `Subject actual viene de «${source}» y no es válido para iOS; conviene fijar WEB_PUSH_VAPID_SUBJECT explícitamente.`,
+        `WEB_PUSH_VAPID_SUBJECT llegó al servidor (${envProbe.explicitSubjectRawLength} caracteres) pero no es válido. Usa solo el correo (ej. tu@gmail.com) o mailto:tu@gmail.com, sin comillas.`,
+      );
+      issues.push(
+        `Subject que interpreta el servidor: ${envProbe.subjectPreview}.`,
+      );
+    } else if (source !== "WEB_PUSH_VAPID_SUBJECT") {
+      issues.push(
+        `El servidor no ve WEB_PUSH_VAPID_SUBJECT (origen actual: «${source}»). En Dokploy añádela al servicio de la app, guarda y pulsa Reload o Redeploy del contenedor.`,
+      );
+      issues.push(
+        `Subject en uso: ${envProbe.subjectPreview} (no válido para iOS).`,
+      );
+    } else {
+      issues.push(
+        "Define WEB_PUSH_VAPID_SUBJECT en Dokploy (solo correo o mailto:correo, sin comillas). Luego Reload del servicio.",
       );
     }
   }
@@ -215,6 +298,7 @@ export function getVapidServerDiagnostics(): VapidServerDiagnostics {
     subjectAcceptable,
     usingDefaultSubject,
     publicKeyFingerprint: vapidPublicKeyFingerprint(publicKey),
+    envProbe,
     issues,
   };
 }

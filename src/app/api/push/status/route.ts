@@ -31,6 +31,7 @@ export async function GET(request: Request) {
       subjectSource: vapidDiag.subjectSource,
       usingDefaultSubject: vapidDiag.usingDefaultSubject,
       publicKeyFingerprint: vapidDiag.publicKeyFingerprint,
+      envProbe: vapidDiag.envProbe,
       issues: vapidDiag.issues,
     },
     subscriptionCount: subscriptions.length,

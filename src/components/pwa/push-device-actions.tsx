@@ -54,6 +54,11 @@ export function PushDeviceActions({
         currentDeviceRegistered?: boolean;
         vapid?: {
           publicKeyFingerprint?: string;
+          subjectSource?: string;
+          envProbe?: {
+            explicitSubjectDefined?: boolean;
+            subjectPreview?: string;
+          };
           issues?: string[];
         };
       };
@@ -61,6 +66,18 @@ export function PushDeviceActions({
       setServerConfigured(data.serverConfigured);
       setCurrentDeviceRegistered(data.currentDeviceRegistered ?? null);
       const issues = [...(data.vapid?.issues ?? [])];
+      const probe = data.vapid?.envProbe;
+      if (probe && issues.length > 0) {
+        if (!probe.explicitSubjectDefined) {
+          issues.push(
+            "Diagnóstico: el contenedor NO recibe WEB_PUSH_VAPID_SUBJECT. Revisa que la variable esté en el servicio de la app (no la BD) y reinicia el contenedor.",
+          );
+        } else if (probe.subjectPreview) {
+          issues.push(
+            `Diagnóstico: el servidor leyó subject «${probe.subjectPreview}».`,
+          );
+        }
+      }
       const serverFp = data.vapid?.publicKeyFingerprint?.trim();
       const localFp = localVapidFingerprint();
       if (serverFp && localFp && serverFp !== localFp) {
