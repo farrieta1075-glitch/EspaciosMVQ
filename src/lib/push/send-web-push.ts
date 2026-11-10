@@ -6,13 +6,13 @@ import {
   getVapidPublicKeyFromEnv,
   getVapidServerDiagnostics,
   getVapidSubjectFromEnv,
+  isVapidSubjectAcceptableForApple,
 } from "@/lib/push/vapid-config";
 
 let vapidConfigured = false;
+let vapidSubjectBound = "";
 
 function ensureVapid(): boolean {
-  if (vapidConfigured) return true;
-
   const publicKey = getVapidPublicKeyFromEnv();
   const privateKey = getVapidPrivateKeyFromEnv();
   const subject = getVapidSubjectFromEnv();
@@ -24,8 +24,18 @@ function ensureVapid(): boolean {
     return false;
   }
 
+  if (!isVapidSubjectAcceptableForApple(subject)) {
+    console.warn(
+      "[web-push] WEB_PUSH_VAPID_SUBJECT no válido para iOS (revisa Dokploy).",
+    );
+    return false;
+  }
+
+  if (vapidConfigured && vapidSubjectBound === subject) return true;
+
   webpush.setVapidDetails(subject, publicKey, privateKey);
   vapidConfigured = true;
+  vapidSubjectBound = subject;
   return true;
 }
 
@@ -137,8 +147,17 @@ export async function sendWebPushToUser(
     return { sent: 0, failed: 0, details, errors: [] };
   }
   if (!ensureVapid()) {
-    console.warn("[web-push] Envío omitido: VAPID no configurado en el servidor.");
-    return { sent: 0, failed: 0, details, errors: [] };
+    const diag = getVapidServerDiagnostics();
+    const hint =
+      diag.issues.join(" ") ||
+      "VAPID no configurado en el servidor (revisa variables en Dokploy).";
+    console.warn("[web-push] Envío omitido:", hint);
+    return {
+      sent: 0,
+      failed: 1,
+      details,
+      errors: [{ host: "servidor", platform: "apple", hint }],
+    };
   }
 
   let subscriptions = await getPushSubscriptionsForUser(userId);

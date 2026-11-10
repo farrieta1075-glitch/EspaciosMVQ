@@ -21,10 +21,14 @@ export async function GET(request: Request) {
     : undefined;
 
   return NextResponse.json({
-    serverConfigured: vapidDiag.configured && vapidDiag.keysMatch,
+    serverConfigured:
+      vapidDiag.configured &&
+      vapidDiag.keysMatch &&
+      vapidDiag.subjectAcceptable,
     vapid: {
       keysMatch: vapidDiag.keysMatch,
       subjectAcceptable: vapidDiag.subjectAcceptable,
+      subjectSource: vapidDiag.subjectSource,
       usingDefaultSubject: vapidDiag.usingDefaultSubject,
       publicKeyFingerprint: vapidDiag.publicKeyFingerprint,
       issues: vapidDiag.issues,

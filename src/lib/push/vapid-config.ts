@@ -1,7 +1,40 @@
 import "server-only";
 import { createECDH } from "crypto";
+import { getAppBaseUrl } from "@/lib/app-url";
 
 export const DEFAULT_VAPID_SUBJECT = "mailto:soporte@mvqro.local";
+
+export type VapidSubjectSource =
+  | "WEB_PUSH_VAPID_SUBJECT"
+  | "EMAIL_SMTP_USER"
+  | "EMAIL_FROM"
+  | "APP_URL"
+  | "default";
+
+/** Acepta correo sin prefijo mailto: o URL http → https para Apple. */
+export function normalizeVapidSubject(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return trimmed;
+
+  if (trimmed.startsWith("mailto:") || trimmed.startsWith("https://")) {
+    return trimmed;
+  }
+
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+    return `mailto:${trimmed}`;
+  }
+
+  if (trimmed.startsWith("http://")) {
+    try {
+      const url = new URL(trimmed);
+      if (url.hostname) return `https://${url.host}`;
+    } catch {
+      /* ignore */
+    }
+  }
+
+  return trimmed;
+}
 
 export function getVapidPublicKeyFromEnv(): string {
   return process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY?.trim() ?? "";
@@ -21,39 +54,64 @@ function extractEmailFromFromHeader(value: string): string | null {
   return null;
 }
 
-/** Si no hay WEB_PUSH_VAPID_SUBJECT, usa el correo de envío o la URL pública (válido para iOS). */
-function deriveVapidSubjectFallback(): string {
+export function resolveVapidSubjectFromEnv(): {
+  subject: string;
+  source: VapidSubjectSource;
+} {
+  const explicit = process.env.WEB_PUSH_VAPID_SUBJECT?.trim();
+  if (explicit) {
+    return {
+      subject: normalizeVapidSubject(explicit),
+      source: "WEB_PUSH_VAPID_SUBJECT",
+    };
+  }
+
   const smtpUser = process.env.EMAIL_SMTP_USER?.trim();
   if (smtpUser && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(smtpUser)) {
-    return `mailto:${smtpUser}`;
+    return { subject: `mailto:${smtpUser}`, source: "EMAIL_SMTP_USER" };
   }
 
   const emailFrom = process.env.EMAIL_FROM?.trim();
   if (emailFrom) {
     const parsed = extractEmailFromFromHeader(emailFrom);
-    if (parsed) return `mailto:${parsed}`;
+    if (parsed) {
+      return { subject: `mailto:${parsed}`, source: "EMAIL_FROM" };
+    }
+  }
+
+  try {
+    const base = getAppBaseUrl();
+    if (base.startsWith("https://")) {
+      const url = new URL(base);
+      if (url.hostname && !/^(localhost|127\.0\.0\.1)$/i.test(url.hostname)) {
+        return { subject: url.origin, source: "APP_URL" };
+      }
+    }
+  } catch {
+    /* ignore */
   }
 
   const appUrl =
     process.env.APP_URL?.trim() || process.env.AUTH_URL?.trim() || "";
-  if (appUrl.startsWith("https://")) {
-    try {
-      const url = new URL(appUrl);
-      if (url.hostname && !/^(localhost|127\.0\.0\.1)$/i.test(url.hostname)) {
-        return url.origin;
+  if (appUrl) {
+    const normalized = normalizeVapidSubject(appUrl);
+    if (normalized.startsWith("https://")) {
+      try {
+        const url = new URL(normalized);
+        if (url.hostname && !/^(localhost|127\.0\.0\.1)$/i.test(url.hostname)) {
+          return { subject: url.origin, source: "APP_URL" };
+        }
+      } catch {
+        /* ignore */
       }
-    } catch {
-      /* ignore */
     }
   }
 
-  return DEFAULT_VAPID_SUBJECT;
+  return { subject: DEFAULT_VAPID_SUBJECT, source: "default" };
 }
 
 export function getVapidSubjectFromEnv(): string {
-  const explicit = process.env.WEB_PUSH_VAPID_SUBJECT?.trim();
-  if (explicit) return explicit;
-  return deriveVapidSubjectFallback();
+  return resolveVapidSubjectFromEnv().subject;
 }
 
 function base64UrlToBuffer(value: string): Buffer {
@@ -112,6 +170,7 @@ export type VapidServerDiagnostics = {
   configured: boolean;
   keysMatch: boolean;
   subject: string;
+  subjectSource: VapidSubjectSource;
   subjectAcceptable: boolean;
   usingDefaultSubject: boolean;
   publicKeyFingerprint: string;
@@ -121,12 +180,10 @@ export type VapidServerDiagnostics = {
 export function getVapidServerDiagnostics(): VapidServerDiagnostics {
   const publicKey = getVapidPublicKeyFromEnv();
   const privateKey = getVapidPrivateKeyFromEnv();
-  const subject = getVapidSubjectFromEnv();
+  const { subject, source } = resolveVapidSubjectFromEnv();
   const configured = Boolean(publicKey && privateKey);
   const keysMatch = configured ? vapidKeysMatchInEnv() : false;
-  const usingDefaultSubject =
-    !process.env.WEB_PUSH_VAPID_SUBJECT?.trim() &&
-    subject === DEFAULT_VAPID_SUBJECT;
+  const usingDefaultSubject = source === "default";
   const subjectAcceptable = isVapidSubjectAcceptableForApple(subject);
 
   const issues: string[] = [];
@@ -141,14 +198,20 @@ export function getVapidServerDiagnostics(): VapidServerDiagnostics {
   }
   if (!subjectAcceptable) {
     issues.push(
-      "WEB_PUSH_VAPID_SUBJECT debe ser mailto:correo real o https://tu-dominio. iOS rechaza mailto:...@....local. Defínela en Dokploy (o usa EMAIL_SMTP_USER con correo válido).",
+      "Define WEB_PUSH_VAPID_SUBJECT en Dokploy (mailto:correo real o https://tu-dominio). Sin comillas. Luego Reload del servicio.",
     );
+    if (source !== "WEB_PUSH_VAPID_SUBJECT") {
+      issues.push(
+        `Subject actual viene de «${source}» y no es válido para iOS; conviene fijar WEB_PUSH_VAPID_SUBJECT explícitamente.`,
+      );
+    }
   }
 
   return {
     configured,
     keysMatch,
     subject,
+    subjectSource: source,
     subjectAcceptable,
     usingDefaultSubject,
     publicKeyFingerprint: vapidPublicKeyFingerprint(publicKey),
