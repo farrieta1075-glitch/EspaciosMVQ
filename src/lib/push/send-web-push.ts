@@ -91,12 +91,12 @@ export type WebPushUserError = {
 function appleVapid403Hint(): string {
   const diag = getVapidServerDiagnostics();
   if (!diag.keysMatch) {
-    return "iOS rechazó VAPID: la clave privada en Vercel no coincide con NEXT_PUBLIC_VAPID_PUBLIC_KEY. Genera un par (npm run generate:vapid), pon las dos claves en Vercel, redeploy y sincroniza de nuevo.";
+    return "iOS rechazó VAPID: la clave privada del servidor no coincide con NEXT_PUBLIC_VAPID_PUBLIC_KEY. Pon el mismo par en Dokploy, haz Rebuild y «Sincronizar dispositivo» en el iPhone.";
   }
   if (!diag.subjectAcceptable) {
-    return "iOS rechazó VAPID: falta WEB_PUSH_VAPID_SUBJECT en Vercel. Añade mailto:tu-correo@tudominio.com (correo real), redeploy, luego «Sincronizar dispositivo» en el iPhone.";
+    return "iOS rechazó VAPID: falta WEB_PUSH_VAPID_SUBJECT válido en Dokploy. Añade mailto:tu-correo@tudominio.com (correo real) o https://tu-dominio, Rebuild, luego «Sincronizar dispositivo».";
   }
-  return "iOS rechazó VAPID tras el envío. En Vercel confirma el par de claves y WEB_PUSH_VAPID_SUBJECT, redeploy, sincroniza el iPhone y vuelve a probar con la app en segundo plano.";
+  return "iOS rechazó VAPID tras el envío. En Dokploy confirma el par de claves y WEB_PUSH_VAPID_SUBJECT, Rebuild, sincroniza el iPhone y prueba con la app en segundo plano.";
 }
 
 function userHintForFailure(detail: WebPushDeliveryDetail): string {

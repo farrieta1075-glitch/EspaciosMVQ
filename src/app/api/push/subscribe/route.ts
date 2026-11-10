@@ -27,7 +27,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         error:
-          "Push no configurado en el servidor (faltan claves VAPID en Vercel).",
+          "Push no configurado en el servidor (faltan claves VAPID en Dokploy).",
       },
       { status: 503 },
     );

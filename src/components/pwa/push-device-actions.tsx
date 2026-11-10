@@ -65,7 +65,7 @@ export function PushDeviceActions({
       const localFp = localVapidFingerprint();
       if (serverFp && localFp && serverFp !== localFp) {
         issues.push(
-          "La app instalada usa otra clave VAPID que el servidor. En Vercel actualiza NEXT_PUBLIC_VAPID_PUBLIC_KEY y VAPID_PRIVATE_KEY juntas y espera un redeploy completo.",
+          "La app instalada usa otra clave VAPID que el servidor. En Dokploy actualiza NEXT_PUBLIC_VAPID_PUBLIC_KEY y VAPID_PRIVATE_KEY juntas y haz Rebuild.",
         );
       }
       setVapidIssues(issues);
@@ -170,7 +170,7 @@ export function PushDeviceActions({
       ) : null}
       {serverConfigured === false ? (
         <p className="text-xs text-destructive">
-          El servidor no tiene claves VAPID válidas (Vercel). Solo funcionan
+          El servidor no tiene claves VAPID válidas. Solo funcionan
           avisos dentro de la app.
         </p>
       ) : null}
