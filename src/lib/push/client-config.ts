@@ -6,22 +6,44 @@ export function getVapidPublicKey(): string {
   return process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY?.trim() ?? "";
 }
 
-/** Usa la clave del servidor si está disponible (tras cambios en Dokploy sin rebuild). */
+/** Clave pública del servidor (no la embebida en build — evita claves Vercel viejas en Dokploy). */
 export async function getVapidPublicKeyForSubscription(): Promise<string> {
-  const embedded = getVapidPublicKey();
+  let response: Response;
   try {
-    const response = await fetch("/api/push/vapid-public", {
+    response = await fetch("/api/push/vapid-public", {
       cache: "no-store",
+      credentials: "same-origin",
     });
-    if (response.ok) {
-      const data = (await response.json()) as { publicKey?: string };
-      const live = data.publicKey?.trim();
-      if (live) return live;
-    }
   } catch {
-    /* sin red: embebida */
+    throw new Error(
+      "No hay conexión con el servidor para leer la clave VAPID. Comprueba el dominio y la red.",
+    );
   }
-  return embedded;
+
+  if (!response.ok) {
+    throw new Error(
+      "El servidor no expuso la clave VAPID pública. Revisa NEXT_PUBLIC_VAPID_PUBLIC_KEY y VAPID_PRIVATE_KEY en Dokploy.",
+    );
+  }
+
+  const data = (await response.json()) as { publicKey?: string };
+  const live = data.publicKey?.trim();
+  if (!live) {
+    throw new Error("Clave VAPID pública vacía en el servidor.");
+  }
+
+  const embedded = getVapidPublicKey();
+  if (
+    embedded &&
+    embedded !== live &&
+    process.env.NODE_ENV === "development"
+  ) {
+    console.warn(
+      "[web-push] La clave embebida en build no coincide con /api/push/vapid-public; usando la del servidor.",
+    );
+  }
+
+  return live;
 }
 
 export function urlBase64ToUint8Array(base64String: string): BufferSource {

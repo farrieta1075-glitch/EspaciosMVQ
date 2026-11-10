@@ -124,6 +124,10 @@ function appleVapid403HintForError(detailError?: string): string {
 function userHintForFailure(detail: WebPushDeliveryDetail): string {
   if (detail.platform === "apple") {
     if (detail.statusCode === 403) {
+      const badJwt = /BadJwtToken/i.test(detail.error ?? "");
+      if (badJwt) {
+        return "Suscripción iOS con clave antigua (se eliminó del servidor). Pulsa «Sincronizar dispositivo» y luego «Probar aviso» otra vez.";
+      }
       const base = appleVapid403HintForError(detail.error);
       if (detail.error?.trim()) {
         return `${base} (Apple: ${detail.error.trim()})`;
@@ -233,7 +237,11 @@ export async function sendWebPushToUser(
         statusCode,
         error: message,
       });
-      if (statusCode === 404 || statusCode === 410) {
+      if (
+        statusCode === 404 ||
+        statusCode === 410 ||
+        (statusCode === 403 && /BadJwtToken/i.test(message))
+      ) {
         const { removePushSubscriptionByEndpoint } = await import(
           "@/lib/sheets/push-subscriptions"
         );

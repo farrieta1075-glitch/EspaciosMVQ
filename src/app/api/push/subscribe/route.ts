@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/lib/auth/index";
+import {
+  getVapidPrivateKeyFromEnv,
+  getVapidPublicKeyFromEnv,
+} from "@/lib/push/vapid-config";
 import { upsertPushSubscription } from "@/lib/sheets/push-subscriptions";
 
 export const runtime = "nodejs";
@@ -20,10 +24,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  if (
-    !process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY?.trim() ||
-    !process.env.VAPID_PRIVATE_KEY?.trim()
-  ) {
+  if (!getVapidPublicKeyFromEnv() || !getVapidPrivateKeyFromEnv()) {
     return NextResponse.json(
       {
         error:

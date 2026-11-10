@@ -36,13 +36,21 @@ export async function upsertPushSubscriptionSql(input: {
   const { createId } = await import("@/lib/id");
   const now = new Date();
 
+  await prisma.pushSubscription.deleteMany({
+    where: {
+      userId: input.userId,
+      deviceId: input.deviceId,
+      NOT: { endpoint: input.endpoint },
+    },
+  });
+
   const byEndpoint = await prisma.pushSubscription.findUnique({
     where: { endpoint: input.endpoint },
   });
   const byDevice = byEndpoint
     ? null
     : await prisma.pushSubscription.findFirst({
-        where: { deviceId: input.deviceId },
+        where: { userId: input.userId, deviceId: input.deviceId },
       });
 
   const existing = byEndpoint ?? byDevice;

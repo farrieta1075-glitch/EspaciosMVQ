@@ -45,11 +45,13 @@ async function obtainBrowserPushSubscription(
 
   let subscription = await registration.pushManager.getSubscription();
 
-  if (
-    subscription &&
-    (forceRefresh || (storedVapid && storedVapid !== vapidKey))
-  ) {
-    await subscription.unsubscribe();
+  const vapidChanged = Boolean(storedVapid && storedVapid !== vapidKey);
+  if (subscription && (forceRefresh || vapidChanged)) {
+    try {
+      await subscription.unsubscribe();
+    } catch {
+      /* iOS a veces falla si ya no existe; seguir */
+    }
     subscription = null;
   }
 
@@ -111,7 +113,7 @@ export async function syncWebPushSubscription(
   let subscription: PushSubscription;
   try {
     subscription = await obtainBrowserPushSubscription(registration, {
-      forceRefresh: isIosDevice(),
+      forceRefresh: true,
     });
   } catch (error) {
     return {
