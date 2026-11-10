@@ -100,9 +100,14 @@ export function SpaceMapViewer({
     }),
     [map],
   );
-  const measuredWidth = containerWidth ?? 0;
+  const fallbackWidth =
+    typeof window !== "undefined"
+      ? Math.max(280, Math.min(window.innerWidth - 24, 520))
+      : 320;
+  const measuredWidth =
+    containerWidth && containerWidth > 0 ? containerWidth : fallbackWidth;
   const displayScale =
-    measuredWidth > 0
+    mapWidth > 0
       ? fitContainerWidth
         ? measuredWidth / mapWidth
         : Math.min(measuredWidth / mapWidth, compact ? 0.6 : 1)
@@ -235,7 +240,7 @@ export function SpaceMapViewer({
         </div>
       )}
 
-      {loadingBg || displayScale === 0 ? (
+      {loadingBg ? (
         <div className="flex h-64 items-center justify-center">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>

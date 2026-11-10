@@ -106,13 +106,25 @@ function appleVapid403Hint(): string {
   if (!diag.subjectAcceptable) {
     return "iOS rechazó VAPID: falta WEB_PUSH_VAPID_SUBJECT válido en Dokploy. Añade mailto:tu-correo@tudominio.com (correo real) o https://tu-dominio, Rebuild, luego «Sincronizar dispositivo».";
   }
-  return "iOS rechazó VAPID tras el envío. En Dokploy confirma el par de claves y WEB_PUSH_VAPID_SUBJECT, Rebuild, sincroniza el iPhone y prueba con la app en segundo plano.";
+  return "iOS rechazó VAPID (BadJwtToken): la suscripción del iPhone no coincide con el par de claves del servidor. En Dokploy revisa NEXT_PUBLIC_VAPID_PUBLIC_KEY y VAPID_PRIVATE_KEY (mismo par), haz Rebuild, luego «Sincronizar dispositivo». Si cambiaste de dominio, abre la app desde el subdominio nuevo (no la IP antigua).";
+}
+
+function appleVapid403HintForError(detailError?: string): string {
+  const base = appleVapid403Hint();
+  const err = detailError?.trim() ?? "";
+  if (/BadJwtToken/i.test(err)) {
+    const diag = getVapidServerDiagnostics();
+    if (diag.keysMatch && diag.subjectAcceptable) {
+      return "Apple rechazó el token VAPID (BadJwtToken): casi siempre la app del iPhone quedó con una clave antigua o instalada desde el dominio anterior. Pulsa «Sincronizar dispositivo»; si sigue, Rebuild en Dokploy (par VAPID + WEB_PUSH_VAPID_SUBJECT), abre la app solo desde el subdominio nuevo y sincroniza otra vez.";
+    }
+  }
+  return base;
 }
 
 function userHintForFailure(detail: WebPushDeliveryDetail): string {
   if (detail.platform === "apple") {
     if (detail.statusCode === 403) {
-      const base = appleVapid403Hint();
+      const base = appleVapid403HintForError(detail.error);
       if (detail.error?.trim()) {
         return `${base} (Apple: ${detail.error.trim()})`;
       }

@@ -3,7 +3,7 @@
 import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { getOrCreateDeviceId } from "@/lib/push/device-id";
-import { getVapidPublicKey } from "@/lib/push/client-config";
+import { getVapidPublicKeyForSubscription } from "@/lib/push/client-config";
 import {
   isIosDevice,
   isStandaloneDisplayMode,
@@ -11,10 +11,10 @@ import {
   syncWebPushSubscription,
 } from "@/lib/push/subscribe-web-push";
 
-function localVapidFingerprint(): string {
-  const key = getVapidPublicKey().trim();
-  if (key.length < 16) return "";
-  return `${key.slice(0, 6)}…${key.slice(-6)}`;
+function fingerprintFromKey(key: string): string {
+  const trimmed = key.trim();
+  if (trimmed.length < 16) return "";
+  return `${trimmed.slice(0, 6)}…${trimmed.slice(-6)}`;
 }
 
 interface PushDeviceActionsProps {
@@ -79,7 +79,13 @@ export function PushDeviceActions({
         }
       }
       const serverFp = data.vapid?.publicKeyFingerprint?.trim();
-      const localFp = localVapidFingerprint();
+      let localFp = "";
+      try {
+        const liveKey = await getVapidPublicKeyForSubscription();
+        localFp = fingerprintFromKey(liveKey);
+      } catch {
+        /* ignore */
+      }
       if (serverFp && localFp && serverFp !== localFp) {
         issues.push(
           "La app instalada usa otra clave VAPID que el servidor. En Dokploy actualiza NEXT_PUBLIC_VAPID_PUBLIC_KEY y VAPID_PRIVATE_KEY juntas y haz Rebuild.",

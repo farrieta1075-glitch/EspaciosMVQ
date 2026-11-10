@@ -75,12 +75,20 @@ export function normalizeVapidSubject(raw: string): string {
   return trimmed;
 }
 
+function sanitizeVapidKey(value: string): string {
+  let key = sanitizeEnvString(value);
+  key = key.replace(/\\n/g, "").replace(/\s+/g, "");
+  return key;
+}
+
 export function getVapidPublicKeyFromEnv(): string {
-  return process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY?.trim() ?? "";
+  const raw = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "";
+  return sanitizeVapidKey(raw);
 }
 
 export function getVapidPrivateKeyFromEnv(): string {
-  return process.env.VAPID_PRIVATE_KEY?.trim() ?? "";
+  const raw = process.env.VAPID_PRIVATE_KEY ?? "";
+  return sanitizeVapidKey(raw);
 }
 
 function extractEmailFromFromHeader(value: string): string | null {

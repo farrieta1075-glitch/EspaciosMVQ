@@ -4,6 +4,7 @@ import {
 } from "@/lib/push/device-id";
 import {
   getVapidPublicKey,
+  getVapidPublicKeyForSubscription,
   isWebPushConfigured,
   urlBase64ToUint8Array,
 } from "@/lib/push/client-config";
@@ -33,7 +34,10 @@ async function obtainBrowserPushSubscription(
   registration: ServiceWorkerRegistration,
   options?: { forceRefresh?: boolean },
 ): Promise<PushSubscription> {
-  const vapidKey = getVapidPublicKey();
+  const vapidKey = await getVapidPublicKeyForSubscription();
+  if (!vapidKey) {
+    throw new Error("El servidor no tiene clave VAPID pública configurada.");
+  }
   const applicationServerKey = urlBase64ToUint8Array(vapidKey);
   const storedVapid = localStorage.getItem(VAPID_STORAGE_KEY);
   const forceRefresh =
