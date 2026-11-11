@@ -1,5 +1,6 @@
 import "server-only";
 import { createECDH } from "crypto";
+import webpush from "web-push";
 import { getAppBaseUrl } from "@/lib/app-url";
 
 export const DEFAULT_VAPID_SUBJECT = "mailto:soporte@mvqro.local";
@@ -243,9 +244,51 @@ export function getVapidEnvProbe(): VapidEnvProbe {
   };
 }
 
+const VAPID_SELFTEST_ENDPOINT = "https://web.push.apple.com/self-test";
+
+/** Genera header Authorization VAPID; detecta clave privada corrupta en Dokploy. */
+export function runVapidJwtSelfTest(): { ok: boolean; error?: string } {
+  try {
+    const subject = getVapidSubjectFromEnv();
+    const publicKey = getVapidPublicKeyFromEnv();
+    const privateKey = getVapidPrivateKeyFromEnv();
+    if (!publicKey || !privateKey) {
+      return { ok: false, error: "Faltan claves VAPID." };
+    }
+    if (!isVapidSubjectAcceptableForApple(subject)) {
+      return { ok: false, error: "Subject VAPID no válido para iOS." };
+    }
+    webpush.setVapidDetails(subject, publicKey, privateKey);
+    const details = webpush.generateRequestDetails(
+      {
+        endpoint: VAPID_SELFTEST_ENDPOINT,
+        keys: {
+          p256dh:
+            "BEl62iUYgUih04TsiZTWy1xWh0X5gYzXgWrY8V6VxPGrn7F3wj0nYbkLORtr1MgpDwRNzJVuxn5BfGD9JkXKW3E=",
+          auth: "tBHItJI5svap7F0MXrA",
+        },
+      },
+      "ping",
+      { TTL: 60 },
+    );
+    const auth = details.headers?.Authorization ?? "";
+    if (!auth.startsWith("vapid t=")) {
+      return { ok: false, error: "No se generó JWT VAPID." };
+    }
+    return { ok: true };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Error generando JWT VAPID.",
+    };
+  }
+}
+
 export type VapidServerDiagnostics = {
   configured: boolean;
   keysMatch: boolean;
+  jwtSelfTestOk: boolean;
+  jwtSelfTestError?: string;
   subject: string;
   subjectSource: VapidSubjectSource;
   subjectAcceptable: boolean;
@@ -261,6 +304,7 @@ export function getVapidServerDiagnostics(): VapidServerDiagnostics {
   const { subject, source } = resolveVapidSubjectFromEnv();
   const configured = Boolean(publicKey && privateKey);
   const keysMatch = configured ? vapidKeysMatchInEnv() : false;
+  const selfTest = configured && keysMatch ? runVapidJwtSelfTest() : { ok: false };
   const usingDefaultSubject = source === "default";
   const subjectAcceptable = isVapidSubjectAcceptableForApple(subject);
 
@@ -272,6 +316,10 @@ export function getVapidServerDiagnostics(): VapidServerDiagnostics {
   } else if (!keysMatch) {
     issues.push(
       "La clave privada no corresponde a la pública: genera un par con npm run generate:vapid, define ambas en Dokploy y haz Rebuild.",
+    );
+  } else if (!selfTest.ok) {
+    issues.push(
+      `La clave privada en Dokploy parece corrupta (JWT VAPID no se genera). Pega de nuevo VAPID_PRIVATE_KEY en una sola línea, sin comillas. Detalle: ${selfTest.error ?? "error"}`,
     );
   }
   const envProbe = getVapidEnvProbe();
@@ -301,6 +349,8 @@ export function getVapidServerDiagnostics(): VapidServerDiagnostics {
   return {
     configured,
     keysMatch,
+    jwtSelfTestOk: selfTest.ok,
+    jwtSelfTestError: selfTest.error,
     subject,
     subjectSource: source,
     subjectAcceptable,

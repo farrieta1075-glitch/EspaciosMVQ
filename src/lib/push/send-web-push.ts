@@ -178,9 +178,10 @@ export async function sendWebPushToUser(
 
   let subscriptions = await getPushSubscriptionsForUser(userId);
   if (options?.deviceId) {
-    subscriptions = subscriptions.filter(
-      (item) => item.deviceId === options.deviceId,
-    );
+    subscriptions = subscriptions
+      .filter((item) => item.deviceId === options.deviceId)
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+      .slice(0, 1);
   }
   if (subscriptions.length === 0) {
     console.info(

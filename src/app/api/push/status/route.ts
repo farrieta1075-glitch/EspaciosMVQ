@@ -27,6 +27,8 @@ export async function GET(request: Request) {
       vapidDiag.subjectAcceptable,
     vapid: {
       keysMatch: vapidDiag.keysMatch,
+      jwtSelfTestOk: vapidDiag.jwtSelfTestOk,
+      jwtSelfTestError: vapidDiag.jwtSelfTestError,
       subjectAcceptable: vapidDiag.subjectAcceptable,
       subjectSource: vapidDiag.subjectSource,
       usingDefaultSubject: vapidDiag.usingDefaultSubject,

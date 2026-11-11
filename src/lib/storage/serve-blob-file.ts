@@ -1,4 +1,6 @@
 import "server-only";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { get, list } from "@vercel/blob";
 import { NextResponse } from "next/server";
 import {
@@ -9,22 +11,50 @@ import {
 
 const FILENAME_PATTERN = /^[a-zA-Z0-9._-]+$/;
 
+const MIME_BY_EXT: Record<string, string> = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  webp: "image/webp",
+  gif: "image/gif",
+  pdf: "application/pdf",
+};
+
+function contentTypeForFilename(filename: string): string {
+  const ext = filename.split(".").pop()?.toLowerCase() ?? "";
+  return MIME_BY_EXT[ext] ?? "application/octet-stream";
+}
+
+async function serveLocalUpload(
+  folder: "maps" | "resources",
+  filename: string,
+): Promise<Response | null> {
+  const filePath = path.join(
+    process.cwd(),
+    "public",
+    "uploads",
+    folder,
+    filename,
+  );
+  try {
+    const buffer = await readFile(filePath);
+    return new Response(buffer, {
+      headers: {
+        "Content-Type": contentTypeForFilename(filename),
+        "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
+        "X-Content-Type-Options": "nosniff",
+        "X-Storage-Source": "vps-uploads",
+      },
+    });
+  } catch {
+    return null;
+  }
+}
+
 export async function serveBlobFile(
   folder: "maps" | "resources",
   filename: string,
 ): Promise<Response> {
-  if (!isBlobConfigured()) {
-    return NextResponse.json(
-      {
-        error: "Almacenamiento no configurado",
-        code: "NO_BLOB_AUTH",
-      },
-      { status: 503 },
-    );
-  }
-
-  const blobAuth = getBlobRequestOptions();
-
   const decoded = decodeURIComponent(filename);
   if (!decoded || !FILENAME_PATTERN.test(decoded)) {
     return NextResponse.json(
@@ -33,6 +63,23 @@ export async function serveBlobFile(
     );
   }
 
+  const local = await serveLocalUpload(folder, decoded);
+  if (local) {
+    return local;
+  }
+
+  if (!isBlobConfigured()) {
+    return NextResponse.json(
+      {
+        error: "Archivo no encontrado en el servidor",
+        code: "NO_LOCAL_OR_BLOB",
+        hint: "Ejecuta scripts/migrate-blob-to-vps-uploads.mjs o define BLOB_READ_WRITE_TOKEN.",
+      },
+      { status: 404 },
+    );
+  }
+
+  const blobAuth = getBlobRequestOptions();
   const pathname = `${folder}/${decoded}`;
   const access = getBlobAccessMode();
 

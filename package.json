@@ -16,6 +16,8 @@
     "test:email": "node --env-file=.env.local scripts/test-email.mjs",
     "list:admin-emails": "node --env-file=.env.local scripts/list-admin-emails.mjs",
     "migrate:uploads-to-blob": "node --env-file=.env.local scripts/migrate-uploads-to-blob.mjs",
+    "migrate:blob-to-vps": "node --env-file=.env.local scripts/migrate-blob-to-vps-uploads.mjs",
+    "migrate:blob-to-vps:dry-run": "node --env-file=.env.local scripts/migrate-blob-to-vps-uploads.mjs --dry-run",
     "generate:vapid": "node scripts/generate-vapid-keys.mjs",
     "db:purge-push-subscriptions": "node --env-file=.env.local scripts/purge-push-subscriptions.mjs --confirm",
     "db:purge-push-subscriptions:dry-run": "node --env-file=.env.local scripts/purge-push-subscriptions.mjs",
