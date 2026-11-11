@@ -43,16 +43,19 @@ export function normalizeVapidSubject(raw: string): string {
   const trimmed = sanitizeEnvString(raw);
   if (!trimmed) return trimmed;
 
-  const fromHeader = extractEmailFromFromHeader(trimmed);
-  if (fromHeader) {
-    return `mailto:${fromHeader}`;
+  const mailtoMatch = trimmed.match(/^(?:mailto:\s*)+(.+)$/i);
+  if (mailtoMatch) {
+    const rest = sanitizeEnvString(mailtoMatch[1]);
+    const email = extractEmailFromFromHeader(rest) ?? rest;
+    if (/^[^\s@:<>]+@[^\s@:<>]+\.[^\s@:<>]+$/.test(email)) {
+      return `mailto:${email}`;
+    }
   }
 
-  const mailtoMatch = trimmed.match(/^mailto:\s*(.+)$/i);
-  if (mailtoMatch) {
-    const email = sanitizeEnvString(mailtoMatch[1]);
-    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return `mailto:${email}`;
+  if (trimmed.includes("<")) {
+    const fromHeader = extractEmailFromFromHeader(trimmed);
+    if (fromHeader) {
+      return `mailto:${fromHeader}`;
     }
   }
 
@@ -96,7 +99,7 @@ function extractEmailFromFromHeader(value: string): string | null {
   const trimmed = value.trim();
   const angle = trimmed.match(/<([^>]+)>/);
   const candidate = (angle ? angle[1] : trimmed).trim();
-  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(candidate)) {
+  if (/^[^\s@:<>]+@[^\s@:<>]+\.[^\s@:<>]+$/.test(candidate)) {
     return candidate;
   }
   return null;
@@ -193,9 +196,9 @@ export function vapidKeysMatchInEnv(): boolean {
 export function isVapidSubjectAcceptableForApple(subject: string): boolean {
   const trimmed = subject.trim();
   if (/^mailto:/i.test(trimmed)) {
-    const email = sanitizeEnvString(trimmed.replace(/^mailto:\s*/i, ""));
+    const email = trimmed.slice("mailto:".length);
     if (!email || email.includes(".local")) return false;
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    return /^[^\s@:<>]+@[^\s@:<>]+\.[^\s@:<>]+$/.test(email);
   }
   if (trimmed.startsWith("https://")) {
     try {
@@ -216,10 +219,10 @@ export function vapidPublicKeyFingerprint(publicKey?: string): string {
 
 export function maskVapidSubjectPreview(subject: string): string {
   if (/^mailto:/i.test(subject)) {
-    const email = sanitizeEnvString(subject.replace(/^mailto:\s*/i, ""));
+    const email = subject.slice("mailto:".length);
     const at = email.indexOf("@");
-    if (at <= 0) return "mailto:(mal formado)";
-    return `mailto:${email.slice(0, Math.min(2, at))}…@${email.slice(at + 1)}`;
+    if (at <= 0 || email.includes(":")) return `(mal formado: ${subject.length} caracteres)`;
+    return `mailto:${email.slice(0, Math.min(2, at))}…@${email.slice(at + 1)} (${subject.length} caracteres)`;
   }
   try {
     return new URL(subject).origin;
