@@ -244,9 +244,7 @@ export function getVapidEnvProbe(): VapidEnvProbe {
   };
 }
 
-const VAPID_SELFTEST_ENDPOINT = "https://web.push.apple.com/self-test";
-
-/** Genera header Authorization VAPID; detecta clave privada corrupta en Dokploy. */
+/** Firma un JWT VAPID para Apple; detecta clave privada corrupta en Dokploy. */
 export function runVapidJwtSelfTest(): { ok: boolean; error?: string } {
   try {
     const subject = getVapidSubjectFromEnv();
@@ -258,21 +256,14 @@ export function runVapidJwtSelfTest(): { ok: boolean; error?: string } {
     if (!isVapidSubjectAcceptableForApple(subject)) {
       return { ok: false, error: "Subject VAPID no válido para iOS." };
     }
-    webpush.setVapidDetails(subject, publicKey, privateKey);
-    const details = webpush.generateRequestDetails(
-      {
-        endpoint: VAPID_SELFTEST_ENDPOINT,
-        keys: {
-          p256dh:
-            "BEl62iUYgUih04TsiZTWy1xWh0X5gYzXgWrY8V6VxPGrn7F3wj0nYbkLORtr1MgpDwRNzJVuxn5BfGD9JkXKW3E=",
-          auth: "tBHItJI5svap7F0MXrA",
-        },
-      },
-      "ping",
-      { TTL: 60 },
+    const headers = webpush.getVapidHeaders(
+      "https://web.push.apple.com",
+      subject,
+      publicKey,
+      privateKey,
+      "aes128gcm",
     );
-    const auth = details.headers?.Authorization ?? "";
-    if (!auth.startsWith("vapid t=")) {
+    if (!String(headers.Authorization ?? "").startsWith("vapid t=")) {
       return { ok: false, error: "No se generó JWT VAPID." };
     }
     return { ok: true };

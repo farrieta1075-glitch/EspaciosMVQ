@@ -21,6 +21,7 @@ export async function GET(request: Request) {
     : undefined;
 
   return NextResponse.json({
+    serverTimeUtc: new Date().toISOString(),
     serverConfigured:
       vapidDiag.configured &&
       vapidDiag.keysMatch &&

@@ -77,7 +77,6 @@
     "@types/web-push": "^3.6.4",
     "eslint": "^9.33.0",
     "eslint-config-next": "^15.4.6",
-    "mssql": "^11.0.2",
     "prisma": "^6.19.2",
     "tailwindcss": "^4.1.11",
     "typescript": "^5.9.2"
