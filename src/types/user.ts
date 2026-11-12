@@ -18,6 +18,8 @@ export interface AppUser {
   active: boolean;
   /** Solo aplica a ADMIN: recibir correos de autorización de reservas. */
   receiveApprovalEmails: boolean;
+  /** Puede ver y activar el toggle de todos los espacios (baños, zonas internas). */
+  canViewAllSpaces: boolean;
 }
 
 export interface SessionUser {
@@ -28,6 +30,7 @@ export interface SessionUser {
   areaId?: string | null;
   areaScopeIds?: string[];
   areaName?: string | null;
+  canViewAllSpaces?: boolean;
 }
 
 export type PublicUser = Omit<AppUser, "passwordHash"> & {

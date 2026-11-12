@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth/index";
 import { can, isAdmin } from "@/lib/auth/permissions";
 import type { UserRole } from "@/types/user";
 import { getCachedCatalogBundle } from "@/lib/sheets/cached-catalog";
+import { getUserById } from "@/lib/sheets/users";
 import { listAllReservationDetails } from "@/lib/reservation-service";
 import { CalendarClient } from "@/components/calendar/calendar-client";
 
@@ -28,6 +29,9 @@ export default async function CalendarioPage({
   ]);
 
   const admin = isAdmin(session?.user ?? null);
+  const userRecord = session?.user?.id
+    ? await getUserById(session.user.id)
+    : null;
 
   const pickMode = params.pick === "1";
   const returnTo =
@@ -52,6 +56,7 @@ export default async function CalendarioPage({
         initialSpaceId={params.spaceId}
         pickMode={pickMode && Boolean(returnTo)}
         returnTo={returnTo}
+        canViewAllSpaces={userRecord?.canViewAllSpaces === true}
       />
     </section>
   );

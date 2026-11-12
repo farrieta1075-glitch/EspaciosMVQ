@@ -26,6 +26,11 @@ const spaceRowSchema = z.object({
     .optional()
     .default("true")
     .transform((value) => value.toLowerCase() !== "false"),
+  isCommon: z
+    .string()
+    .optional()
+    .default("true")
+    .transform((value) => value.toLowerCase() !== "false"),
 });
 
 function parseGeometry(raw: string): SpaceGeometry | null {
@@ -47,6 +52,7 @@ function spaceToRow(space: Space): string[] {
     space.mapId,
     space.active ? "true" : "false",
     String(space.minCapacity > 0 ? space.minCapacity : 1),
+    space.isCommon !== false ? "true" : "false",
   ];
 }
 
@@ -95,6 +101,7 @@ export async function getAllSpaces(): Promise<Space[]> {
       geometry: parseGeometry(parsed.data.geometryJson),
       mapId: parsed.data.mapId,
       active: parsed.data.active,
+      isCommon: parsed.data.isCommon,
     });
   }
 
@@ -134,6 +141,7 @@ export async function createSpace(
     geometry: input.geometry,
     mapId: input.mapId,
     active: input.active,
+    isCommon: input.isCommon !== false,
   };
 
   if (!space.id) {

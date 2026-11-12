@@ -31,6 +31,11 @@ const userRowSchema = z.object({
     .default("true")
     .transform((value) => value.toLowerCase() !== "false"),
   areaScopeIds: z.string().optional().default(""),
+  canViewAllSpaces: z
+    .string()
+    .optional()
+    .default("false")
+    .transform((value) => value.toLowerCase() === "true"),
 });
 
 function parseAreaScopeIds(raw: string): string[] {
@@ -71,6 +76,7 @@ export function mapRowToUser(row: Record<string, string>): AppUser {
     areaId: parsed.areaId || null,
     active: parsed.active,
     receiveApprovalEmails: parsed.receiveApprovalEmails,
+    canViewAllSpaces: parsed.canViewAllSpaces,
     areaScopeIds: parseAreaScopeIds(parsed.areaScopeIds),
   };
 }
@@ -86,6 +92,7 @@ function userToRow(user: AppUser): string[] {
     user.active ? "true" : "false",
     user.role === "ADMIN" && user.receiveApprovalEmails ? "true" : "false",
     serializeAreaScopeIds(user.areaScopeIds ?? []),
+    user.canViewAllSpaces ? "true" : "false",
   ];
 }
 
@@ -167,6 +174,7 @@ export async function createUser(input: {
   areaScopeIds?: string[];
   active?: boolean;
   receiveApprovalEmails?: boolean;
+  canViewAllSpaces?: boolean;
 }): Promise<AppUser> {
   if (isCatalogOnSql()) {
     const catalog = await import("@/lib/db/catalog/users");
@@ -186,6 +194,7 @@ export async function createUser(input: {
     active: input.active ?? true,
     receiveApprovalEmails:
       input.role === "ADMIN" ? (input.receiveApprovalEmails ?? true) : false,
+    canViewAllSpaces: input.canViewAllSpaces ?? false,
   };
 
   await appendSheetRow(SHEET_TABS.USUARIOS, userToRow(user));
@@ -203,6 +212,7 @@ export async function updateUser(
     areaScopeIds: string[];
     active: boolean;
     receiveApprovalEmails: boolean;
+    canViewAllSpaces: boolean;
   }>,
 ): Promise<AppUser | null> {
   if (isCatalogOnSql()) {
@@ -243,6 +253,7 @@ export async function updateUser(
         ? (input.receiveApprovalEmails ??
           (existing.role === "ADMIN" ? existing.receiveApprovalEmails : true))
         : false,
+    canViewAllSpaces: input.canViewAllSpaces ?? existing.canViewAllSpaces,
     passwordHash:
       input.password && input.password.trim()
         ? await bcrypt.hash(input.password, 10)

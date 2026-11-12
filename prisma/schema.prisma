@@ -16,6 +16,7 @@ model User {
   areaId                String? @db.VarChar(64)
   active                Boolean @default(true)
   receiveApprovalEmails Boolean @default(true)
+  canViewAllSpaces      Boolean @default(false)
   areaScopeIds          String  @default("[]") @db.Text
 
   @@map("Users")
@@ -59,6 +60,7 @@ model Space {
   mapId        String  @db.VarChar(64)
   active       Boolean @default(true)
   minCapacity  Int     @default(0)
+  isCommon     Boolean @default(true)
 
   @@index([mapId])
   @@map("Spaces")

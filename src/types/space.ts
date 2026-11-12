@@ -15,6 +15,8 @@ export interface Space {
   geometry: SpaceGeometry | null;
   mapId: string;
   active: boolean;
+  /** false = baños, zonas internas, etc. Solo se ven con “todos los espacios” o si hay reserva. */
+  isCommon: boolean;
 }
 
 export type BackgroundType = "blank" | "image" | "pdf";

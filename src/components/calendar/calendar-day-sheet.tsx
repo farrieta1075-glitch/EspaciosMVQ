@@ -31,6 +31,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
+import { visibleSpacesForMap } from "@/lib/space-visibility";
 
 interface CalendarDaySheetProps {
   open: boolean;
@@ -44,6 +45,7 @@ interface CalendarDaySheetProps {
   canReserve: boolean;
   initialMapId?: string;
   initialSpaceId?: string;
+  showAllSpaces?: boolean;
 }
 
 function reservationsOnDate(reservations: ReservationDetail[], date: Date) {
@@ -79,6 +81,7 @@ export function CalendarDaySheet({
   canReserve,
   initialMapId,
   initialSpaceId,
+  showAllSpaces = false,
 }: CalendarDaySheetProps) {
   const [mapId, setMapId] = React.useState(
     initialMapId ?? maps[0]?.id ?? "",
@@ -125,8 +128,12 @@ export function CalendarDaySheet({
   }, [dayEvents]);
 
   const currentMap = maps.find((item) => item.id === mapId) ?? maps[0];
-  const mapSpaces = spaces.filter(
-    (space) => space.mapId === mapId && space.active,
+  const mapSpaces = visibleSpacesForMap(
+    spaces.filter((space) => space.mapId === mapId && space.active),
+    {
+      showAllSpaces,
+      reservedSpaceIds: occupancyBySpace.keys(),
+    },
   );
 
   const spaceStatuses = React.useMemo(() => {

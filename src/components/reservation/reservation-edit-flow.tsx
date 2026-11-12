@@ -61,6 +61,7 @@ interface ReservationEditFlowProps {
   isAdmin: boolean;
   userAreaId: string | null;
   userAreaScopeIds: string[];
+  canViewAllSpaces?: boolean;
 }
 
 export function ReservationEditFlow({
@@ -71,6 +72,7 @@ export function ReservationEditFlow({
   isAdmin,
   userAreaId,
   userAreaScopeIds,
+  canViewAllSpaces = false,
 }: ReservationEditFlowProps) {
   const router = useRouter();
   const defaultMapId =
@@ -460,6 +462,7 @@ export function ReservationEditFlow({
         isAdmin={isAdmin}
         userAreaId={userAreaId}
         userAreaScopeIds={userAreaScopeIds}
+        canViewAllSpaces={canViewAllSpaces}
         initialDate={restoredSelection?.date ?? initialDate}
         mapSelectorKey={mapSelectorKey}
         restoredSelection={restoredSelection}

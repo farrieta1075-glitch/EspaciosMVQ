@@ -14,6 +14,7 @@ const updateSpaceSchema = z.object({
   minCapacity: z.coerce.number().optional(),
   mapId: z.string().optional(),
   active: z.boolean().optional(),
+  isCommon: z.boolean().optional(),
   geometry: z
     .object({
       type: z.enum(["rect", "polygon"]),

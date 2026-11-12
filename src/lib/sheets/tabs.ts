@@ -25,6 +25,7 @@ export const SHEET_HEADERS: Record<SheetTab, string[]> = {
     "active",
     "receiveApprovalEmails",
     "areaScopeIds",
+    "canViewAllSpaces",
   ],
   Areas: ["id", "name", "code", "parentId", "colorHex", "eventPresets"],
   Espacios: [
@@ -37,6 +38,7 @@ export const SHEET_HEADERS: Record<SheetTab, string[]> = {
     "active",
     /** Al final para no desalinear filas existentes (antes de minCapacity). */
     "minCapacity",
+    "isCommon",
   ],
   Mapas: [
     "id",

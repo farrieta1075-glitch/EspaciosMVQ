@@ -14,6 +14,7 @@ interface MapDateSelectorWrapperProps {
   readOnly?: boolean;
   compact?: boolean;
   onSelectionChange?: (selection: MapDateSelection) => void;
+  canViewAllSpaces?: boolean;
 }
 
 export function MapDateSelectorWrapper(props: MapDateSelectorWrapperProps) {

@@ -36,6 +36,7 @@ export async function createSpace(
       geometryJson: geometryJson(input),
       mapId: input.mapId,
       active: input.active,
+      isCommon: input.isCommon !== false,
     },
   });
   return mapDbSpace(row);
@@ -63,6 +64,7 @@ export async function updateSpace(
         input.geometry !== undefined ? geometryJson({ geometry: input.geometry }) : geometryJson(existing),
       mapId: input.mapId ?? existing.mapId,
       active: input.active ?? existing.active,
+      isCommon: input.isCommon ?? existing.isCommon,
     },
   });
   return mapDbSpace(row);

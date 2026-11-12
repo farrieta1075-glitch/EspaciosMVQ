@@ -18,6 +18,7 @@ const createUserSchema = z
     areaScopeIds: z.array(z.string()).optional().default([]),
     active: z.boolean().optional().default(true),
     receiveApprovalEmails: z.boolean().optional(),
+    canViewAllSpaces: z.boolean().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.email?.trim()) {
@@ -42,6 +43,7 @@ function toPublicUser(
     areaScopeIds: string[];
     active: boolean;
     receiveApprovalEmails: boolean;
+    canViewAllSpaces: boolean;
     areaName?: string | null;
   },
   passwordConfigured = false,
@@ -55,6 +57,7 @@ function toPublicUser(
     areaScopeIds: user.areaScopeIds ?? [],
     active: user.active,
     receiveApprovalEmails: user.receiveApprovalEmails,
+    canViewAllSpaces: user.canViewAllSpaces,
     areaName: user.areaName,
     passwordConfigured,
   };
@@ -104,6 +107,7 @@ export async function POST(request: Request) {
     areaScopeIds,
     active,
     receiveApprovalEmails,
+    canViewAllSpaces,
   } = parsed.data;
   const scopeIds = [...new Set(areaScopeIds.filter(Boolean))];
   const primaryAreaId = areaId?.trim() || scopeIds[0] || null;
@@ -134,6 +138,7 @@ export async function POST(request: Request) {
       areaScopeIds: scopeIds.length > 0 ? scopeIds : primaryAreaId ? [primaryAreaId] : [],
       active,
       receiveApprovalEmails,
+      canViewAllSpaces,
     });
     const [publicUser] = await enrichUsers([user]);
     return NextResponse.json(publicUser, { status: 201 });

@@ -10,6 +10,7 @@ const createSpaceSchema = z.object({
   minCapacity: z.coerce.number().optional().default(1),
   mapId: z.string().optional().default(""),
   active: z.boolean().optional().default(true),
+  isCommon: z.boolean().optional().default(true),
   geometry: z
     .object({
       type: z.enum(["rect", "polygon"]),
@@ -48,6 +49,7 @@ export async function POST(request: Request) {
     minCapacity: parsed.data.minCapacity,
     mapId: parsed.data.mapId,
     active: parsed.data.active,
+    isCommon: parsed.data.isCommon,
     geometry: parsed.data.geometry ?? null,
   });
 

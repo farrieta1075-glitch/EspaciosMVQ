@@ -57,6 +57,7 @@ interface UserFormState {
   areaScopeIds: string[];
   active: boolean;
   receiveApprovalEmails: boolean;
+  canViewAllSpaces: boolean;
 }
 
 const emptyForm: UserFormState = {
@@ -68,6 +69,7 @@ const emptyForm: UserFormState = {
   areaScopeIds: [],
   active: true,
   receiveApprovalEmails: true,
+  canViewAllSpaces: false,
 };
 
 interface UserFormFieldsProps {
@@ -293,6 +295,18 @@ function UserFormFields({
         />
         Usuario activo
       </label>
+      <label className="flex items-start gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={form.canViewAllSpaces}
+          onChange={(e) => onPatch({ canViewAllSpaces: e.target.checked })}
+          className="mt-0.5 rounded border-border"
+        />
+        <span>
+          Ver todos los espacios (baños y zonas internas) y el botón para
+          mostrarlos u ocultarlos en el calendario
+        </span>
+      </label>
       {form.role === "ADMIN" && (
         <label className="flex items-start gap-2 text-sm">
           <input
@@ -379,6 +393,7 @@ export function AdminUsuariosClient({
       areaScopeIds: user.areaScopeIds ?? (user.areaId ? [user.areaId] : []),
       active: user.active,
       receiveApprovalEmails: user.receiveApprovalEmails,
+      canViewAllSpaces: user.canViewAllSpaces === true,
     });
     setEditPasswordConfigured(Boolean(user.passwordConfigured));
     setShowPassword(false);
@@ -409,6 +424,7 @@ export function AdminUsuariosClient({
       areaId: primaryAreaId,
       areaScopeIds,
       active: form.active,
+      canViewAllSpaces: form.canViewAllSpaces,
       ...(form.role === "ADMIN"
         ? { receiveApprovalEmails: form.receiveApprovalEmails }
         : {}),

@@ -34,6 +34,8 @@ import { formatDateISO } from "@/lib/date-utils";
 import { preloadMapBackgrounds } from "@/lib/map-background-cache";
 import { readJsonResponse } from "@/lib/read-json-response";
 import { releaseRadixBodyScrollLockIfIdle } from "@/lib/radix-body-lock";
+import { SpacesVisibilityToggle } from "@/components/calendar/spaces-visibility-toggle";
+import { visibleSpacesForMap } from "@/lib/space-visibility";
 
 export interface InitialMapSelection {
   date?: string;
@@ -70,6 +72,7 @@ interface MapDateSelectorProps {
   emptySpaceLegend?: string;
   estimatedAttendees?: number;
   resourcesDisabled?: boolean;
+  canViewAllSpaces?: boolean;
 }
 
 export function MapDateSelector({
@@ -97,6 +100,7 @@ export function MapDateSelector({
   emptySpaceLegend,
   estimatedAttendees = 0,
   resourcesDisabled = false,
+  canViewAllSpaces = false,
 }: MapDateSelectorProps) {
   const isReservationLayout = layout === "reservation";
   const [selectedDate, setSelectedDate] = React.useState(() => {
@@ -151,9 +155,21 @@ export function MapDateSelector({
   const resourcesBlocked =
     resourcesDisabled || selectedSpaceIds.length === 0;
 
+  const [showAllSpaces, setShowAllSpaces] = React.useState(false);
   const currentMap = maps.find((map) => map.id === mapId) ?? maps[0];
-  const mapSpaces = spaces.filter(
-    (space) => space.mapId === mapId && space.active,
+  const reservedSpaceIds = React.useMemo(
+    () =>
+      (availability?.spaces ?? [])
+        .filter((space) => space.status === "occupied")
+        .map((space) => space.id),
+    [availability?.spaces],
+  );
+  const mapSpaces = visibleSpacesForMap(
+    spaces.filter((space) => space.mapId === mapId && space.active),
+    {
+      showAllSpaces: canViewAllSpaces && showAllSpaces,
+      reservedSpaceIds,
+    },
   );
 
   const spaceStatuses = React.useMemo(() => {
@@ -480,6 +496,14 @@ export function MapDateSelector({
               compact={compact || isReservationLayout}
               fitContainerWidth={isReservationLayout}
               showDefaultLegend={!isReservationLayout}
+              headerExtra={
+                canViewAllSpaces ? (
+                  <SpacesVisibilityToggle
+                    showAllSpaces={showAllSpaces}
+                    onToggle={() => setShowAllSpaces((value) => !value)}
+                  />
+                ) : undefined
+              }
               getSpacePaintStyle={
                 isReservationLayout ? reservationPaintStyle : undefined
               }

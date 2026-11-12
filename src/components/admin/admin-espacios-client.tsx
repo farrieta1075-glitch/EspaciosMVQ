@@ -13,7 +13,8 @@ import {
   Trash2,
 } from "lucide-react";
 import { HelpHint } from "@/components/ui/help-hint";
-import type { FloorMap, Space } from "@/types/space";
+import type { FloorMap, MapFloorId, Space } from "@/types/space";
+import { normalizeMapFloorId } from "@/lib/map-floors";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -37,6 +38,24 @@ interface AdminEspaciosClientProps {
   initialSpaces: Space[];
 }
 
+function floorChoices(map: FloorMap | undefined): { id: MapFloorId; label: string }[] {
+  return [
+    {
+      id: "1",
+      label: map?.floor1Label?.trim() || "Planta principal",
+    },
+    {
+      id: "2",
+      label: map?.floor2Label?.trim() || "Piso 2",
+    },
+  ];
+}
+
+function floorLabel(map: FloorMap | undefined, floor: string): string {
+  const id = normalizeMapFloorId(floor);
+  return floorChoices(map).find((item) => item.id === id)?.label ?? id;
+}
+
 export function AdminEspaciosClient({
   initialMaps,
   initialSpaces,
@@ -54,10 +73,11 @@ export function AdminEspaciosClient({
   const [mapFile, setMapFile] = React.useState<File | null>(null);
 
   const [spaceName, setSpaceName] = React.useState("");
-  const [spaceFloor, setSpaceFloor] = React.useState("");
+  const [spaceFloor, setSpaceFloor] = React.useState("1");
   const [spaceCapacity, setSpaceCapacity] = React.useState("10");
   const [spaceMinCapacity, setSpaceMinCapacity] = React.useState("1");
   const [spaceMapId, setSpaceMapId] = React.useState(maps[0]?.id ?? "");
+  const [spaceIsCommon, setSpaceIsCommon] = React.useState(true);
   const [mapsSectionOpen, setMapsSectionOpen] = React.useState(false);
   const [spacesSectionOpen, setSpacesSectionOpen] = React.useState(false);
   const [createSpaceOpen, setCreateSpaceOpen] = React.useState(false);
@@ -73,10 +93,30 @@ export function AdminEspaciosClient({
   const [editSpaceMinCapacity, setEditSpaceMinCapacity] = React.useState("1");
   const [editSpaceMapId, setEditSpaceMapId] = React.useState("");
   const [editSpaceActive, setEditSpaceActive] = React.useState(true);
+  const [editSpaceIsCommon, setEditSpaceIsCommon] = React.useState(true);
+
+  const selectedCreateMap = maps.find((map) => map.id === spaceMapId) ?? maps[0];
+  const selectedEditMap =
+    maps.find((map) => map.id === editSpaceMapId) ?? selectedCreateMap;
 
   React.useEffect(() => {
     if (!spaceMapId && maps[0]?.id) setSpaceMapId(maps[0].id);
   }, [maps, spaceMapId]);
+
+  React.useEffect(() => {
+    const ids = floorChoices(selectedCreateMap).map((item) => item.id);
+    if (!ids.includes(normalizeMapFloorId(spaceFloor))) {
+      setSpaceFloor(ids[0] ?? "1");
+    }
+  }, [selectedCreateMap, spaceFloor]);
+
+  React.useEffect(() => {
+    if (!editSpace) return;
+    const ids = floorChoices(selectedEditMap).map((item) => item.id);
+    if (!ids.includes(normalizeMapFloorId(editSpaceFloor))) {
+      setEditSpaceFloor(ids[0] ?? "1");
+    }
+  }, [editSpace, selectedEditMap, editSpaceFloor]);
 
   async function refreshData() {
     const [mapsRes, spacesRes] = await Promise.all([
@@ -142,20 +182,25 @@ export function AdminEspaciosClient({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: spaceName,
-          floor: spaceFloor,
+          floor: normalizeMapFloorId(spaceFloor),
           capacity: Number(spaceCapacity) || 0,
           minCapacity: Number(spaceMinCapacity) || 1,
           mapId: spaceMapId,
           active: true,
+          isCommon: spaceIsCommon,
         }),
       });
 
       if (!response.ok) throw new Error("No se pudo crear el espacio");
 
       setSpaceName("");
-      setSpaceFloor("");
+      setSpaceFloor(
+        floorChoices(maps.find((map) => map.id === spaceMapId) ?? maps[0])[0]
+          ?.id ?? "1",
+      );
       setSpaceCapacity("10");
       setSpaceMinCapacity("1");
+      setSpaceIsCommon(true);
       setCreateSpaceOpen(false);
       await refreshData();
     } catch (err) {
@@ -168,11 +213,12 @@ export function AdminEspaciosClient({
   function openEditSpace(space: Space) {
     setEditSpace(space);
     setEditSpaceName(space.name);
-    setEditSpaceFloor(space.floor);
+    setEditSpaceFloor(normalizeMapFloorId(space.floor));
     setEditSpaceCapacity(String(space.capacity));
     setEditSpaceMinCapacity(String(space.minCapacity));
     setEditSpaceMapId(space.mapId);
     setEditSpaceActive(space.active);
+    setEditSpaceIsCommon(space.isCommon !== false);
   }
 
   async function handleUpdateSpace(event: React.FormEvent) {
@@ -186,11 +232,12 @@ export function AdminEspaciosClient({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: editSpaceName,
-          floor: editSpaceFloor,
+          floor: normalizeMapFloorId(editSpaceFloor),
           capacity: Number(editSpaceCapacity) || 0,
           minCapacity: Number(editSpaceMinCapacity) || 1,
           mapId: editSpaceMapId,
           active: editSpaceActive,
+          isCommon: editSpaceIsCommon,
         }),
       });
       if (!response.ok) throw new Error("No se pudo actualizar el espacio");
@@ -423,7 +470,11 @@ export function AdminEspaciosClient({
                       {expanded && (
                         <div className="space-y-3 border-t border-border px-3 py-3">
                           <p className="text-sm text-muted-foreground">
-                            {space.floor || "Sin piso"} · Mapa: {mapName}
+                            {floorLabel(
+                              maps.find((map) => map.id === space.mapId),
+                              space.floor,
+                            )}{" "}
+                            · Mapa: {mapName}
                           </p>
                           <div className="flex flex-wrap gap-2">
                             <Badge variant={space.geometry ? "default" : "outline"}>
@@ -432,6 +483,9 @@ export function AdminEspaciosClient({
                             {!space.active && (
                               <Badge variant="secondary">Inactivo</Badge>
                             )}
+                            <Badge variant={space.isCommon !== false ? "default" : "outline"}>
+                              {space.isCommon !== false ? "Común" : "Interno"}
+                            </Badge>
                           </div>
                           <div className="flex flex-wrap gap-2">
                             <Button
@@ -484,14 +538,43 @@ export function AdminEspaciosClient({
                 required
               />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="spaceMapId">Mapa asociado</Label>
+              <Select
+                id="spaceMapId"
+                value={spaceMapId}
+                onChange={(e) => {
+                  const nextMapId = e.target.value;
+                  setSpaceMapId(nextMapId);
+                  const nextMap = maps.find((map) => map.id === nextMapId);
+                  const ids = floorChoices(nextMap).map((item) => item.id);
+                  if (!ids.includes(normalizeMapFloorId(spaceFloor))) {
+                    setSpaceFloor(ids[0] ?? "1");
+                  }
+                }}
+                required
+              >
+                {maps.map((map) => (
+                  <option key={map.id} value={map.id}>
+                    {map.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="spaceFloor">Piso / zona</Label>
-                <Input
+                <Label htmlFor="spaceFloor">Planta</Label>
+                <Select
                   id="spaceFloor"
-                  value={spaceFloor}
+                  value={normalizeMapFloorId(spaceFloor)}
                   onChange={(e) => setSpaceFloor(e.target.value)}
-                />
+                >
+                  {floorChoices(selectedCreateMap).map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.label}
+                    </option>
+                  ))}
+                </Select>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="spaceCapacity">Capacidad máxima</Label>
@@ -514,21 +597,18 @@ export function AdminEspaciosClient({
                 />
               </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="spaceMapId">Mapa asociado</Label>
-              <Select
-                id="spaceMapId"
-                value={spaceMapId}
-                onChange={(e) => setSpaceMapId(e.target.value)}
-                required
-              >
-                {maps.map((map) => (
-                  <option key={map.id} value={map.id}>
-                    {map.name}
-                  </option>
-                ))}
-              </Select>
-            </div>
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={spaceIsCommon}
+                onChange={(e) => setSpaceIsCommon(e.target.checked)}
+                className="mt-0.5 rounded border-border"
+              />
+              <span>
+                Espacio común (visible para todos). Desmárcalo para baños y
+                zonas internas.
+              </span>
+            </label>
             <div className="flex gap-2">
               <Button
                 type="button"
@@ -563,12 +643,18 @@ export function AdminEspaciosClient({
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="editSpaceFloor">Piso / zona</Label>
-                <Input
+                <Label htmlFor="editSpaceFloor">Planta</Label>
+                <Select
                   id="editSpaceFloor"
-                  value={editSpaceFloor}
+                  value={normalizeMapFloorId(editSpaceFloor)}
                   onChange={(e) => setEditSpaceFloor(e.target.value)}
-                />
+                >
+                  {floorChoices(selectedEditMap).map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.label}
+                    </option>
+                  ))}
+                </Select>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="editSpaceCapacity">Capacidad máxima</Label>
@@ -596,7 +682,15 @@ export function AdminEspaciosClient({
               <Select
                 id="editSpaceMapId"
                 value={editSpaceMapId}
-                onChange={(e) => setEditSpaceMapId(e.target.value)}
+                onChange={(e) => {
+                  const nextMapId = e.target.value;
+                  setEditSpaceMapId(nextMapId);
+                  const nextMap = maps.find((map) => map.id === nextMapId);
+                  const ids = floorChoices(nextMap).map((item) => item.id);
+                  if (!ids.includes(normalizeMapFloorId(editSpaceFloor))) {
+                    setEditSpaceFloor(ids[0] ?? "1");
+                  }
+                }}
               >
                 {maps.map((map) => (
                   <option key={map.id} value={map.id}>
@@ -613,6 +707,18 @@ export function AdminEspaciosClient({
                 className="rounded border-border"
               />
               Espacio activo
+            </label>
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={editSpaceIsCommon}
+                onChange={(e) => setEditSpaceIsCommon(e.target.checked)}
+                className="mt-0.5 rounded border-border"
+              />
+              <span>
+                Espacio común (visible para todos). Desmárcalo para baños y
+                zonas internas.
+              </span>
             </label>
             <div className="flex gap-2">
               <Button

@@ -7,6 +7,7 @@ import type { Area } from "@/types/area";
 import type { FloorMap, Space } from "@/types/space";
 import type { ReservationDetail } from "@/types/reservation";
 import { AreaLegendToggle } from "@/components/calendar/area-legend-toggle";
+import { SpacesVisibilityToggle } from "@/components/calendar/spaces-visibility-toggle";
 import { CalendarDaySheet } from "@/components/calendar/calendar-day-sheet";
 import { MonthView } from "@/components/calendar/month-view";
 import { WeekView } from "@/components/calendar/week-view";
@@ -42,6 +43,7 @@ interface CalendarClientProps {
   initialSpaceId?: string;
   pickMode?: boolean;
   returnTo?: string;
+  canViewAllSpaces?: boolean;
 }
 
 function reservationsInVisiblePeriod(
@@ -80,9 +82,11 @@ export function CalendarClient({
   initialSpaceId,
   pickMode = false,
   returnTo,
+  canViewAllSpaces = false,
 }: CalendarClientProps) {
   const [viewMode, setViewMode] = React.useState<CalendarViewMode>("month");
   const [showAreaLegend, setShowAreaLegend] = React.useState(false);
+  const [showAllSpaces, setShowAllSpaces] = React.useState(false);
   const [anchorDate, setAnchorDate] = React.useState(() => {
     if (initialDate) {
       const [y, m, d] = initialDate.split("-").map(Number);
@@ -200,12 +204,21 @@ export function CalendarClient({
       <header className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <h1 className="text-2xl font-semibold tracking-tight">Calendario</h1>
         {!pickMode && (
-          <AreaLegendToggle
-            areas={areasInView}
-            show={showAreaLegend}
-            onToggle={() => setShowAreaLegend((value) => !value)}
-            className="sm:items-end"
-          />
+          <div className="flex flex-col items-stretch gap-2 sm:items-end">
+            {canViewAllSpaces ? (
+              <SpacesVisibilityToggle
+                showAllSpaces={showAllSpaces}
+                onToggle={() => setShowAllSpaces((value) => !value)}
+                className="sm:items-end"
+              />
+            ) : null}
+            <AreaLegendToggle
+              areas={areasInView}
+              show={showAreaLegend}
+              onToggle={() => setShowAreaLegend((value) => !value)}
+              className="sm:items-end"
+            />
+          </div>
         )}
       </header>
 
@@ -314,6 +327,7 @@ export function CalendarClient({
           canReserve={canReserve}
           initialMapId={sheetSelectionHint?.mapId}
           initialSpaceId={sheetSelectionHint?.spaceId}
+          showAllSpaces={showAllSpaces}
         />
       )}
     </div>

@@ -45,6 +45,7 @@ export default async function ReservaPage({
           showResourcePanel={false}
           showCalendarLink
           readOnly
+          canViewAllSpaces={userRecord?.canViewAllSpaces === true}
         />
       ) : (
         <ReservationFlow
@@ -54,6 +55,7 @@ export default async function ReservaPage({
           isAdmin={admin}
           userAreaId={session?.user?.areaId ?? null}
           userAreaScopeIds={userAreaScopeIds}
+          canViewAllSpaces={userRecord?.canViewAllSpaces === true}
           initialDate={params.date}
           initialMapId={params.mapId}
           initialSpaceId={params.spaceId}

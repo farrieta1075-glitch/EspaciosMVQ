@@ -138,6 +138,7 @@ interface ReservationCreateWizardProps {
   isAdmin: boolean;
   userAreaId: string | null;
   userAreaScopeIds: string[];
+  canViewAllSpaces?: boolean;
   initialDate?: string;
   initialMapId?: string;
   initialSpaceId?: string;
@@ -204,6 +205,7 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
     isAdmin,
     userAreaScopeIds,
     userAreaId,
+    canViewAllSpaces = false,
     initialDate,
     initialMapId,
     initialSpaceId,
@@ -1747,6 +1749,7 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
             key={`map-${mapSelectorKey}`}
             maps={maps}
             spaces={spaces}
+            canViewAllSpaces={canViewAllSpaces}
             initialDate={reservationDate}
             initialMapId={initialMapId}
             initialSpaceId={initialSpaceId}

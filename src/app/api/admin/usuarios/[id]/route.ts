@@ -20,6 +20,7 @@ const updateUserSchema = z
     areaScopeIds: z.array(z.string()).optional(),
     active: z.boolean().optional(),
     receiveApprovalEmails: z.boolean().optional(),
+    canViewAllSpaces: z.boolean().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.email?.trim()) {
@@ -44,6 +45,7 @@ function toPublicUser(
     areaScopeIds: string[];
     active: boolean;
     receiveApprovalEmails: boolean;
+    canViewAllSpaces: boolean;
     areaName?: string | null;
   },
   passwordConfigured = false,
@@ -57,6 +59,7 @@ function toPublicUser(
     areaScopeIds: user.areaScopeIds ?? [],
     active: user.active,
     receiveApprovalEmails: user.receiveApprovalEmails,
+    canViewAllSpaces: user.canViewAllSpaces,
     areaName: user.areaName,
     passwordConfigured,
   };

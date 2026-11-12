@@ -54,6 +54,7 @@ interface ReservationFlowProps {
   isAdmin: boolean;
   userAreaId: string | null;
   userAreaScopeIds: string[];
+  canViewAllSpaces?: boolean;
   initialDate?: string;
   initialMapId?: string;
   initialSpaceId?: string;
@@ -66,6 +67,7 @@ export function ReservationFlow({
   isAdmin,
   userAreaId,
   userAreaScopeIds,
+  canViewAllSpaces = false,
   initialDate,
   initialMapId,
   initialSpaceId,
@@ -553,6 +555,7 @@ export function ReservationFlow({
         isAdmin={isAdmin}
         userAreaId={userAreaId}
         userAreaScopeIds={userAreaScopeIds}
+        canViewAllSpaces={canViewAllSpaces}
         initialDate={restoredSelection?.date ?? initialDate}
         initialMapId={initialMapId}
         initialSpaceId={initialSpaceId}

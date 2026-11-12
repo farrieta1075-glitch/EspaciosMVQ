@@ -33,6 +33,7 @@ export function mapDbUser(row: DbUser): AppUser {
     areaId: row.areaId,
     active: row.active,
     receiveApprovalEmails: row.receiveApprovalEmails,
+    canViewAllSpaces: row.canViewAllSpaces,
     areaScopeIds: parseAreaScopeIds(row.areaScopeIds),
   };
 }
@@ -86,6 +87,7 @@ export function mapDbSpace(row: DbSpace): Space {
     geometry: parseGeometry(row.geometryJson),
     mapId: row.mapId,
     active: row.active,
+    isCommon: row.isCommon,
   };
 }
 

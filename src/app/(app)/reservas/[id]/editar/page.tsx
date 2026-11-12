@@ -88,6 +88,7 @@ export default async function EditarReservaPage({
             isAdmin={admin}
             userAreaId={session.user.areaId ?? null}
             userAreaScopeIds={userAreaScopeIds}
+            canViewAllSpaces={userRecord?.canViewAllSpaces === true}
           />
           {showAttendanceSection && (
             <div id="asistencia" className="scroll-mt-4 space-y-2 pt-2">

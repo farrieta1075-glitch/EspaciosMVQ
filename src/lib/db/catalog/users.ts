@@ -61,6 +61,7 @@ export async function createUser(input: {
   areaScopeIds?: string[];
   active?: boolean;
   receiveApprovalEmails?: boolean;
+  canViewAllSpaces?: boolean;
 }): Promise<AppUser> {
   await assertUniqueCredentials(input);
   const { createId } = await import("@/lib/id");
@@ -76,6 +77,7 @@ export async function createUser(input: {
       active: input.active ?? true,
       receiveApprovalEmails:
         input.role === "ADMIN" ? (input.receiveApprovalEmails ?? true) : false,
+      canViewAllSpaces: input.canViewAllSpaces ?? false,
     },
   });
   return mapDbUser(row);
@@ -92,6 +94,7 @@ export async function updateUser(
     areaScopeIds: string[];
     active: boolean;
     receiveApprovalEmails: boolean;
+    canViewAllSpaces: boolean;
   }>,
 ): Promise<AppUser | null> {
   const existing = await getUserById(id);
@@ -124,6 +127,7 @@ export async function updateUser(
           ? (input.receiveApprovalEmails ??
             (existing.role === "ADMIN" ? existing.receiveApprovalEmails : true))
           : false,
+      canViewAllSpaces: input.canViewAllSpaces ?? existing.canViewAllSpaces,
       passwordHash:
         input.password && input.password.trim()
           ? await bcrypt.hash(input.password, 10)
