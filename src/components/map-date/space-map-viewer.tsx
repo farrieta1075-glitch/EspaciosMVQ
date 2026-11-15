@@ -221,7 +221,7 @@ export function SpaceMapViewer({
       className="w-full min-w-0 max-w-full overflow-x-auto rounded-xl border border-border bg-muted/20 p-1 sm:p-2"
     >
       {showFloorSwitcher && (
-        <MapFloorSwitcher>
+        <MapFloorSwitcher
           floors={floorOrder}
           labels={floorLabels}
           activeFloor={activeFloor}
