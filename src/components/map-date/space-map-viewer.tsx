@@ -83,13 +83,13 @@ export function SpaceMapViewer({
   const hasFloorTwoSpaces = spaces.some(
     (space) => space.active && normalizeMapFloorId(space.floor) === "2",
   );
-  const floorOrder = React.useMemo(() => {
+  const floorOrder = React.useMemo<MapFloorId[]>(() => {
     const order = getMapFloorDisplayOrder(map);
     if (hasFloorTwoSpaces && !order.includes("2")) return [...order, "2"];
     return order;
   }, [map, hasFloorTwoSpaces]);
   const [activeFloor, setActiveFloor] = React.useState<MapFloorId>(
-    floorOrder[0] ?? "1",
+    () => floorOrder[0] ?? "1",
   );
   React.useEffect(() => {
     setActiveFloor((current) =>
@@ -258,8 +258,7 @@ export function SpaceMapViewer({
           className="relative mx-auto max-w-full"
         >
           {backgroundImage ? (
-            // El editor pinta el PDF/imagen bien; en reserva el canvas de Konva
-            // se recortaba. El <img> garantiza el plano completo detrás.
+            // eslint-disable-next-line @next/next/no-img-element -- data URL del plano
             <img
               src={backgroundImage.src}
               alt=""

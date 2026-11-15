@@ -53,7 +53,6 @@ export async function getCachedMapBackground(
         ? "pdf"
         : "image"
       : map.backgroundType;
-  if (type === "blank") return null;
   const assetUrl = resolveAssetUrl(url);
   return loadMapBackgroundImage(assetUrl, type);
 }
