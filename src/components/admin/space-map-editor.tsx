@@ -22,8 +22,7 @@ import {
   spaceBelongsToFloor,
 } from "@/lib/map-floors";
 import type { FloorMap, MapFloorId, Space, SpaceGeometry } from "@/types/space";
-import { loadImage } from "@/lib/load-image";
-import { resolveAssetUrl } from "@/lib/storage/resolve-asset-url";
+import { getCachedMapBackground } from "@/lib/map-background-cache";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
@@ -120,38 +119,31 @@ export function SpaceMapEditor({ map, initialSpaces }: SpaceMapEditorProps) {
   }, [mapWidth]);
 
   React.useEffect(() => {
+    let cancelled = false;
     async function loadBackground() {
       setLoadingBg(true);
       try {
-        if (activeLayer.backgroundType === "blank" || !activeLayer.backgroundUrl) {
-          setBackgroundImage(null);
-          return;
+        const image = await getCachedMapBackground({
+          backgroundType: activeLayer.backgroundType,
+          backgroundUrl: activeLayer.backgroundUrl,
+        });
+        if (cancelled) return;
+        setBackgroundImage(image);
+        if (!image && activeLayer.backgroundUrl) {
+          setMessage("No se pudo cargar el fondo del mapa.");
         }
-
-        const assetUrl = resolveAssetUrl(activeLayer.backgroundUrl);
-        if (activeLayer.backgroundType === "pdf") {
-          const { renderPdfFirstPage } = await import("@/lib/pdf-render");
-          const rendered = await renderPdfFirstPage(assetUrl);
-          const img = await loadImage(rendered.dataUrl);
-          setBackgroundImage(img);
-          return;
-        }
-
-        const img = await loadImage(assetUrl);
-        setBackgroundImage(img);
       } catch {
-        setMessage("No se pudo cargar el fondo del mapa.");
+        if (!cancelled) setMessage("No se pudo cargar el fondo del mapa.");
       } finally {
-        setLoadingBg(false);
+        if (!cancelled) setLoadingBg(false);
       }
     }
 
-    loadBackground();
-  }, [
-    activeLayer.backgroundType,
-    activeLayer.backgroundUrl,
-    activeFloor,
-  ]);
+    void loadBackground();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeLayer.backgroundType, activeLayer.backgroundUrl, activeFloor]);
 
   function getPointerPosition(): { x: number; y: number } | null {
     const stage = stageRef.current;

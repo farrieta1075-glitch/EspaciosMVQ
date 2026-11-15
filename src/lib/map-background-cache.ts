@@ -30,7 +30,8 @@ async function loadMapBackgroundImage(
       const img = await loadImage(assetUrl);
       imageCache.set(cacheKey, img);
       return img;
-    } catch {
+    } catch (error) {
+      console.warn("[map-background] No se pudo cargar el plano", assetUrl, error);
       return null;
     } finally {
       inflight.delete(cacheKey);
@@ -69,12 +70,19 @@ export function preloadMapBackgrounds(
 ): void {
   if (typeof window === "undefined") return;
   for (const map of maps) {
+    const primaryIsPdf =
+      map.backgroundType === "pdf" ||
+      map.backgroundUrl?.toLowerCase().includes(".pdf");
     void getCachedMapBackground(map);
-    if (map.secondaryBackgroundUrl) {
-      void getCachedMapBackground({
-        backgroundType: map.secondaryBackgroundType || "image",
-        backgroundUrl: map.secondaryBackgroundUrl,
-      });
-    }
+    if (!map.secondaryBackgroundUrl) continue;
+    const secondaryIsPdf =
+      map.secondaryBackgroundType === "pdf" ||
+      map.secondaryBackgroundUrl.toLowerCase().includes(".pdf");
+    // Dos PDFs grandes a la vez (planta + piso 2) agotan memoria y el segundo falla.
+    if (primaryIsPdf && secondaryIsPdf) continue;
+    void getCachedMapBackground({
+      backgroundType: map.secondaryBackgroundType || "image",
+      backgroundUrl: map.secondaryBackgroundUrl,
+    });
   }
 }

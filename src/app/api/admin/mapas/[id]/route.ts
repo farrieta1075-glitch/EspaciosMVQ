@@ -1,3 +1,4 @@
+import { revalidateTag } from "next/cache";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAdminSession, unauthorizedResponse } from "@/lib/auth/api";
@@ -56,6 +57,7 @@ export async function PATCH(
     return NextResponse.json({ error: "Mapa no encontrado" }, { status: 404 });
   }
 
+  revalidateTag("catalog-maps");
   return NextResponse.json(updated);
 }
 
@@ -72,5 +74,6 @@ export async function DELETE(
     return NextResponse.json({ error: "Mapa no encontrado" }, { status: 404 });
   }
 
+  revalidateTag("catalog-maps");
   return NextResponse.json({ ok: true });
 }

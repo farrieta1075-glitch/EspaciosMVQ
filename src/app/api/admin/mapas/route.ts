@@ -1,3 +1,4 @@
+import { revalidateTag } from "next/cache";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAdminSession, unauthorizedResponse } from "@/lib/auth/api";
@@ -33,5 +34,6 @@ export async function POST(request: Request) {
   }
 
   const map = await createMap(parsed.data);
+  revalidateTag("catalog-maps");
   return NextResponse.json(map, { status: 201 });
 }

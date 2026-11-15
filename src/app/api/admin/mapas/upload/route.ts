@@ -1,3 +1,4 @@
+import { revalidateTag } from "next/cache";
 import { NextResponse } from "next/server";
 import { requireAdminSession, unauthorizedResponse } from "@/lib/auth/api";
 import { getMapById, updateMap } from "@/lib/sheets/maps";
@@ -63,5 +64,6 @@ export async function POST(request: Request) {
         },
   );
 
+  revalidateTag("catalog-maps");
   return NextResponse.json(updated);
 }
