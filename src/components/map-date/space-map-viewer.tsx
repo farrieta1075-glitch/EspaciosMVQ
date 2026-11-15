@@ -4,12 +4,11 @@ import * as React from "react";
 import type Konva from "konva";
 import type { KonvaEventObject } from "konva/lib/Node";
 import { Loader2 } from "lucide-react";
-import { Stage, Layer, Rect, Line, Image as KonvaImage, Text } from "react-konva";
+import { Stage, Layer, Rect, Line, Text } from "react-konva";
 import { MapFloorSwitcher } from "@/components/map-date/map-floor-switcher";
 import {
   getMapFloorDisplayOrder,
   getMapFloorLayer,
-  mapHasSecondFloor,
   spaceBelongsToFloor,
   normalizeMapFloorId,
 } from "@/lib/map-floors";
@@ -70,6 +69,7 @@ export function SpaceMapViewer({
 }: SpaceMapViewerProps) {
   const stageRef = React.useRef<Konva.Stage>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
+  const stageBoxRef = React.useRef<HTMLDivElement>(null);
   /** Evita doble toggle en móvil (Konva dispara onTap y onClick por un mismo toque). */
   const lastSpaceToggleRef = React.useRef<{ spaceId: string; at: number } | null>(
     null,
@@ -110,33 +110,23 @@ export function SpaceMapViewer({
     }),
     [map],
   );
-  const fallbackWidth =
-    typeof window !== "undefined"
-      ? Math.max(280, Math.min(window.innerWidth - 24, 520))
-      : 320;
   const measuredWidth =
-    containerWidth && containerWidth > 0 ? containerWidth : fallbackWidth;
+    containerWidth && containerWidth > 0 ? containerWidth : 0;
   const displayScale =
-    mapWidth > 0
-      ? fitContainerWidth
-        ? measuredWidth / mapWidth
-        : Math.min(measuredWidth / mapWidth, compact ? 0.6 : 1)
+    mapWidth > 0 && measuredWidth > 0
+      ? Math.min(measuredWidth / mapWidth, 1)
       : 0;
-  const stageWidth = Math.max(1, Math.round(mapWidth * displayScale));
-  const stageHeight = Math.max(1, Math.round(mapHeight * displayScale));
+  const cssWidth = Math.max(1, Math.round(mapWidth * displayScale));
+  const cssHeight = Math.max(1, Math.round(mapHeight * displayScale));
   const showFloorSwitcher = floorOrder.length > 1;
 
   React.useEffect(() => {
-    const node = containerRef.current;
+    const node = stageBoxRef.current ?? containerRef.current;
     if (!node) return;
 
     function updateSize() {
       if (!node) return;
-      const styles = window.getComputedStyle(node);
-      const padX =
-        Number.parseFloat(styles.paddingLeft || "0") +
-        Number.parseFloat(styles.paddingRight || "0");
-      setContainerWidth(Math.max(0, node.clientWidth - padX));
+      setContainerWidth(Math.max(0, node.clientWidth));
     }
 
     updateSize();
@@ -144,7 +134,7 @@ export function SpaceMapViewer({
     const observer = new ResizeObserver(updateSize);
     observer.observe(node);
     return () => observer.disconnect();
-  }, [mapWidth, compact, headerExtra, showDefaultLegend, showFloorSwitcher]);
+  }, [mapWidth, compact, fitContainerWidth, headerExtra, showDefaultLegend, showFloorSwitcher]);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -218,7 +208,7 @@ export function SpaceMapViewer({
   return (
     <div
       ref={containerRef}
-      className="w-full min-w-0 max-w-full overflow-x-auto rounded-xl border border-border bg-muted/20 p-1 sm:p-2"
+      className="w-full min-w-0 max-w-full overflow-hidden rounded-xl border border-border bg-muted/20 p-1 sm:p-2"
     >
       {showFloorSwitcher && (
         <MapFloorSwitcher
@@ -257,33 +247,42 @@ export function SpaceMapViewer({
         </div>
       )}
 
-      {loadingBg ? (
+      <div ref={stageBoxRef} className="w-full min-w-0 max-w-full overflow-auto">
+      {loadingBg || displayScale <= 0 ? (
         <div className="flex h-64 items-center justify-center">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
       ) : (
-        <div style={{ width: stageWidth, height: stageHeight }} className="relative mx-auto">
+        <div
+          style={{ width: cssWidth, height: cssHeight }}
+          className="relative mx-auto max-w-full"
+        >
+          {backgroundImage ? (
+            // El editor pinta el PDF/imagen bien; en reserva el canvas de Konva
+            // se recortaba. El <img> garantiza el plano completo detrás.
+            <img
+              src={backgroundImage.src}
+              alt=""
+              draggable={false}
+              className="pointer-events-none absolute inset-0 h-full w-full object-fill"
+            />
+          ) : null}
           <Stage
             ref={stageRef}
-            width={stageWidth}
-            height={stageHeight}
+            width={mapWidth}
+            height={mapHeight}
             scaleX={displayScale}
             scaleY={displayScale}
-            className="touch-manipulation bg-white shadow-sm dark:bg-zinc-900"
+            pixelRatio={1}
+            className="touch-manipulation bg-transparent shadow-sm"
             style={{
-              width: stageWidth,
-              height: stageHeight,
+              width: cssWidth,
+              height: cssHeight,
+              maxWidth: "100%",
             }}
           >
             <Layer>
-              {backgroundImage ? (
-                <KonvaImage
-                  image={backgroundImage}
-                  width={mapWidth}
-                  height={mapHeight}
-                  listening={false}
-                />
-              ) : (
+              {backgroundImage ? null : (
                 <Rect
                   width={mapWidth}
                   height={mapHeight}
@@ -367,6 +366,7 @@ export function SpaceMapViewer({
           ) : null}
         </div>
       )}
+      </div>
     </div>
   );
 }

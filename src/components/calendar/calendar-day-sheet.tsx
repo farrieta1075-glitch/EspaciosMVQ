@@ -19,7 +19,7 @@ import {
   reservationStatusLabel,
 } from "@/lib/calendar-utils";
 import { formatDateDisplay, formatDateISO, isSameDay } from "@/lib/date-utils";
-import { SpaceMapViewer } from "@/components/map-date/space-map-viewer";
+import { SpaceMapViewer } from "@/components/map-date/space-map-viewer-dynamic";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";

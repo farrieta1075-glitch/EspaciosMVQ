@@ -26,7 +26,9 @@ export const getCachedCatalogAreas = unstable_cache(
 
 export async function getCachedCatalogBundle() {
   return Promise.all([
-    getCachedCatalogMaps(),
+    // Los planos (sobre todo piso 2) no pueden servirse de cache: el editor
+    // lee getMapById fresco y por eso sí se ven; calendario/reserva no.
+    getAllMaps(),
     getCachedCatalogSpaces(),
     getCachedCatalogAreas(),
   ]);

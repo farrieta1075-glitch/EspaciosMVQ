@@ -17,7 +17,7 @@ import type {
 } from "@/types/reservation";
 import { DateNavigator } from "@/components/map-date/date-navigator";
 import { ResourcePanel } from "@/components/map-date/resource-panel";
-import { SpaceMapViewer } from "@/components/map-date/space-map-viewer";
+import { SpaceMapViewer } from "@/components/map-date/space-map-viewer-dynamic";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
