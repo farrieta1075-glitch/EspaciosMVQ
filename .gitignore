@@ -45,8 +45,11 @@ public/workbox-*.js
 public/sw.js.map
 public/workbox-*.js.map
 
-# uploads (dev/local map backgrounds)
-/public/uploads/
+# uploads (dev/local). Los PDF de mapas sí van al repo para Dokploy.
+/public/uploads/*
+!/public/uploads/maps/
+/public/uploads/maps/*
+!/public/uploads/maps/*.pdf
 
 # secrets
 *-service-account.json
