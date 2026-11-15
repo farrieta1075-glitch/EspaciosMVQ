@@ -11,6 +11,7 @@ import {
   getMapFloorLayer,
   mapHasSecondFloor,
   spaceBelongsToFloor,
+  normalizeMapFloorId,
 } from "@/lib/map-floors";
 import type { FloorMap, MapFloorId, Space } from "@/types/space";
 import type { SpaceAvailabilityStatus } from "@/types/reservation";
@@ -79,12 +80,21 @@ export function SpaceMapViewer({
   const [loadingBg, setLoadingBg] = React.useState(true);
   const [containerWidth, setContainerWidth] = React.useState<number | null>(null);
 
-  const floorOrder = React.useMemo(() => getMapFloorDisplayOrder(map), [map]);
+  const hasFloorTwoSpaces = spaces.some(
+    (space) => space.active && normalizeMapFloorId(space.floor) === "2",
+  );
+  const floorOrder = React.useMemo(() => {
+    const order = getMapFloorDisplayOrder(map);
+    if (hasFloorTwoSpaces && !order.includes("2")) return [...order, "2"];
+    return order;
+  }, [map, hasFloorTwoSpaces]);
   const [activeFloor, setActiveFloor] = React.useState<MapFloorId>(
     floorOrder[0] ?? "1",
   );
   React.useEffect(() => {
-    setActiveFloor(floorOrder[0] ?? "1");
+    setActiveFloor((current) =>
+      floorOrder.includes(current) ? current : (floorOrder[0] ?? "1"),
+    );
   }, [map.id, floorOrder]);
 
   const layer = React.useMemo(
@@ -112,6 +122,9 @@ export function SpaceMapViewer({
         ? measuredWidth / mapWidth
         : Math.min(measuredWidth / mapWidth, compact ? 0.6 : 1)
       : 0;
+  const stageWidth = Math.max(1, Math.round(mapWidth * displayScale));
+  const stageHeight = Math.max(1, Math.round(mapHeight * displayScale));
+  const showFloorSwitcher = floorOrder.length > 1;
 
   React.useEffect(() => {
     const node = containerRef.current;
@@ -119,7 +132,11 @@ export function SpaceMapViewer({
 
     function updateSize() {
       if (!node) return;
-      setContainerWidth(node.clientWidth);
+      const styles = window.getComputedStyle(node);
+      const padX =
+        Number.parseFloat(styles.paddingLeft || "0") +
+        Number.parseFloat(styles.paddingRight || "0");
+      setContainerWidth(Math.max(0, node.clientWidth - padX));
     }
 
     updateSize();
@@ -127,7 +144,7 @@ export function SpaceMapViewer({
     const observer = new ResizeObserver(updateSize);
     observer.observe(node);
     return () => observer.disconnect();
-  }, [mapWidth]);
+  }, [mapWidth, compact, headerExtra, showDefaultLegend, showFloorSwitcher]);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -201,10 +218,10 @@ export function SpaceMapViewer({
   return (
     <div
       ref={containerRef}
-      className="w-full min-w-0 max-w-full overflow-hidden rounded-xl border border-border bg-muted/20 p-1 sm:p-2"
+      className="w-full min-w-0 max-w-full overflow-x-auto rounded-xl border border-border bg-muted/20 p-1 sm:p-2"
     >
-      {mapHasSecondFloor(map) && (
-        <MapFloorSwitcher
+      {showFloorSwitcher && (
+        <MapFloorSwitcher>
           floors={floorOrder}
           labels={floorLabels}
           activeFloor={activeFloor}
@@ -244,30 +261,18 @@ export function SpaceMapViewer({
         <div className="flex h-64 items-center justify-center">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
-      ) : drawableSpaces.length === 0 ? (
-        <div className="flex h-64 items-center justify-center px-4 text-center text-sm text-muted-foreground">
-          {spaces.some((space) => space.geometry && space.active)
-            ? `No hay espacios en ${layer.label}. Cambia de planta con las flechas.`
-            : "Este mapa no tiene espacios delimitados. Configúralos en Administración → Espacios."}
-        </div>
       ) : (
-        <div
-          style={{
-            width: mapWidth * displayScale,
-            height: mapHeight * displayScale,
-          }}
-          className="mx-auto"
-        >
+        <div style={{ width: stageWidth, height: stageHeight }} className="relative mx-auto">
           <Stage
             ref={stageRef}
-            width={mapWidth}
-            height={mapHeight}
+            width={stageWidth}
+            height={stageHeight}
             scaleX={displayScale}
             scaleY={displayScale}
             className="touch-manipulation bg-white shadow-sm dark:bg-zinc-900"
             style={{
-              width: mapWidth * displayScale,
-              height: mapHeight * displayScale,
+              width: stageWidth,
+              height: stageHeight,
             }}
           >
             <Layer>
@@ -353,6 +358,13 @@ export function SpaceMapViewer({
               })}
             </Layer>
           </Stage>
+          {drawableSpaces.length === 0 ? (
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-background/55 px-4 text-center text-sm text-muted-foreground">
+              {spaces.some((space) => space.geometry && space.active)
+                ? `No hay espacios visibles en ${layer.label}. Cambia de planta o activa todos los espacios.`
+                : "Este mapa no tiene espacios delimitados. Configúralos en Administración → Espacios."}
+            </div>
+          ) : null}
         </div>
       )}
     </div>

@@ -44,16 +44,37 @@ async function loadMapBackgroundImage(
 export async function getCachedMapBackground(
   map: Pick<FloorMap, "backgroundType" | "backgroundUrl">,
 ): Promise<HTMLImageElement | null> {
-  if (map.backgroundType === "blank" || !map.backgroundUrl) return null;
-  const assetUrl = resolveAssetUrl(map.backgroundUrl);
-  return loadMapBackgroundImage(assetUrl, map.backgroundType);
+  const url = map.backgroundUrl?.trim();
+  if (!url) return null;
+  const type =
+    !map.backgroundType || map.backgroundType === "blank"
+      ? url.toLowerCase().includes(".pdf")
+        ? "pdf"
+        : "image"
+      : map.backgroundType;
+  if (type === "blank") return null;
+  const assetUrl = resolveAssetUrl(url);
+  return loadMapBackgroundImage(assetUrl, type);
 }
 
 export function preloadMapBackgrounds(
-  maps: Pick<FloorMap, "id" | "backgroundType" | "backgroundUrl">[],
+  maps: Pick<
+    FloorMap,
+    | "id"
+    | "backgroundType"
+    | "backgroundUrl"
+    | "secondaryBackgroundType"
+    | "secondaryBackgroundUrl"
+  >[],
 ): void {
   if (typeof window === "undefined") return;
   for (const map of maps) {
     void getCachedMapBackground(map);
+    if (map.secondaryBackgroundUrl) {
+      void getCachedMapBackground({
+        backgroundType: map.secondaryBackgroundType || "image",
+        backgroundUrl: map.secondaryBackgroundUrl,
+      });
+    }
   }
 }

@@ -1,5 +1,21 @@
 import type { BackgroundType, FloorMap, MapFloorId } from "@/types/space";
 
+function inferBackgroundType(
+  type: string | undefined,
+  url: string | undefined,
+): BackgroundType {
+  const trimmedUrl = url?.trim() ?? "";
+  const trimmedType = type?.trim();
+  if (trimmedType === "pdf" || trimmedType === "image" || trimmedType === "blank") {
+    if (trimmedType === "blank" && trimmedUrl) {
+      return trimmedUrl.toLowerCase().includes(".pdf") ? "pdf" : "image";
+    }
+    return trimmedType;
+  }
+  if (!trimmedUrl) return "blank";
+  return trimmedUrl.toLowerCase().includes(".pdf") ? "pdf" : "image";
+}
+
 export interface MapFloorLayer {
   id: MapFloorId;
   label: string;
@@ -14,7 +30,7 @@ export function normalizeMapFloorId(raw: string | null | undefined): MapFloorId 
 }
 
 export function mapHasSecondFloor(map: FloorMap): boolean {
-  const type = map.secondaryBackgroundType;
+  const type = map.secondaryBackgroundType?.trim();
   const url = map.secondaryBackgroundUrl?.trim();
   if (url) return true;
   return Boolean(type && type !== "blank");
@@ -22,11 +38,12 @@ export function mapHasSecondFloor(map: FloorMap): boolean {
 
 export function getMapFloorLayer(map: FloorMap, floor: MapFloorId): MapFloorLayer {
   if (floor === "2") {
+    const backgroundUrl = map.secondaryBackgroundUrl ?? "";
     return {
       id: "2",
       label: map.floor2Label?.trim() || "Piso 2",
-      backgroundType: (map.secondaryBackgroundType ?? "blank") as BackgroundType,
-      backgroundUrl: map.secondaryBackgroundUrl ?? "",
+      backgroundType: inferBackgroundType(map.secondaryBackgroundType, backgroundUrl),
+      backgroundUrl,
       width: map.secondaryWidth && map.secondaryWidth > 0 ? map.secondaryWidth : map.width,
       height:
         map.secondaryHeight && map.secondaryHeight > 0
@@ -37,7 +54,7 @@ export function getMapFloorLayer(map: FloorMap, floor: MapFloorId): MapFloorLaye
   return {
     id: "1",
     label: map.floor1Label?.trim() || "Planta baja",
-    backgroundType: map.backgroundType,
+    backgroundType: inferBackgroundType(map.backgroundType, map.backgroundUrl),
     backgroundUrl: map.backgroundUrl,
     width: map.width,
     height: map.height,
