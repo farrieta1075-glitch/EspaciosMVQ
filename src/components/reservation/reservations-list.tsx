@@ -16,7 +16,10 @@ import {
   formatTimeDisplay,
 } from "@/lib/date-utils";
 import type { ReservationDetail } from "@/types/reservation";
+import type { Area } from "@/types/area";
 import type { SessionUser } from "@/types/user";
+import { AreaTag } from "@/components/calendar/area-tag";
+import { getReservationAreaColor } from "@/lib/calendar-utils";
 import { reservationNeedsAdminAction } from "@/types/reservation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -41,6 +44,7 @@ interface ReservationsListProps {
   initialReservations: ReservationDetail[];
   isAdmin: boolean;
   viewerUser: SessionUser | null;
+  areas?: Area[];
 }
 
 type ListFilter = "upcoming" | "past";
@@ -142,6 +146,7 @@ export function ReservationsList({
   initialReservations,
   isAdmin,
   viewerUser,
+  areas = [],
 }: ReservationsListProps) {
   const router = useRouter();
   const [reservations, setReservations] =
@@ -250,6 +255,14 @@ export function ReservationsList({
             <p className="truncate text-xs text-muted-foreground sm:text-sm">
               {summaryDateTime(reservation)}
             </p>
+            {(reservation.areaName || reservation.areaId) && (
+              <div className="mt-1.5">
+                <AreaTag
+                  name={reservation.areaName ?? reservation.areaId}
+                  color={getReservationAreaColor(reservation, areas)}
+                />
+              </div>
+            )}
           </div>
           <Badge
             variant={statusVariant(reservation)}
@@ -313,11 +326,14 @@ export function ReservationsList({
                   {reservation.actualAttendees}
                 </p>
               )}
-              {isAdmin && (
-                <p>
+              {(reservation.areaName || reservation.areaId) && (
+                <div className="flex items-center gap-2">
                   <span className="text-muted-foreground">Área: </span>
-                  {reservation.areaName ?? reservation.areaId ?? "—"}
-                </p>
+                  <AreaTag
+                    name={reservation.areaName ?? reservation.areaId}
+                    color={getReservationAreaColor(reservation, areas)}
+                  />
+                </div>
               )}
             </div>
 

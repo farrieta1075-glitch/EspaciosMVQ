@@ -214,6 +214,7 @@ export function CalendarClient({
             ) : null}
             <AreaLegendToggle
               areas={areasInView}
+              allAreas={areas}
               show={showAreaLegend}
               onToggle={() => setShowAreaLegend((value) => !value)}
               className="sm:items-end"

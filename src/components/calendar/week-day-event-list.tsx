@@ -2,9 +2,9 @@
 
 import type { Area } from "@/types/area";
 import type { ReservationDetail } from "@/types/reservation";
+import { AreaTag } from "@/components/calendar/area-tag";
 import {
   getReservationAreaColor,
-  reservationDotStyle,
 } from "@/lib/calendar-utils";
 import { formatDateDisplay, isSameDay } from "@/lib/date-utils";
 
@@ -51,17 +51,17 @@ export function WeekDayEventList({
                 key={event.id}
                 className="flex min-w-0 items-center gap-2 text-sm"
               >
-                <span
-                  className="h-2.5 w-2.5 shrink-0 rounded-full"
-                  style={reservationDotStyle(color)}
-                  aria-hidden
-                />
                 <span className="shrink-0 tabular-nums text-muted-foreground">
                   {formatStartTime(event.startAt)}
                 </span>
                 <span className="min-w-0 truncate font-medium">
                   {event.eventName}
                 </span>
+                <AreaTag
+                  className="ml-auto shrink-0 py-0.5"
+                  name={event.areaName ?? "Área"}
+                  color={color}
+                />
               </li>
             );
           })}

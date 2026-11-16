@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth/index";
 import { isAdmin } from "@/lib/auth/permissions";
 import { resolveUserAreaScopeIds } from "@/lib/area-scope";
 import { listReservationDetails } from "@/lib/reservation-service";
+import { getAllAreas } from "@/lib/sheets/areas";
 import { getUserById } from "@/lib/sheets/users";
 import { ReservationsList } from "@/components/reservation/reservations-list";
 import { Button } from "@/components/ui/button";
@@ -18,7 +19,10 @@ export default async function ReservasPage() {
     ? resolveUserAreaScopeIds(userRecord)
     : [];
 
-  const reservations = await listReservationDetails(scopeAreaIds, admin);
+  const [reservations, areas] = await Promise.all([
+    listReservationDetails(scopeAreaIds, admin),
+    getAllAreas(),
+  ]);
 
   return (
     <section className="space-y-6">
@@ -35,6 +39,7 @@ export default async function ReservasPage() {
         initialReservations={reservations}
         isAdmin={admin}
         viewerUser={session?.user ?? null}
+        areas={areas}
       />
     </section>
   );

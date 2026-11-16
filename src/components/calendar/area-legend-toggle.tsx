@@ -1,12 +1,15 @@
 "use client";
 
 import type { Area } from "@/types/area";
-import { areaCardStyle, getAreaColor } from "@/lib/area-colors";
+import { getAreaColor } from "@/lib/area-colors";
+import { AreaTag } from "@/components/calendar/area-tag";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 interface AreaLegendToggleProps {
   areas: Area[];
+  /** Catálogo completo para heredar color del padre. */
+  allAreas?: Area[];
   show: boolean;
   onToggle: () => void;
   className?: string;
@@ -14,10 +17,12 @@ interface AreaLegendToggleProps {
 
 export function AreaLegendToggle({
   areas,
+  allAreas,
   show,
   onToggle,
   className,
 }: AreaLegendToggleProps) {
+  const colorCatalog = allAreas && allAreas.length > 0 ? allAreas : areas;
   return (
     <div className={cn("space-y-2", className)}>
       <Button
@@ -32,22 +37,13 @@ export function AreaLegendToggle({
       </Button>
       {show && areas.length > 0 && (
         <div className="flex flex-wrap justify-end gap-2">
-          {areas.map((area) => {
-            const color = getAreaColor(area, areas);
-            return (
-              <span
-                key={area.id}
-                className="inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-xs"
-                style={areaCardStyle(color)}
-              >
-                <span
-                  className="h-2.5 w-2.5 shrink-0 rounded-full"
-                  style={{ backgroundColor: color.hex }}
-                />
-                {area.name}
-              </span>
-            );
-          })}
+          {areas.map((area) => (
+            <AreaTag
+              key={area.id}
+              name={area.name}
+              color={getAreaColor(area, colorCatalog)}
+            />
+          ))}
         </div>
       )}
     </div>

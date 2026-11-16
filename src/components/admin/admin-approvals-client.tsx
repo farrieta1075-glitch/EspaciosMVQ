@@ -4,7 +4,9 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import type { ReservationDetail } from "@/types/reservation";
-import { areaCardStyle, getAreaColor } from "@/lib/area-colors";
+import { areaCardStyle } from "@/lib/area-colors";
+import { AreaTag } from "@/components/calendar/area-tag";
+import { getReservationAreaColor } from "@/lib/calendar-utils";
 import type { Area } from "@/types/area";
 import { ApprovalBatchDatesList } from "@/components/approval/approval-batch-dates";
 import { formatDateTimeRange } from "@/lib/approval-change-summary";
@@ -74,7 +76,7 @@ export function AdminApprovalsClient({
       ) : (
         reservations.map((reservation) => {
           const area = areas.find((item) => item.id === reservation.areaId);
-          const color = getAreaColor(area ?? null, areas);
+          const color = getReservationAreaColor(reservation, areas);
           const statusLabel = reservationStatusLabel(reservation);
 
           return (
@@ -87,15 +89,20 @@ export function AdminApprovalsClient({
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
                     <CardTitle>{reservation.eventName}</CardTitle>
-                    <CardDescription>
-                      {reservation.areaName ?? area?.name ?? "Sin área"}
-                      {reservation.approvalBatchOccurrences &&
-                      reservation.approvalBatchOccurrences.length > 1
-                        ? ` · Serie de ${reservation.approvalBatchOccurrences.length} fechas`
-                        : ` · ${formatDateTimeRange(
-                            reservation.startAt,
-                            reservation.endAt,
-                          )}`}
+                    <CardDescription className="flex flex-col gap-1.5">
+                      <AreaTag
+                        name={reservation.areaName ?? area?.name ?? "Sin área"}
+                        color={color}
+                      />
+                      <span>
+                        {reservation.approvalBatchOccurrences &&
+                        reservation.approvalBatchOccurrences.length > 1
+                          ? `Serie de ${reservation.approvalBatchOccurrences.length} fechas`
+                          : formatDateTimeRange(
+                              reservation.startAt,
+                              reservation.endAt,
+                            )}
+                      </span>
                     </CardDescription>
                   </div>
                   {statusLabel && <Badge variant="outline">{statusLabel}</Badge>}

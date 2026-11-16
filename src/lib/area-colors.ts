@@ -21,15 +21,21 @@ const AREA_HEX_BY_KEY: Record<string, string> = {
   "vida kids": "#FFFF00",
   comms: "#00FF00",
   "servicios pastorales": "#F5F5DC",
+  pastoral: "#F5F5DC",
   formacion: "#4A235A",
   fomacion: "#4A235A",
   "equipo mv": "#FF1493",
   eventos: "#556B2F",
   "escuela de musica": "#FF7F00",
   "escuela de música": "#FF7F00",
+  "grupos pequenos": "#8B4513",
   "grupo pequenos": "#8B4513",
   "grupo pequeños": "#8B4513",
 };
+
+const PALETTE_NEEDLES = Object.entries(AREA_HEX_BY_KEY).sort(
+  (a, b) => b[0].length - a[0].length,
+);
 
 const FALLBACK_HEX = [
   "#FF0000",
@@ -61,6 +67,44 @@ function hashAreaId(areaId: string): number {
   return hash;
 }
 
+/** Acepta #RGB, #RRGGBB o RRGGBB. */
+export function parseColorHex(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  let value = raw.trim();
+  if (!value) return null;
+  if (!value.startsWith("#")) value = `#${value}`;
+  if (/^#[0-9A-Fa-f]{3}$/.test(value)) {
+    const r = value[1];
+    const g = value[2];
+    const b = value[3];
+    return `#${r}${r}${g}${g}${b}${b}`.toUpperCase();
+  }
+  if (/^#[0-9A-Fa-f]{6}$/.test(value)) return value.toUpperCase();
+  return null;
+}
+
+function tokensInclude(key: string, needle: string): boolean {
+  const haystack = key.split(/\s+/).filter(Boolean);
+  const needleTokens = needle.split(/\s+/).filter(Boolean);
+  if (needleTokens.length === 0) return false;
+  for (let index = 0; index <= haystack.length - needleTokens.length; index += 1) {
+    if (needleTokens.every((token, offset) => haystack[index + offset] === token)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function lookupPaletteHex(
+  area: Pick<Area, "name" | "code">,
+): string | null {
+  const key = normalizeAreaKey(area.name, area.code ?? "");
+  for (const [needle, hex] of PALETTE_NEEDLES) {
+    if (tokensInclude(key, needle)) return hex;
+  }
+  return null;
+}
+
 export function hexToRgba(hex: string, alpha: number): string {
   const normalized = hex.replace("#", "");
   if (normalized.length !== 6) return `rgba(211, 211, 211, ${alpha})`;
@@ -73,14 +117,12 @@ export function hexToRgba(hex: string, alpha: number): string {
 function resolveAreaHex(
   area: Pick<Area, "id" | "name" | "code" | "colorHex">,
 ): string {
-  if (area.colorHex?.trim() && /^#[0-9A-Fa-f]{6}$/.test(area.colorHex.trim())) {
-    return area.colorHex.trim();
-  }
-  const key = normalizeAreaKey(area.name, area.code ?? "");
-  for (const [needle, hex] of Object.entries(AREA_HEX_BY_KEY)) {
-    if (key.includes(needle)) return hex;
-  }
-  return FALLBACK_HEX[hashAreaId(area.id)] ?? FALLBACK_HEX[0];
+  return (
+    parseColorHex(area.colorHex) ??
+    lookupPaletteHex(area) ??
+    FALLBACK_HEX[hashAreaId(area.id)] ??
+    FALLBACK_HEX[0]
+  );
 }
 
 function mixHexWithWhite(hex: string, whiteMix: number): string {
@@ -97,9 +139,10 @@ function mixHexWithWhite(hex: string, whiteMix: number): string {
 }
 
 function resolveAreaHexWithHierarchy(area: Area, allAreas: Area[]): string {
-  if (area.colorHex?.trim() && /^#[0-9A-Fa-f]{6}$/.test(area.colorHex.trim())) {
-    return area.colorHex.trim();
-  }
+  const ownExplicit = parseColorHex(area.colorHex);
+  if (ownExplicit) return ownExplicit;
+  const ownPalette = lookupPaletteHex(area);
+  if (ownPalette) return ownPalette;
 
   const { areasById, childrenByParent } = buildAreaHierarchy(allAreas);
   const chain: Area[] = [area];
@@ -111,7 +154,17 @@ function resolveAreaHexWithHierarchy(area: Area, allAreas: Area[]): string {
   }
 
   const root = chain[0] ?? area;
-  const baseHex = resolveAreaHex(root);
+  let baseHex: string | null = null;
+  for (const node of chain) {
+    const hex = parseColorHex(node.colorHex) ?? lookupPaletteHex(node);
+    if (hex) {
+      baseHex = hex;
+      break;
+    }
+  }
+  if (!baseHex) {
+    baseHex = FALLBACK_HEX[hashAreaId(root.id)] ?? FALLBACK_HEX[0];
+  }
 
   if (!area.parentId || chain.length <= 1) {
     return baseHex;

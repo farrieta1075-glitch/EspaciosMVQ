@@ -13,6 +13,7 @@ import {
   MAP_AVAILABLE_FILL,
   MAP_AVAILABLE_STROKE,
 } from "@/lib/area-colors";
+import { AreaTag } from "@/components/calendar/area-tag";
 import {
   getReservationAreaColor,
   isOwnAreaReservation,
@@ -259,22 +260,13 @@ export function CalendarDaySheet({
 
           {showAreaLegend && areasOnDay.length > 0 && (
             <div className="flex flex-wrap gap-2">
-              {areasOnDay.map((area) => {
-                const color = getAreaColor(area, areas);
-                return (
-                  <span
-                    key={area.id}
-                    className="inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-xs"
-                    style={areaCardStyle(color)}
-                  >
-                    <span
-                      className="h-2.5 w-2.5 rounded-full"
-                      style={{ backgroundColor: color.hex }}
-                    />
-                    {area.name}
-                  </span>
-                );
-              })}
+              {areasOnDay.map((area) => (
+                <AreaTag
+                  key={area.id}
+                  name={area.name}
+                  color={getAreaColor(area, areas)}
+                />
+              ))}
             </div>
           )}
 
@@ -341,6 +333,17 @@ export function CalendarDaySheet({
                       {statusLabel && (
                         <Badge variant="outline">{statusLabel}</Badge>
                       )}
+                    </div>
+                    <div className="mt-2">
+                      <AreaTag
+                        name={
+                          reservation.areaName ??
+                          areas.find((item) => item.id === reservation.areaId)
+                            ?.name ??
+                          "Área"
+                        }
+                        color={color}
+                      />
                     </div>
                     <p className="mt-2 text-sm">
                       {reservation.spaceNames.join(", ")}
