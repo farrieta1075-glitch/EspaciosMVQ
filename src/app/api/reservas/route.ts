@@ -8,6 +8,7 @@ import {
   createReservation,
   listReservationDetails,
 } from "@/lib/reservation-service";
+import { getAllAreas } from "@/lib/sheets/areas";
 import { getUserById } from "@/lib/sheets/users";
 
 export async function GET() {
@@ -17,9 +18,12 @@ export async function GET() {
   }
 
   const admin = isAdmin(session.user);
-  const userRecord = await getUserById(session.user.id);
+  const [userRecord, areas] = await Promise.all([
+    getUserById(session.user.id),
+    getAllAreas(),
+  ]);
   const scopeAreaIds = userRecord
-    ? resolveUserAreaScopeIds(userRecord)
+    ? resolveUserAreaScopeIds(userRecord, areas)
     : [];
 
   const reservations = await listReservationDetails(scopeAreaIds, admin);
@@ -118,8 +122,13 @@ export async function POST(request: Request) {
       );
     }
   } else {
-    const userRecord = await getUserById(user.id);
-    const scopes = userRecord ? resolveUserAreaScopeIds(userRecord) : [];
+    const [userRecord, areas] = await Promise.all([
+      getUserById(user.id),
+      getAllAreas(),
+    ]);
+    const scopes = userRecord
+      ? resolveUserAreaScopeIds(userRecord, areas)
+      : [];
     if (scopes.length === 0) {
       return NextResponse.json(
         { error: "Tu usuario no tiene un área o subárea asignada." },
@@ -127,9 +136,9 @@ export async function POST(request: Request) {
       );
     }
     const requestedAreaId = parsed.data.areaId?.trim();
-    if (requestedAreaId && userHasAreaScope(userRecord!, requestedAreaId)) {
+    if (requestedAreaId && userHasAreaScope(userRecord!, requestedAreaId, areas)) {
       areaId = requestedAreaId;
-    } else if (requestedAreaId && !userHasAreaScope(userRecord!, requestedAreaId)) {
+    } else if (requestedAreaId && !userHasAreaScope(userRecord!, requestedAreaId, areas)) {
       return NextResponse.json(
         { error: "No puedes reservar para un área no asignada." },
         { status: 403 },

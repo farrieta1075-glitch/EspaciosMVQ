@@ -19,15 +19,25 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const scopeParam = searchParams.get("scopeIds");
   const areas = await getAllAreas();
+  const admin = isAdmin(session.user);
+  const user = admin ? null : await getUserById(session.user.id);
+  const allowed = admin
+    ? null
+    : new Set(user ? resolveUserAreaScopeIds(user, areas) : []);
 
   let scopeIds: string[] = [];
   if (scopeParam) {
-    scopeIds = scopeParam.split(",").map((id) => id.trim()).filter(Boolean);
-  } else if (isAdmin(session.user)) {
+    const requested = scopeParam
+      .split(",")
+      .map((id) => id.trim())
+      .filter(Boolean);
+    scopeIds = allowed
+      ? requested.filter((id) => allowed.has(id))
+      : requested;
+  } else if (admin) {
     scopeIds = areas.map((area) => area.id);
   } else {
-    const user = await getUserById(session.user.id);
-    scopeIds = user ? resolveUserAreaScopeIds(user) : [];
+    scopeIds = allowed ? [...allowed] : [];
   }
 
   const areaOptions = buildEventPresetAreaOptions(areas, scopeIds);

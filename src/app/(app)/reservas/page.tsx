@@ -15,14 +15,12 @@ export default async function ReservasPage() {
   const userRecord = session?.user?.id
     ? await getUserById(session.user.id)
     : null;
+  const areas = await getAllAreas();
   const scopeAreaIds = userRecord
-    ? resolveUserAreaScopeIds(userRecord)
+    ? resolveUserAreaScopeIds(userRecord, areas)
     : [];
 
-  const [reservations, areas] = await Promise.all([
-    listReservationDetails(scopeAreaIds, admin),
-    getAllAreas(),
-  ]);
+  const reservations = await listReservationDetails(scopeAreaIds, admin);
 
   return (
     <section className="space-y-6">
@@ -39,6 +37,7 @@ export default async function ReservasPage() {
         initialReservations={reservations}
         isAdmin={admin}
         viewerUser={session?.user ?? null}
+        viewerAreaScopeIds={scopeAreaIds}
         areas={areas}
       />
     </section>

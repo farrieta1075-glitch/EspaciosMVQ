@@ -38,6 +38,7 @@ interface CalendarClientProps {
   viewerAreaId: string | null;
   viewerRole: UserRole;
   viewerUser: SessionUser | null;
+  viewerAreaScopeIds?: string[];
   initialDate?: string;
   initialMapId?: string;
   initialSpaceId?: string;
@@ -77,6 +78,7 @@ export function CalendarClient({
   viewerAreaId,
   viewerRole,
   viewerUser,
+  viewerAreaScopeIds = [],
   initialDate,
   initialMapId,
   initialSpaceId,
@@ -121,8 +123,16 @@ export function CalendarClient({
         viewerUser,
         reservations: activeReservations,
         pickMode,
+        areaScopeIds: viewerAreaScopeIds,
       }),
-    [activeReservations, isAdmin, pickMode, viewerRole, viewerUser],
+    [
+      activeReservations,
+      isAdmin,
+      pickMode,
+      viewerAreaScopeIds,
+      viewerRole,
+      viewerUser,
+    ],
   );
 
   React.useEffect(() => {

@@ -171,9 +171,9 @@ async function validateAvailability(
 }
 
 async function getAreaUserIds(areaId: string): Promise<string[]> {
-  const users = await getAllUserRecords();
+  const [users, areas] = await Promise.all([getAllUserRecords(), getAllAreas()]);
   return users
-    .filter((user) => user.active && userHasAreaScope(user, areaId))
+    .filter((user) => user.active && userHasAreaScope(user, areaId, areas))
     .map((user) => user.id);
 }
 

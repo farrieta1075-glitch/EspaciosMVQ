@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth/index";
 import { can, isAdmin } from "@/lib/auth/permissions";
+import { resolveUserAreaScopeIds } from "@/lib/area-scope";
 import type { UserRole } from "@/types/user";
 import { getCachedCatalogBundle } from "@/lib/sheets/cached-catalog";
 import { getUserById } from "@/lib/sheets/users";
@@ -32,6 +33,9 @@ export default async function CalendarioPage({
   const userRecord = session?.user?.id
     ? await getUserById(session.user.id)
     : null;
+  const viewerAreaScopeIds = userRecord
+    ? resolveUserAreaScopeIds(userRecord, areas)
+    : [];
 
   const pickMode = params.pick === "1";
   const returnTo =
@@ -51,6 +55,7 @@ export default async function CalendarioPage({
         viewerAreaId={session?.user?.areaId ?? null}
         viewerRole={(session?.user?.role ?? "VISUALIZACION") as UserRole}
         viewerUser={session?.user ?? null}
+        viewerAreaScopeIds={viewerAreaScopeIds}
         initialDate={params.date}
         initialMapId={params.mapId}
         initialSpaceId={params.spaceId}

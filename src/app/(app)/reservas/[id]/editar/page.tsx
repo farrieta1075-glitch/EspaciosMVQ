@@ -27,40 +27,48 @@ export default async function EditarReservaPage({
   if (!session?.user) redirect("/login");
 
   const { id } = await params;
-  const reservation = await getReservationById(id);
+  const [reservation, userRecord, areas] = await Promise.all([
+    getReservationById(id),
+    getUserById(session.user.id),
+    getAllAreas(),
+  ]);
+  const userAreaScopeIds = userRecord
+    ? resolveUserAreaScopeIds(userRecord, areas)
+    : [];
+  const areaAccess = { areaScopeIds: userAreaScopeIds };
   if (
     !reservation ||
     reservation.status === "CANCELLED" ||
-    !canAccessReservation(session.user, reservation)
+    !canAccessReservation(session.user, reservation, areaAccess)
   ) {
     notFound();
   }
 
   const admin = isAdmin(session.user);
   const past = isPastReservation(reservation);
-  const attendanceOnly = past && !admin && canConfirmAttendance(session.user, reservation);
+  const attendanceOnly =
+    past &&
+    !admin &&
+    canConfirmAttendance(session.user, reservation, areaAccess);
 
-  if (!attendanceOnly && !canModifyReservation(session.user, reservation)) {
+  if (
+    !attendanceOnly &&
+    !canModifyReservation(session.user, reservation, areaAccess)
+  ) {
     notFound();
   }
 
-  const [detail, maps, spaces, areas] = await Promise.all([
+  const [detail, maps, spaces] = await Promise.all([
     getReservationDetail(id),
     getAllMaps(),
     getAllSpaces(),
-    getAllAreas(),
   ]);
 
   if (!detail) notFound();
-
-  const userRecord = session.user.id
-    ? await getUserById(session.user.id)
-    : null;
-  const userAreaScopeIds = userRecord
-    ? resolveUserAreaScopeIds(userRecord)
-    : [];
   const showAttendanceSection =
-    past && admin && canConfirmAttendance(session.user, reservation);
+    past &&
+    admin &&
+    canConfirmAttendance(session.user, reservation, areaAccess);
 
   return (
     <section className="space-y-3">

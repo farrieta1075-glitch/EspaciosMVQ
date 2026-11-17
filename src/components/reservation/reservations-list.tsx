@@ -44,6 +44,7 @@ interface ReservationsListProps {
   initialReservations: ReservationDetail[];
   isAdmin: boolean;
   viewerUser: SessionUser | null;
+  viewerAreaScopeIds?: string[];
   areas?: Area[];
 }
 
@@ -146,6 +147,7 @@ export function ReservationsList({
   initialReservations,
   isAdmin,
   viewerUser,
+  viewerAreaScopeIds = [],
   areas = [],
 }: ReservationsListProps) {
   const router = useRouter();
@@ -342,7 +344,9 @@ export function ReservationsList({
               onClick={(event) => event.stopPropagation()}
               onKeyDown={(event) => event.stopPropagation()}
             >
-              {canConfirmAttendance(viewerUser, reservation) &&
+              {canConfirmAttendance(viewerUser, reservation, {
+                areaScopeIds: viewerAreaScopeIds,
+              }) &&
                 isPastReservation(reservation) && (
                   <Button
                     asChild
@@ -354,7 +358,9 @@ export function ReservationsList({
                     </Link>
                   </Button>
                 )}
-              {canModifyReservation(viewerUser, reservation) && (
+              {canModifyReservation(viewerUser, reservation, {
+                areaScopeIds: viewerAreaScopeIds,
+              }) && (
                 <Button asChild size="sm" variant="outline">
                   <Link href={`/reservas/${reservation.id}/editar`}>
                     <Pencil className="mr-1 h-4 w-4" />
@@ -362,7 +368,9 @@ export function ReservationsList({
                   </Link>
                 </Button>
               )}
-              {canCancelReservation(viewerUser, reservation) && (
+              {canCancelReservation(viewerUser, reservation, {
+                areaScopeIds: viewerAreaScopeIds,
+              }) && (
                 <Button
                   size="sm"
                   variant="ghost"

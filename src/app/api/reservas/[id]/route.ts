@@ -7,12 +7,27 @@ import {
   canCancelReservation,
   canModifyReservation,
 } from "@/lib/auth/reservation-permissions";
+import { resolveUserAreaScopeIds } from "@/lib/area-scope";
 import {
   cancelReservation,
   getReservationDetail,
   updateReservation,
 } from "@/lib/reservation-service";
+import { getAllAreas } from "@/lib/sheets/areas";
 import { getReservationById } from "@/lib/sheets/reservations";
+import { getUserById } from "@/lib/sheets/users";
+
+async function loadAreaAccess(userId: string) {
+  const [userRecord, areas] = await Promise.all([
+    getUserById(userId),
+    getAllAreas(),
+  ]);
+  return {
+    areaScopeIds: userRecord
+      ? resolveUserAreaScopeIds(userRecord, areas)
+      : [],
+  };
+}
 
 const updateSchema = z.object({
   eventName: z.string().min(1),
@@ -47,8 +62,11 @@ export async function GET(
   }
 
   const { id } = await params;
-  const reservation = await getReservationById(id);
-  if (!reservation || !canAccessReservation(session.user, reservation)) {
+  const [reservation, areaAccess] = await Promise.all([
+    getReservationById(id),
+    loadAreaAccess(session.user.id),
+  ]);
+  if (!reservation || !canAccessReservation(session.user, reservation, areaAccess)) {
     return NextResponse.json({ error: "Reserva no encontrada" }, { status: 404 });
   }
 
@@ -67,8 +85,11 @@ export async function PATCH(
   }
 
   const { id } = await params;
-  const existing = await getReservationById(id);
-  if (!existing || !canModifyReservation(session.user, existing)) {
+  const [existing, areaAccess] = await Promise.all([
+    getReservationById(id),
+    loadAreaAccess(session.user.id),
+  ]);
+  if (!existing || !canModifyReservation(session.user, existing, areaAccess)) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
@@ -157,8 +178,11 @@ export async function DELETE(
   }
 
   const { id } = await params;
-  const existing = await getReservationById(id);
-  if (!existing || !canCancelReservation(session.user, existing)) {
+  const [existing, areaAccess] = await Promise.all([
+    getReservationById(id),
+    loadAreaAccess(session.user.id),
+  ]);
+  if (!existing || !canCancelReservation(session.user, existing, areaAccess)) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 

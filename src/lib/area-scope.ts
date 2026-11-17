@@ -14,20 +14,42 @@ export function serializeEventPresets(presets: AreaEventPreset[]): string {
   return serializeAreaEventPresets(presets);
 }
 
-export function resolveUserAreaScopeIds(user: Pick<AppUser, "areaId" | "areaScopeIds">): string[] {
+export function expandAssignedAreaIds(
+  assignedIds: string[],
+  areas: Area[],
+): string[] {
+  const expanded = new Set<string>();
+  for (const id of assignedIds) {
+    if (!id) continue;
+    for (const descendantId of getDescendantAreaIds(id, areas)) {
+      expanded.add(descendantId);
+    }
+  }
+  return [...expanded];
+}
+
+export function resolveUserAreaScopeIds(
+  user: Pick<AppUser, "areaId" | "areaScopeIds">,
+  areas?: Area[],
+): string[] {
   const scoped = (user.areaScopeIds ?? []).filter(Boolean);
-  if (scoped.length > 0) return [...new Set(scoped)];
-  if (user.areaId) return [user.areaId];
-  return [];
+  const assigned =
+    scoped.length > 0
+      ? [...new Set(scoped)]
+      : user.areaId
+        ? [user.areaId]
+        : [];
+  if (!areas?.length) return assigned;
+  return expandAssignedAreaIds(assigned, areas);
 }
 
 export function userHasAreaScope(
   user: Pick<AppUser, "areaId" | "areaScopeIds">,
   areaId: string,
+  areas?: Area[],
 ): boolean {
   if (!areaId) return false;
-  const scopes = resolveUserAreaScopeIds(user);
-  return scopes.includes(areaId);
+  return resolveUserAreaScopeIds(user, areas).includes(areaId);
 }
 
 export function buildAreaTree(areas: Area[]): Area[] {

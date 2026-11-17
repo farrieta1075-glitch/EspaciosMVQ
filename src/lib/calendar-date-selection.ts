@@ -22,6 +22,7 @@ export function canSelectCalendarDay(
     viewerUser: SessionUser | null;
     reservations: ReservationDetail[];
     pickMode?: boolean;
+    areaScopeIds?: string[];
   },
 ): boolean {
   if (!isCalendarDayInPast(day)) return true;
@@ -39,7 +40,9 @@ export function canSelectCalendarDay(
     return options.reservations.some(
       (reservation) =>
         isSameDay(new Date(reservation.startAt), day) &&
-        canConfirmAttendance(options.viewerUser, reservation),
+        canConfirmAttendance(options.viewerUser, reservation, {
+          areaScopeIds: options.areaScopeIds,
+        }),
     );
   }
 

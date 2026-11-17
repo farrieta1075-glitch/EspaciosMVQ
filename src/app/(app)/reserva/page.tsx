@@ -21,7 +21,7 @@ export default async function ReservaPage({
     ? await getUserById(session.user.id)
     : null;
   const userAreaScopeIds = userRecord
-    ? resolveUserAreaScopeIds(userRecord)
+    ? resolveUserAreaScopeIds(userRecord, areas)
     : [];
 
   return (

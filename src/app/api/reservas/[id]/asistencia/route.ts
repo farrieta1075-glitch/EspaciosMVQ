@@ -2,9 +2,12 @@ import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/lib/auth/index";
+import { resolveUserAreaScopeIds } from "@/lib/area-scope";
 import { canConfirmAttendance } from "@/lib/auth/reservation-permissions";
 import { confirmReservationAttendance } from "@/lib/reservation-service";
+import { getAllAreas } from "@/lib/sheets/areas";
 import { getReservationById } from "@/lib/sheets/reservations";
+import { getUserById } from "@/lib/sheets/users";
 
 const bodySchema = z.object({
   actualAttendees: z.coerce.number().min(1),
@@ -21,8 +24,17 @@ export async function POST(
   }
 
   const { id } = await params;
-  const reservation = await getReservationById(id);
-  if (!reservation || !canConfirmAttendance(session.user, reservation)) {
+  const [reservation, userRecord, areas] = await Promise.all([
+    getReservationById(id),
+    getUserById(session.user.id),
+    getAllAreas(),
+  ]);
+  const areaAccess = {
+    areaScopeIds: userRecord
+      ? resolveUserAreaScopeIds(userRecord, areas)
+      : [],
+  };
+  if (!reservation || !canConfirmAttendance(session.user, reservation, areaAccess)) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
