@@ -1,5 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
+import { auth } from "@/lib/auth/index";
+import { decisionActorFromSession } from "@/lib/reservation-decision";
 import { renderApprovalActionResultPage } from "@/lib/email/approval-action-html";
 import { approvalResponderUrl } from "@/lib/email/approval-email-content";
 import { getPendingCreateBatchMembers } from "@/lib/approval-batch";
@@ -97,10 +99,12 @@ export async function GET(
   const batchSize = batchBeforeDecision.length;
 
   try {
+    const session = await auth();
     const detail = await decideReservationByToken({
       id,
       token,
       approve,
+      actor: decisionActorFromSession(session?.user ?? null),
     });
 
     if (!detail) {

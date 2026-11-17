@@ -108,6 +108,10 @@ model Reservation {
   actualAttendees           Int?
   attendanceComment         String  @default("") @db.Text
   sendEventReminder         Boolean @default(false)
+  decision                  String  @default("") @db.VarChar(16)
+  decisionByName            String  @default("") @db.VarChar(256)
+  decisionByUserId          String  @default("") @db.VarChar(64)
+  decisionAt                String  @default("") @db.VarChar(64)
 
   @@index([areaId])
   @@index([userId])

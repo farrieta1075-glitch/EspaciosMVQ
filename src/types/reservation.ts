@@ -2,6 +2,13 @@ export type ReservationStatus = "CONFIRMED" | "CANCELLED" | "PENDING";
 
 export type PendingAction = "" | "UPDATE" | "CANCEL";
 
+export type ReservationDecision = "" | "APPROVED" | "REJECTED";
+
+export interface DecisionActor {
+  userId?: string | null;
+  name?: string | null;
+}
+
 export interface Reservation {
   id: string;
   eventName: string;
@@ -25,6 +32,10 @@ export interface Reservation {
   attendanceComment: string;
   /** Recordatorio in-app 1 día antes (columna al final en Reservas). */
   sendEventReminder: boolean;
+  decision: ReservationDecision;
+  decisionByName: string;
+  decisionByUserId: string;
+  decisionAt: string;
 }
 
 export interface PendingUpdatePayload {
@@ -122,6 +133,7 @@ export interface CreateReservationInput {
   resources: { resourceId: string; quantity: number }[];
   confirmSimilarName?: boolean;
   createdByAdmin?: boolean;
+  createdByAdminActor?: DecisionActor;
   estimatedAttendees?: number;
   attendeeJustificationCode?: string;
   attendeeJustificationNote?: string;

@@ -34,8 +34,13 @@ import {
 import { getAllResources } from "@/lib/sheets/resources";
 import { getAllAreas } from "@/lib/sheets/areas";
 import { isAppDataOnSql } from "@/lib/db/config";
+import {
+  emptyReservationDecision,
+  stampReservationDecision,
+} from "@/lib/reservation-decision";
 import type {
   CreateReservationInput,
+  DecisionActor,
   PendingUpdatePayload,
   Reservation,
   ReservationDetail,
@@ -334,9 +339,17 @@ export async function createReservation(
       actualAttendees: null,
       attendanceComment: "",
       sendEventReminder: input.sendEventReminder !== false,
+      ...emptyReservationDecision(),
     };
+    const toInsert = input.createdByAdmin
+      ? stampReservationDecision(
+          reservation,
+          input.createdByAdminActor,
+          "APPROVED",
+        )
+      : reservation;
 
-    await insertReservation({ ...reservation, spaceIds: input.spaceIds });
+    await insertReservation({ ...toInsert, spaceIds: input.spaceIds });
 
     const persisted = await getReservationById(id);
     if (!persisted) {
@@ -714,7 +727,10 @@ export async function updateReservation(
   return { pending: false };
 }
 
-async function applyPendingUpdate(reservation: Reservation): Promise<void> {
+async function applyPendingUpdate(
+  reservation: Reservation,
+  actor?: DecisionActor,
+): Promise<void> {
   const payload = parsePendingPayload(reservation.pendingPayload);
   if (!payload) throw new Error("Solicitud de cambio inválida.");
 
@@ -723,7 +739,8 @@ async function applyPendingUpdate(reservation: Reservation): Promise<void> {
     endAt: `${payload.date}T${payload.endTime}:00`,
   };
 
-  const updated: Reservation = {
+  const updated: Reservation = stampReservationDecision(
+    {
     ...reservation,
     eventName: payload.eventName,
     eventDescription: payload.eventDescription,
@@ -743,7 +760,10 @@ async function applyPendingUpdate(reservation: Reservation): Promise<void> {
     attendeeJustificationNote:
       payload.attendeeJustificationNote ??
       reservation.attendeeJustificationNote,
-  };
+    },
+    actor,
+    "APPROVED",
+  );
 
   await updateReservationRecord(updated);
   await replaceReservationResources(reservation.id, payload.resources);
@@ -774,6 +794,7 @@ export async function confirmReservationAttendance(
 
 export async function approveReservation(
   id: string,
+  actor?: DecisionActor,
 ): Promise<ReservationDetail | null> {
   const reservation = await getReservationById(id);
   if (!reservation) return null;
@@ -784,11 +805,17 @@ export async function approveReservation(
     );
     const batch = await getPendingCreateBatchMembers(reservation);
     for (const item of batch) {
-      await updateReservationRecord({
-        ...item,
-        status: "CONFIRMED",
-        approvalToken: "",
-      });
+      await updateReservationRecord(
+        stampReservationDecision(
+          {
+            ...item,
+            status: "CONFIRMED",
+            approvalToken: "",
+          },
+          actor,
+          "APPROVED",
+        ),
+      );
     }
     await recordEventUsage(reservation.eventName, reservation.areaId);
     const areaUserIds = await getAreaUserIds(reservation.areaId);
@@ -806,15 +833,21 @@ export async function approveReservation(
     );
     return getReservationDetail(id);
   } else if (reservation.pendingAction === "UPDATE") {
-    await applyPendingUpdate(reservation);
+    await applyPendingUpdate(reservation, actor);
   } else if (reservation.pendingAction === "CANCEL") {
-    await updateReservationRecord({
-      ...reservation,
-      status: "CANCELLED",
-      pendingAction: "",
-      pendingPayload: "",
-      approvalToken: "",
-    });
+    await updateReservationRecord(
+      stampReservationDecision(
+        {
+          ...reservation,
+          status: "CANCELLED",
+          pendingAction: "",
+          pendingPayload: "",
+          approvalToken: "",
+        },
+        actor,
+        "APPROVED",
+      ),
+    );
   } else {
     throw new Error("Esta reserva no requiere autorización.");
   }
@@ -847,6 +880,7 @@ export async function approveReservation(
 
 export async function rejectReservation(
   id: string,
+  actor?: DecisionActor,
 ): Promise<ReservationDetail | null> {
   const reservation = await getReservationById(id);
   if (!reservation) return null;
@@ -859,11 +893,17 @@ export async function rejectReservation(
     );
     const batch = await getPendingCreateBatchMembers(reservation);
     for (const item of batch) {
-      await updateReservationRecord({
-        ...item,
-        status: "CANCELLED",
-        approvalToken: "",
-      });
+      await updateReservationRecord(
+        stampReservationDecision(
+          {
+            ...item,
+            status: "CANCELLED",
+            approvalToken: "",
+          },
+          actor,
+          "REJECTED",
+        ),
+      );
     }
     const count = batch.length;
     await notifyAreaUsers(
@@ -876,12 +916,18 @@ export async function rejectReservation(
       areaUserIds,
     );
   } else if (reservation.pendingAction === "UPDATE") {
-    await updateReservationRecord({
-      ...reservation,
-      pendingAction: "",
-      pendingPayload: "",
-      approvalToken: "",
-    });
+    await updateReservationRecord(
+      stampReservationDecision(
+        {
+          ...reservation,
+          pendingAction: "",
+          pendingPayload: "",
+          approvalToken: "",
+        },
+        actor,
+        "REJECTED",
+      ),
+    );
     await notifyAreaUsers(
       reservation.areaId,
       reservation.id,
@@ -890,12 +936,18 @@ export async function rejectReservation(
       areaUserIds,
     );
   } else if (reservation.pendingAction === "CANCEL") {
-    await updateReservationRecord({
-      ...reservation,
-      pendingAction: "",
-      pendingPayload: "",
-      approvalToken: "",
-    });
+    await updateReservationRecord(
+      stampReservationDecision(
+        {
+          ...reservation,
+          pendingAction: "",
+          pendingPayload: "",
+          approvalToken: "",
+        },
+        actor,
+        "REJECTED",
+      ),
+    );
     await notifyAreaUsers(
       reservation.areaId,
       reservation.id,
@@ -914,12 +966,13 @@ export async function decideReservationByToken(input: {
   id: string;
   token: string;
   approve: boolean;
+  actor?: DecisionActor;
 }): Promise<ReservationDetail | null> {
   const reservation = await getReservationById(input.id);
   if (!reservation || !reservation.approvalToken) return null;
   if (reservation.approvalToken !== input.token) return null;
 
   return input.approve
-    ? approveReservation(input.id)
-    : rejectReservation(input.id);
+    ? approveReservation(input.id, input.actor)
+    : rejectReservation(input.id, input.actor);
 }

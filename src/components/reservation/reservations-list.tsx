@@ -11,14 +11,15 @@ import {
   Pencil,
   Trash2,
 } from "lucide-react";
-import {
-  formatReservationDateTimeRange,
-  formatTimeDisplay,
-} from "@/lib/date-utils";
+import { formatTimeDisplay } from "@/lib/date-utils";
 import type { ReservationDetail } from "@/types/reservation";
 import type { Area } from "@/types/area";
 import type { SessionUser } from "@/types/user";
 import { AreaTag } from "@/components/calendar/area-tag";
+import {
+  ReservationAuthorizationDetail,
+  ReservationAuthorizationMark,
+} from "@/components/reservation/reservation-authorization-mark";
 import { getReservationAreaColor } from "@/lib/calendar-utils";
 import { reservationNeedsAdminAction } from "@/types/reservation";
 import { Badge } from "@/components/ui/badge";
@@ -266,12 +267,16 @@ export function ReservationsList({
               </div>
             )}
           </div>
-          <Badge
-            variant={statusVariant(reservation)}
-            className="shrink-0 text-[10px] sm:text-xs"
-          >
-            {statusLabel(reservation)}
-          </Badge>
+          {isAdmin ? (
+            <ReservationAuthorizationMark reservation={reservation} />
+          ) : (
+            <Badge
+              variant={statusVariant(reservation)}
+              className="shrink-0 text-[10px] sm:text-xs"
+            >
+              {statusLabel(reservation)}
+            </Badge>
+          )}
         </button>
 
         {expanded && (
@@ -291,15 +296,6 @@ export function ReservationsList({
               </p>
             )}
             <div className="space-y-1 text-sm">
-              <p className="font-medium text-foreground">
-                <span className="font-normal text-muted-foreground">
-                  Fecha y horario:{" "}
-                </span>
-                {formatReservationDateTimeRange(
-                  reservation.startAt,
-                  reservation.endAt,
-                )}
-              </p>
               <p>
                 <span className="text-muted-foreground">Espacios: </span>
                 {reservation.spaceNames.join(", ") || "—"}
@@ -328,15 +324,9 @@ export function ReservationsList({
                   {reservation.actualAttendees}
                 </p>
               )}
-              {(reservation.areaName || reservation.areaId) && (
-                <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground">Área: </span>
-                  <AreaTag
-                    name={reservation.areaName ?? reservation.areaId}
-                    color={getReservationAreaColor(reservation, areas)}
-                  />
-                </div>
-              )}
+              {isAdmin ? (
+                <ReservationAuthorizationDetail reservation={reservation} />
+              ) : null}
             </div>
 
             <div

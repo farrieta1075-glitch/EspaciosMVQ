@@ -2,9 +2,11 @@ import "server-only";
 import { serializeReservationDateTime } from "@/lib/date-utils";
 import { normalizeReservationStatusValue } from "@/lib/sheets/reservation-row-parse";
 import { getPrisma } from "@/lib/db/prisma";
+import { ensureReservationDecisionColumns } from "@/lib/db/ensure-reservation-decision-columns";
 import type {
   PendingAction,
   Reservation,
+  ReservationDecision,
   ReservationResource,
   ReservationStatus,
 } from "@/types/reservation";
@@ -29,7 +31,14 @@ export function serializeSpaceIds(spaceIds: string[]): string {
   return JSON.stringify(spaceIds);
 }
 
-export function mapDbReservation(row: DbReservation): Reservation {
+type ReservationRow = DbReservation & {
+  decision?: string;
+  decisionByName?: string;
+  decisionByUserId?: string;
+  decisionAt?: string;
+};
+
+export function mapDbReservation(row: ReservationRow): Reservation {
   return {
     id: row.id,
     eventName: row.eventName,
@@ -51,6 +60,10 @@ export function mapDbReservation(row: DbReservation): Reservation {
     actualAttendees: row.actualAttendees,
     attendanceComment: row.attendanceComment,
     sendEventReminder: row.sendEventReminder,
+    decision: (row.decision ?? "") as ReservationDecision,
+    decisionByName: row.decisionByName ?? "",
+    decisionByUserId: row.decisionByUserId ?? "",
+    decisionAt: row.decisionAt ?? "",
   };
 }
 
@@ -76,26 +89,39 @@ function reservationToDbData(reservation: Reservation) {
     actualAttendees: reservation.actualAttendees,
     attendanceComment: reservation.attendanceComment,
     sendEventReminder: reservation.sendEventReminder,
+    decision: reservation.decision ?? "",
+    decisionByName: reservation.decisionByName ?? "",
+    decisionByUserId: reservation.decisionByUserId ?? "",
+    decisionAt: reservation.decisionAt ?? "",
   };
 }
 
+async function prismaReady() {
+  const prisma = getPrisma();
+  await ensureReservationDecisionColumns(prisma);
+  return prisma;
+}
+
 export async function getAllReservationsSql(): Promise<Reservation[]> {
-  const rows = await getPrisma().reservation.findMany();
+  const prisma = await prismaReady();
+  const rows = await prisma.reservation.findMany();
   return rows.map(mapDbReservation);
 }
 
 export async function getReservationByIdSql(
   id: string,
 ): Promise<Reservation | null> {
-  const row = await getPrisma().reservation.findUnique({ where: { id } });
+  const prisma = await prismaReady();
+  const row = await prisma.reservation.findUnique({ where: { id } });
   return row ? mapDbReservation(row) : null;
 }
 
 export async function insertReservationSql(
   reservation: Reservation,
 ): Promise<void> {
-  await getPrisma().reservation.create({
-    data: reservationToDbData(reservation),
+  const prisma = await prismaReady();
+  await prisma.reservation.create({
+    data: reservationToDbData(reservation) as never,
   });
 }
 
@@ -103,9 +129,10 @@ export async function updateReservationSql(
   reservation: Reservation,
 ): Promise<boolean> {
   try {
-    await getPrisma().reservation.update({
+    const prisma = await prismaReady();
+    await prisma.reservation.update({
       where: { id: reservation.id },
-      data: reservationToDbData(reservation),
+      data: reservationToDbData(reservation) as never,
     });
     return true;
   } catch {

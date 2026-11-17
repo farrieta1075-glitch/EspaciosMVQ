@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/lib/auth/index";
 import { isAdmin } from "@/lib/auth/permissions";
+import { decisionActorFromSession } from "@/lib/reservation-decision";
 import { resolveUserAreaScopeIds, userHasAreaScope } from "@/lib/area-scope";
 import {
   createReservation,
@@ -181,6 +182,7 @@ export async function POST(request: Request) {
       resources: parsed.data.resources.filter((item) => item.quantity > 0),
       confirmSimilarName: parsed.data.confirmSimilarName,
       createdByAdmin: admin,
+      createdByAdminActor: admin ? decisionActorFromSession(user) : undefined,
       estimatedAttendees: parsed.data.estimatedAttendees,
       attendeeJustificationCode: parsed.data.attendeeJustificationCode,
       attendeeJustificationNote: parsed.data.attendeeJustificationNote,

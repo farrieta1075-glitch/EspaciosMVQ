@@ -18,6 +18,7 @@ import { parsePendingPayload } from "@/types/reservation";
 import { getPendingCreateBatchMembers } from "@/lib/approval-batch";
 import { getApprovalResolution } from "@/lib/approval-resolution";
 import { reservationNeedsAdminAction } from "@/types/reservation";
+import { decisionActorFromSession } from "@/lib/reservation-decision";
 
 const bodySchema = z.object({
   action: z.enum(["approve", "reject"]),
@@ -62,6 +63,7 @@ export async function POST(
       id,
       token: body.data.token,
       approve,
+      actor: decisionActorFromSession(session?.user ?? null),
     });
     if (!detail) {
       return NextResponse.json({ error: "Enlace inválido o expirado" }, { status: 403 });
@@ -78,9 +80,10 @@ export async function POST(
   }
 
   try {
+    const actor = decisionActorFromSession(session.user);
     const detail = approve
-      ? await approveReservation(id)
-      : await rejectReservation(id);
+      ? await approveReservation(id, actor)
+      : await rejectReservation(id, actor);
 
     if (!detail) {
       return NextResponse.json(

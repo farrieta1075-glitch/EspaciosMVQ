@@ -21,6 +21,7 @@ import { SHEET_TABS } from "@/lib/sheets/tabs";
 import type {
   PendingAction,
   Reservation,
+  ReservationDecision,
   ReservationResource,
   ReservationStatus,
 } from "@/types/reservation";
@@ -62,6 +63,10 @@ const reservationRowSchema = z.object({
     .optional()
     .default("true")
     .transform((value) => value.trim().toLowerCase() !== "false"),
+  decision: z.string().optional().default(""),
+  decisionByName: z.string().optional().default(""),
+  decisionByUserId: z.string().optional().default(""),
+  decisionAt: z.string().optional().default(""),
 });
 
 export const parseSpaceIds = parseSpaceIdsSql;
@@ -91,6 +96,10 @@ function mapParsedRowToReservation(parsed: ParsedReservationRow): Reservation {
     actualAttendees: parsed.actualAttendees,
     attendanceComment: parsed.attendanceComment,
     sendEventReminder: parsed.sendEventReminder,
+    decision: (parsed.decision ?? "") as ReservationDecision,
+    decisionByName: parsed.decisionByName ?? "",
+    decisionByUserId: parsed.decisionByUserId ?? "",
+    decisionAt: parsed.decisionAt ?? "",
   };
 }
 
@@ -118,6 +127,10 @@ export function reservationToRow(reservation: Reservation): string[] {
       : "",
     reservation.attendanceComment ?? "",
     reservation.sendEventReminder === false ? "false" : "true",
+    reservation.decision ?? "",
+    reservation.decisionByName ?? "",
+    reservation.decisionByUserId ?? "",
+    reservation.decisionAt ?? "",
   ];
 }
 
