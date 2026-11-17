@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { CheckCircle2, Loader2, XCircle } from "lucide-react";
 import type { ApprovalChangeSummary } from "@/lib/approval-change-summary";
 import { ApprovalBatchDatesList } from "@/components/approval/approval-batch-dates";
+import { ApprovalChangeView } from "@/components/approval/approval-change-view";
 import type { ReservationDetail } from "@/types/reservation";
 import { Button } from "@/components/ui/button";
 
@@ -133,7 +134,7 @@ export function ApprovalResponderClient() {
   const summary = preview.changeSummary;
 
   return (
-    <div className="mx-auto max-w-2xl space-y-5 rounded-xl border border-border bg-card p-6 shadow-sm">
+    <div className="mx-auto w-full min-w-0 max-w-2xl space-y-5 rounded-xl border border-border bg-card p-4 shadow-sm sm:p-6">
       <div className="space-y-1">
         <h1 className="text-xl font-semibold">Solicitud de aprobación</h1>
         <p className="text-sm text-muted-foreground">
@@ -170,66 +171,7 @@ export function ApprovalResponderClient() {
         </p>
       </div>
 
-      {summary.action === "CREATE" && (
-        <div className="space-y-2">
-          <h2 className="text-sm font-semibold">Recursos solicitados</h2>
-          {summary.resources.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Ninguno</p>
-          ) : (
-            <ul className="list-inside list-disc text-sm">
-              {summary.resources.map((item) => (
-                <li key={item.resourceId}>
-                  {item.resourceName} × {item.quantity}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
-
-      {summary.action === "CANCEL" && (
-        <div className="space-y-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
-          <h2 className="text-sm font-semibold">Cancelación solicitada</h2>
-          <p className="text-sm text-muted-foreground">
-            Se solicita cancelar la reserva confirmada con los recursos actuales.
-          </p>
-          <ul className="list-inside list-disc text-sm">
-            {summary.resources.map((item) => (
-              <li key={item.resourceId}>
-                {item.resourceName} × {item.quantity}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {summary.action === "UPDATE" && (
-        <div className="space-y-2">
-          <h2 className="text-sm font-semibold">Cambios solicitados</h2>
-          <div className="overflow-x-auto rounded-lg border border-border">
-            <table className="w-full min-w-[480px] text-left text-sm">
-              <thead className="bg-muted/40">
-                <tr>
-                  <th className="px-3 py-2 font-medium">Campo</th>
-                  <th className="px-3 py-2 font-medium">Actual</th>
-                  <th className="px-3 py-2 font-medium">Solicitado</th>
-                </tr>
-              </thead>
-              <tbody>
-                {summary.changes.map((change) => (
-                  <tr key={change.label} className="border-t border-border">
-                    <td className="px-3 py-2 font-medium">{change.label}</td>
-                    <td className="px-3 py-2 text-muted-foreground">
-                      {change.before}
-                    </td>
-                    <td className="px-3 py-2">{change.after}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+      <ApprovalChangeView summary={summary} />
 
       {outcome && (
         <div
@@ -262,11 +204,11 @@ export function ApprovalResponderClient() {
       )}
 
       {!outcome && preview.canRespond && (
-        <div className="flex flex-wrap gap-2 pt-1">
+        <div className="sticky bottom-0 z-10 -mx-4 flex flex-wrap gap-2 border-t border-border bg-card px-4 py-3 sm:-mx-6 sm:px-6">
           <Button
             disabled={Boolean(submitting)}
             onClick={() => submit("approve")}
-            className="gap-2"
+            className="min-h-10 flex-1 gap-2 sm:flex-none"
           >
             {submitting === "approve" ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -277,7 +219,7 @@ export function ApprovalResponderClient() {
             variant="outline"
             disabled={Boolean(submitting)}
             onClick={() => submit("reject")}
-            className="gap-2"
+            className="min-h-10 flex-1 gap-2 sm:flex-none"
           >
             {submitting === "reject" ? (
               <Loader2 className="h-4 w-4 animate-spin" />

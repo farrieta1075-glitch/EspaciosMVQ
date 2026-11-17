@@ -179,6 +179,7 @@ export function PushDeviceActions({
   }
 
   if (typeof Notification === "undefined") return null;
+  if (compact && permission !== "default") return null;
 
   return (
     <div
@@ -197,7 +198,7 @@ export function PushDeviceActions({
           avisos dentro de la app.
         </p>
       ) : null}
-      {vapidIssues.length > 0 ? (
+      {!compact && vapidIssues.length > 0 ? (
         <ul className="list-disc space-y-1 pl-4 text-xs text-amber-800 dark:text-amber-400">
           {vapidIssues.map((issue) => (
             <li key={issue}>{issue}</li>
@@ -259,6 +260,7 @@ export function PushDeviceActions({
             >
               Sincronizar dispositivo
             </Button>
+            {compact ? null : (
             <Button
               type="button"
               size="sm"
@@ -269,6 +271,7 @@ export function PushDeviceActions({
             >
               Probar aviso
             </Button>
+            )}
           </>
         ) : null}
       </div>

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth/index";
+import { stripAdminAlertBatchMarker } from "@/lib/admin-alert-notifications";
 import {
   deleteNotificationForUser,
   getNotificationsForUser,
@@ -13,7 +14,12 @@ export async function GET() {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  const notifications = await getNotificationsForUser(session.user.id);
+  const notifications = (await getNotificationsForUser(session.user.id)).map(
+    (item) => ({
+      ...item,
+      message: stripAdminAlertBatchMarker(item.message),
+    }),
+  );
   const unreadCount = notifications.filter((item) => !item.read).length;
   return NextResponse.json({ notifications, unreadCount });
 }

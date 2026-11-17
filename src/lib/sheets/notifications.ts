@@ -84,13 +84,19 @@ function parseNotificationRow(row: Record<string, string>): AppNotification | nu
   };
 }
 
-function pushTargetForNotificationType(type: NotificationType): {
+function pushTargetForNotificationType(
+  type: NotificationType,
+  reservationId?: string,
+): {
   url: string;
   title: string;
 } {
   if (type === "APPROVAL_NEEDED") {
+    const url = reservationId
+      ? `/aprobaciones/responder?id=${encodeURIComponent(reservationId)}`
+      : "/admin/aprobaciones";
     return {
-      url: "/admin/aprobaciones",
+      url,
       title: "Autorización pendiente",
     };
   }
@@ -103,11 +109,15 @@ async function dispatchWebPush(
   tag: string,
   type: NotificationType,
   pushTitle?: string,
+  reservationId?: string,
 ): Promise<void> {
   const { stripAdminAlertBatchMarker } = await import(
     "@/lib/admin-alert-notifications"
   );
-  const { url, title: defaultTitle } = pushTargetForNotificationType(type);
+  const { url, title: defaultTitle } = pushTargetForNotificationType(
+    type,
+    reservationId,
+  );
   const body = stripAdminAlertBatchMarker(message);
   try {
     const { sendWebPushToUser } = await import("@/lib/push/send-web-push");
@@ -237,6 +247,7 @@ export async function createNotification(input: {
       input.pushTag ?? saved.id,
       input.type,
       input.pushTitle,
+      input.reservationId,
     );
     return saved;
   }
@@ -248,6 +259,7 @@ export async function createNotification(input: {
     input.pushTag ?? notification.id,
     input.type,
     input.pushTitle,
+    input.reservationId,
   );
   return notification;
 }

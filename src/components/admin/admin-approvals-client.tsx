@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import type { ReservationDetail } from "@/types/reservation";
@@ -9,7 +10,11 @@ import { AreaTag } from "@/components/calendar/area-tag";
 import { getReservationAreaColor } from "@/lib/calendar-utils";
 import type { Area } from "@/types/area";
 import { ApprovalBatchDatesList } from "@/components/approval/approval-batch-dates";
-import { formatDateTimeRange } from "@/lib/approval-change-summary";
+import { ApprovalChangeView } from "@/components/approval/approval-change-view";
+import {
+  buildApprovalChangeSummary,
+  formatDateTimeRange,
+} from "@/lib/approval-change-summary";
 import { reservationStatusLabel } from "@/lib/calendar-utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -78,6 +83,12 @@ export function AdminApprovalsClient({
           const area = areas.find((item) => item.id === reservation.areaId);
           const color = getReservationAreaColor(reservation, areas);
           const statusLabel = reservationStatusLabel(reservation);
+          const changeSummary = buildApprovalChangeSummary({
+            reservation,
+            spaceNames: reservation.spaceNames,
+            resources: reservation.resources,
+            areaName: reservation.areaName,
+          });
 
           return (
             <Card
@@ -121,6 +132,7 @@ export function AdminApprovalsClient({
                   <span className="text-muted-foreground">Espacios: </span>
                   {reservation.spaceNames.join(", ")}
                 </p>
+                <ApprovalChangeView summary={changeSummary} />
                 <div className="flex flex-wrap gap-2">
                   <Button
                     size="sm"
@@ -140,6 +152,11 @@ export function AdminApprovalsClient({
                     onClick={() => decide(reservation.id, "reject")}
                   >
                     Rechazar
+                  </Button>
+                  <Button size="sm" variant="ghost" asChild>
+                    <Link href={`/aprobaciones/responder?id=${encodeURIComponent(reservation.id)}`}>
+                      Ver detalle
+                    </Link>
                   </Button>
                 </div>
               </CardContent>
