@@ -46,6 +46,7 @@ function TreeNode({
             id={`area-${node.area.id}`}
             checked={value === node.area.id}
             onChange={() => onChange(node.area.id)}
+            onClick={() => onChange(node.area.id)}
             className="mt-1 h-4 w-4 shrink-0"
           />
         ) : (

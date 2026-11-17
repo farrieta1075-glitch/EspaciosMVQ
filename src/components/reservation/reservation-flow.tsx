@@ -89,12 +89,15 @@ export function ReservationFlow({
     customDates: [],
   });
   const [sendEventReminder, setSendEventReminder] = React.useState(true);
-  const [areaId, setAreaId] = React.useState(
-    userAreaId ?? userAreaScopeIds[0] ?? areas[0]?.id ?? "",
+  const [areaId, setAreaId] = React.useState(() =>
+    isAdmin && areas.length === 1 ? (areas[0]?.id ?? "") : "",
   );
-  const [reservationAreaId, setReservationAreaId] = React.useState(
-    userAreaScopeIds[0] ?? userAreaId ?? "",
-  );
+  const [reservationAreaId, setReservationAreaId] = React.useState(() => {
+    if (isAdmin) return "";
+    if (userAreaScopeIds.length === 1) return userAreaScopeIds[0];
+    if (userAreaScopeIds.length === 0 && userAreaId) return userAreaId;
+    return "";
+  });
   const [eventPresetGroups, setEventPresetGroups] = React.useState<
     EventPresetGroup[]
   >([]);
@@ -296,11 +299,7 @@ export function ReservationFlow({
       (Boolean(attendeeJustificationCode) &&
         (attendeeJustificationCode !== "OTHER" ||
           attendeeJustificationNote.trim().length > 0))) &&
-    (isAdmin
-      ? Boolean(areaId)
-      : Boolean(
-          reservationAreaId || userAreaScopeIds[0] || userAreaId,
-        ));
+    (isAdmin ? Boolean(areaId) : Boolean(reservationAreaId));
 
   async function submitReservation(confirmSimilarName = false) {
     if (!selection || !canSubmit || submitInFlightRef.current) return;
@@ -313,9 +312,7 @@ export function ReservationFlow({
       eventName: eventName.trim(),
       eventDescription: eventDescription.trim(),
       spaceIds: selection.selectedSpaceIds,
-      areaId: isAdmin
-        ? areaId
-        : reservationAreaId || userAreaScopeIds[0] || userAreaId,
+      areaId: isAdmin ? areaId : reservationAreaId,
       date: selection.date,
       startTime: selection.startTime,
       endTime: selection.endTime,
@@ -421,8 +418,14 @@ export function ReservationFlow({
     setCalendarDateChangeConfirm(null);
     setEventDetailsDone(false);
     setResourcesOpen(false);
-    setAreaId(userAreaId ?? userAreaScopeIds[0] ?? areas[0]?.id ?? "");
-    setReservationAreaId(userAreaScopeIds[0] ?? userAreaId ?? "");
+    setAreaId(isAdmin && areas.length === 1 ? (areas[0]?.id ?? "") : "");
+    setReservationAreaId(
+      !isAdmin && userAreaScopeIds.length === 1
+        ? userAreaScopeIds[0]
+        : !isAdmin && userAreaScopeIds.length === 0 && userAreaId
+          ? userAreaId
+          : "",
+    );
     setMapSelectorKey((value) => value + 1);
     setWizardResetKey((value) => value + 1);
   }

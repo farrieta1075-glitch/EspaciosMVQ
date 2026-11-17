@@ -264,9 +264,7 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
   });
   const flatSelectable = flattenSelectableAreaIds(tree);
   const showAreaPicker = isAdmin ? areas.length > 1 : flatSelectable.length > 1;
-  const activeAreaId = isAdmin
-    ? areaId
-    : reservationAreaId || flatSelectable[0] || userAreaId || "";
+  const activeAreaId = isAdmin ? areaId : reservationAreaId;
 
   const restoreApplied = React.useRef(false);
   const [confirmed, setConfirmed] = React.useState<ReservationWizardConfirmed>(
@@ -644,6 +642,7 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
   function requestAreaChange(id: string) {
     if (!id) return;
     if (id === activeAreaId) {
+      setConfirmed((c) => ({ ...c, area: true }));
       setEditingSection(null);
       setPendingAreaId(null);
       setAreaChangeDialogOpen(false);
@@ -1463,6 +1462,12 @@ export function ReservationCreateWizard(props: ReservationCreateWizardProps) {
             selectableAreaIds={selectableIds}
             value={activeAreaId}
             onChange={requestAreaChange}
+          />
+          <ContinueButton
+            visible={Boolean(activeAreaId) && !confirmed.area}
+            onClick={() => {
+              if (activeAreaId) applyAreaChange(activeAreaId);
+            }}
           />
         </section>
       )}
