@@ -36,6 +36,7 @@ type ReservationRow = DbReservation & {
   decisionByName?: string;
   decisionByUserId?: string;
   decisionAt?: string;
+  activityLog?: string;
 };
 
 export function mapDbReservation(row: ReservationRow): Reservation {
@@ -64,6 +65,7 @@ export function mapDbReservation(row: ReservationRow): Reservation {
     decisionByName: row.decisionByName ?? "",
     decisionByUserId: row.decisionByUserId ?? "",
     decisionAt: row.decisionAt ?? "",
+    activityLog: row.activityLog ?? "[]",
   };
 }
 
@@ -93,6 +95,7 @@ function reservationToDbData(reservation: Reservation) {
     decisionByName: reservation.decisionByName ?? "",
     decisionByUserId: reservation.decisionByUserId ?? "",
     decisionAt: reservation.decisionAt ?? "",
+    activityLog: reservation.activityLog ?? "[]",
   };
 }
 

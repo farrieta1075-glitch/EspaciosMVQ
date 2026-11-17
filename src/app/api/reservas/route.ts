@@ -183,6 +183,7 @@ export async function POST(request: Request) {
       confirmSimilarName: parsed.data.confirmSimilarName,
       createdByAdmin: admin,
       createdByAdminActor: admin ? decisionActorFromSession(user) : undefined,
+      actor: decisionActorFromSession(user),
       estimatedAttendees: parsed.data.estimatedAttendees,
       attendeeJustificationCode: parsed.data.attendeeJustificationCode,
       attendeeJustificationNote: parsed.data.attendeeJustificationNote,

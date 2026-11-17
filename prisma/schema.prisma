@@ -112,6 +112,7 @@ model Reservation {
   decisionByName            String  @default("") @db.VarChar(256)
   decisionByUserId          String  @default("") @db.VarChar(64)
   decisionAt                String  @default("") @db.VarChar(64)
+  activityLog               String  @default("[]") @db.Text
 
   @@index([areaId])
   @@index([userId])

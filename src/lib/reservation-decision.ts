@@ -1,6 +1,8 @@
 import type {
   DecisionActor,
   Reservation,
+  ReservationActivityEntry,
+  ReservationActivityKind,
   ReservationDecision,
 } from "@/types/reservation";
 import { reservationNeedsAdminAction } from "@/types/reservation";
@@ -12,13 +14,75 @@ export function emptyReservationDecision(): {
   decisionByName: string;
   decisionByUserId: string;
   decisionAt: string;
+  activityLog: string;
 } {
   return {
     decision: "",
     decisionByName: "",
     decisionByUserId: "",
     decisionAt: "",
+    activityLog: "[]",
   };
+}
+
+export function parseReservationActivityLog(
+  raw: string | null | undefined,
+): ReservationActivityEntry[] {
+  if (!raw?.trim()) return [];
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map((item) => {
+        if (!item || typeof item !== "object") return null;
+        const row = item as Partial<ReservationActivityEntry>;
+        const kind = row.kind;
+        if (
+          kind !== "REQUESTED" &&
+          kind !== "MODIFIED" &&
+          kind !== "CANCELLED"
+        ) {
+          return null;
+        }
+        const name = String(row.name ?? "").trim();
+        const at = String(row.at ?? "").trim();
+        if (!name || !at) return null;
+        return {
+          kind,
+          name,
+          userId: String(row.userId ?? ""),
+          at,
+        };
+      })
+      .filter((item): item is ReservationActivityEntry => item !== null);
+  } catch {
+    return [];
+  }
+}
+
+export function appendReservationActivity(
+  reservation: Reservation,
+  kind: ReservationActivityKind,
+  actor?: DecisionActor,
+): Reservation {
+  const name = actor?.name?.trim() || "Usuario";
+  const entries = parseReservationActivityLog(reservation.activityLog);
+  entries.push({
+    kind,
+    name,
+    userId: actor?.userId?.trim() ?? "",
+    at: new Date().toISOString(),
+  });
+  return {
+    ...reservation,
+    activityLog: JSON.stringify(entries),
+  };
+}
+
+export function activityKindLabel(kind: ReservationActivityKind): string {
+  if (kind === "REQUESTED") return "Solicitó";
+  if (kind === "MODIFIED") return "Modificó";
+  return "Canceló";
 }
 
 export function stampReservationDecision(

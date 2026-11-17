@@ -1,10 +1,23 @@
 import { UserRound } from "lucide-react";
 import {
+  activityKindLabel,
   authorizationVisual,
   formatAuthorizationWhen,
+  parseReservationActivityLog,
 } from "@/lib/reservation-decision";
 import type { Reservation } from "@/types/reservation";
 import { cn } from "@/lib/utils";
+
+function PersonIcon({ className }: { className?: string }) {
+  return (
+    <UserRound
+      className={className}
+      fill="currentColor"
+      strokeWidth={1.25}
+      aria-hidden
+    />
+  );
+}
 
 export function ReservationAuthorizationMark({
   reservation,
@@ -22,17 +35,13 @@ export function ReservationAuthorizationMark({
     visual === "pending" ? "" : reservation.decisionByName.trim() || "";
 
   return (
-    <div className="flex w-[4.75rem] shrink-0 flex-col items-center gap-0.5 text-center">
-      <UserRound className={cn("h-5 w-5", color)} aria-hidden />
+    <div className={cn("flex items-center gap-1", color)}>
+      <PersonIcon className="h-3.5 w-3.5 shrink-0" />
       {name ? (
-        <span className="max-w-full truncate text-[10px] leading-tight text-foreground">
+        <span className="max-w-[6.5rem] truncate text-[10px] leading-tight text-foreground">
           {name}
         </span>
-      ) : (
-        <span className="text-[10px] leading-tight text-muted-foreground">
-          {visual === "pending" ? "Pendiente" : ""}
-        </span>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -63,7 +72,7 @@ export function ReservationAuthorizationDetail({
       {visual !== "pending" && reservation.decisionByName.trim() ? (
         <>
           <span className="text-muted-foreground">/</span>
-          <UserRound className={cn("h-4 w-4", color)} aria-hidden />
+          <PersonIcon className={cn("h-3.5 w-3.5", color)} />
           <span>{reservation.decisionByName.trim()}</span>
         </>
       ) : null}
@@ -74,5 +83,33 @@ export function ReservationAuthorizationDetail({
         </>
       ) : null}
     </p>
+  );
+}
+
+export function ReservationActivityLines({
+  reservation,
+}: {
+  reservation: Reservation;
+}) {
+  const entries = parseReservationActivityLog(reservation.activityLog);
+  if (entries.length === 0) return null;
+
+  return (
+    <div className="space-y-1 text-sm">
+      {entries.map((entry, index) => (
+        <p
+          key={`${entry.kind}-${entry.at}-${index}`}
+          className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5"
+        >
+          <span className="text-muted-foreground">
+            {activityKindLabel(entry.kind)}:
+          </span>
+          <PersonIcon className="h-3.5 w-3.5 text-muted-foreground" />
+          <span>{entry.name}</span>
+          <span className="text-muted-foreground">/</span>
+          <span>{formatAuthorizationWhen(entry.at)}</span>
+        </p>
+      ))}
+    </div>
   );
 }

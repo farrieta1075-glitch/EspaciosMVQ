@@ -67,6 +67,7 @@ const reservationRowSchema = z.object({
   decisionByName: z.string().optional().default(""),
   decisionByUserId: z.string().optional().default(""),
   decisionAt: z.string().optional().default(""),
+  activityLog: z.string().optional().default("[]"),
 });
 
 export const parseSpaceIds = parseSpaceIdsSql;
@@ -100,6 +101,7 @@ function mapParsedRowToReservation(parsed: ParsedReservationRow): Reservation {
     decisionByName: parsed.decisionByName ?? "",
     decisionByUserId: parsed.decisionByUserId ?? "",
     decisionAt: parsed.decisionAt ?? "",
+    activityLog: parsed.activityLog ?? "[]",
   };
 }
 
@@ -131,6 +133,7 @@ export function reservationToRow(reservation: Reservation): string[] {
     reservation.decisionByName ?? "",
     reservation.decisionByUserId ?? "",
     reservation.decisionAt ?? "",
+    reservation.activityLog ?? "[]",
   ];
 }
 

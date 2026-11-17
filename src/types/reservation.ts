@@ -4,9 +4,18 @@ export type PendingAction = "" | "UPDATE" | "CANCEL";
 
 export type ReservationDecision = "" | "APPROVED" | "REJECTED";
 
+export type ReservationActivityKind = "REQUESTED" | "MODIFIED" | "CANCELLED";
+
 export interface DecisionActor {
   userId?: string | null;
   name?: string | null;
+}
+
+export interface ReservationActivityEntry {
+  kind: ReservationActivityKind;
+  name: string;
+  userId: string;
+  at: string;
 }
 
 export interface Reservation {
@@ -36,6 +45,8 @@ export interface Reservation {
   decisionByName: string;
   decisionByUserId: string;
   decisionAt: string;
+  /** Historial JSON de quién solicitó, modificó o canceló. */
+  activityLog: string;
 }
 
 export interface PendingUpdatePayload {
@@ -134,6 +145,7 @@ export interface CreateReservationInput {
   confirmSimilarName?: boolean;
   createdByAdmin?: boolean;
   createdByAdminActor?: DecisionActor;
+  actor?: DecisionActor;
   estimatedAttendees?: number;
   attendeeJustificationCode?: string;
   attendeeJustificationNote?: string;
@@ -186,6 +198,7 @@ export interface UpdateReservationInput {
   resources: { resourceId: string; quantity: number }[];
   confirmSimilarName?: boolean;
   requestedByAdmin?: boolean;
+  actor?: DecisionActor;
   estimatedAttendees?: number;
   attendeeJustificationCode?: string;
   attendeeJustificationNote?: string;

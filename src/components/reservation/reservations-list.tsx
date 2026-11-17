@@ -17,6 +17,7 @@ import type { Area } from "@/types/area";
 import type { SessionUser } from "@/types/user";
 import { AreaTag } from "@/components/calendar/area-tag";
 import {
+  ReservationActivityLines,
   ReservationAuthorizationDetail,
   ReservationAuthorizationMark,
 } from "@/components/reservation/reservation-authorization-mark";
@@ -267,16 +268,17 @@ export function ReservationsList({
               </div>
             )}
           </div>
-          {isAdmin ? (
-            <ReservationAuthorizationMark reservation={reservation} />
-          ) : (
+          <div className="flex shrink-0 flex-col items-end gap-1">
             <Badge
               variant={statusVariant(reservation)}
-              className="shrink-0 text-[10px] sm:text-xs"
+              className="text-[10px] sm:text-xs"
             >
               {statusLabel(reservation)}
             </Badge>
-          )}
+            {isAdmin ? (
+              <ReservationAuthorizationMark reservation={reservation} />
+            ) : null}
+          </div>
         </button>
 
         {expanded && (
@@ -325,7 +327,10 @@ export function ReservationsList({
                 </p>
               )}
               {isAdmin ? (
-                <ReservationAuthorizationDetail reservation={reservation} />
+                <>
+                  <ReservationActivityLines reservation={reservation} />
+                  <ReservationAuthorizationDetail reservation={reservation} />
+                </>
               ) : null}
             </div>
 

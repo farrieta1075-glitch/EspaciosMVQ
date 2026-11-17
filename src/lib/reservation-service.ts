@@ -35,6 +35,7 @@ import { getAllResources } from "@/lib/sheets/resources";
 import { getAllAreas } from "@/lib/sheets/areas";
 import { isAppDataOnSql } from "@/lib/db/config";
 import {
+  appendReservationActivity,
   emptyReservationDecision,
   stampReservationDecision,
 } from "@/lib/reservation-decision";
@@ -341,13 +342,17 @@ export async function createReservation(
       sendEventReminder: input.sendEventReminder !== false,
       ...emptyReservationDecision(),
     };
-    const toInsert = input.createdByAdmin
-      ? stampReservationDecision(
-          reservation,
-          input.createdByAdminActor,
-          "APPROVED",
-        )
-      : reservation;
+    const toInsert = appendReservationActivity(
+      input.createdByAdmin
+        ? stampReservationDecision(
+            reservation,
+            input.createdByAdminActor ?? input.actor,
+            "APPROVED",
+          )
+        : reservation,
+      "REQUESTED",
+      input.actor ?? input.createdByAdminActor,
+    );
 
     await insertReservation({ ...toInsert, spaceIds: input.spaceIds });
 
@@ -554,6 +559,7 @@ export async function getReservationDetail(
 export async function cancelReservation(
   id: string,
   requestedByAdmin = true,
+  actor?: DecisionActor,
 ): Promise<{ pending: boolean }> {
   const reservation = await getReservationById(id);
   if (!reservation || reservation.status === "CANCELLED") {
@@ -561,13 +567,19 @@ export async function cancelReservation(
   }
 
   if (requestedByAdmin) {
-    await updateReservationRecord({
-      ...reservation,
-      status: "CANCELLED",
-      pendingAction: "",
-      pendingPayload: "",
-      approvalToken: "",
-    });
+    await updateReservationRecord(
+      appendReservationActivity(
+        {
+          ...reservation,
+          status: "CANCELLED",
+          pendingAction: "",
+          pendingPayload: "",
+          approvalToken: "",
+        },
+        "CANCELLED",
+        actor,
+      ),
+    );
     return { pending: false };
   }
 
@@ -577,13 +589,19 @@ export async function cancelReservation(
     );
     const batch = await getPendingCreateBatchMembers(reservation);
     for (const item of batch) {
-      await updateReservationRecord({
-        ...item,
-        status: "CANCELLED",
-        pendingAction: "",
-        pendingPayload: "",
-        approvalToken: "",
-      });
+      await updateReservationRecord(
+        appendReservationActivity(
+          {
+            ...item,
+            status: "CANCELLED",
+            pendingAction: "",
+            pendingPayload: "",
+            approvalToken: "",
+          },
+          "CANCELLED",
+          actor,
+        ),
+      );
     }
     const anchor = batch[0] ?? reservation;
     await notifyAdminsReservationApprovalNeeded(anchor, {
@@ -593,12 +611,16 @@ export async function cancelReservation(
     return { pending: false };
   }
 
-  const updated: Reservation = {
-    ...reservation,
-    pendingAction: "CANCEL",
-    pendingPayload: "",
-    approvalToken: createApprovalToken(),
-  };
+  const updated: Reservation = appendReservationActivity(
+    {
+      ...reservation,
+      pendingAction: "CANCEL",
+      pendingPayload: "",
+      approvalToken: createApprovalToken(),
+    },
+    "CANCELLED",
+    actor,
+  );
   await updateReservationRecord(updated);
   await notifyAdminsReservationApprovalNeeded(updated, { alertKind: "cancel" });
   return { pending: true };
@@ -688,18 +710,23 @@ export async function updateReservation(
       attendeeJustificationNote: input.attendeeJustificationNote,
     };
 
-    const updated: Reservation = {
-      ...existing,
-      pendingAction: "UPDATE",
-      pendingPayload: JSON.stringify(payload),
-      approvalToken: createApprovalToken(),
-    };
+    const updated: Reservation = appendReservationActivity(
+      {
+        ...existing,
+        pendingAction: "UPDATE",
+        pendingPayload: JSON.stringify(payload),
+        approvalToken: createApprovalToken(),
+      },
+      "MODIFIED",
+      input.actor,
+    );
     await updateReservationRecord(updated);
     await notifyAdminsReservationApprovalNeeded(updated, { alertKind: "update" });
     return { pending: true };
   }
 
-  const updated: Reservation = {
+  const updated: Reservation = appendReservationActivity(
+    {
     ...existing,
     eventName,
     eventDescription: input.eventDescription?.trim() ?? "",
@@ -717,7 +744,10 @@ export async function updateReservation(
     attendeeJustificationNote:
       input.attendeeJustificationNote?.trim() ??
       existing.attendeeJustificationNote,
-  };
+    },
+    "MODIFIED",
+    input.actor,
+  );
 
   const ok = await updateReservationRecord(updated);
   if (!ok) throw new Error("No se pudo actualizar la reserva.");

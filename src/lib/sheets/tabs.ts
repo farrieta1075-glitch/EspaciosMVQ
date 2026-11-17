@@ -91,6 +91,7 @@ export const SHEET_HEADERS: Record<SheetTab, string[]> = {
     "decisionByName",
     "decisionByUserId",
     "decisionAt",
+    "activityLog",
   ],
   ReservaRecursos: ["reservationId", "resourceId", "quantity"],
   EventoHistorico: ["eventName", "areaId", "count", "lastUsedAt"],

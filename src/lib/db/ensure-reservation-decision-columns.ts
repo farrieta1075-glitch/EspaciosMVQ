@@ -13,6 +13,7 @@ export function ensureReservationDecisionColumns(
         `ALTER TABLE "Reservations" ADD COLUMN IF NOT EXISTS "decisionByName" VARCHAR(256) NOT NULL DEFAULT ''`,
         `ALTER TABLE "Reservations" ADD COLUMN IF NOT EXISTS "decisionByUserId" VARCHAR(64) NOT NULL DEFAULT ''`,
         `ALTER TABLE "Reservations" ADD COLUMN IF NOT EXISTS "decisionAt" VARCHAR(64) NOT NULL DEFAULT ''`,
+        `ALTER TABLE "Reservations" ADD COLUMN IF NOT EXISTS "activityLog" TEXT NOT NULL DEFAULT '[]'`,
       ];
       for (const sql of statements) {
         await prisma.$executeRawUnsafe(sql);

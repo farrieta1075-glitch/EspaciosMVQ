@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/lib/auth/index";
 import { isAdmin } from "@/lib/auth/permissions";
+import { decisionActorFromSession } from "@/lib/reservation-decision";
 import {
   canAccessReservation,
   canCancelReservation,
@@ -123,6 +124,7 @@ export async function PATCH(
       estimatedAttendees: parsed.data.estimatedAttendees,
       attendeeJustificationCode: parsed.data.attendeeJustificationCode,
       attendeeJustificationNote: parsed.data.attendeeJustificationNote,
+      actor: decisionActorFromSession(session.user),
     });
 
     const detail = await getReservationDetail(id);
@@ -187,7 +189,11 @@ export async function DELETE(
   }
 
   const admin = isAdmin(session.user);
-  const result = await cancelReservation(id, admin);
+  const result = await cancelReservation(
+    id,
+    admin,
+    decisionActorFromSession(session.user),
+  );
   if (!admin) {
     const { recordGeneralUserActivity } = await import("@/lib/activity-log");
     await recordGeneralUserActivity({
